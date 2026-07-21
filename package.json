@@ -21,7 +21,8 @@
     "db:generate": "npm run generate --workspace=@repo/database",
     "db:migrate": "npm run migrate --workspace=@repo/database",
     "db:studio": "npm run studio --workspace=@repo/database",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "postinstall": "npm run db:generate"
   },
   "devDependencies": {
     "turbo": "^2.3.0",
