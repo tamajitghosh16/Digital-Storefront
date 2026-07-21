@@ -1,0 +1,20 @@
+{
+  "name": "@repo/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./server": "./src/server.ts",
+    "./client": "./src/client.ts",
+    "./roles": "./src/roles.ts",
+    "./middleware": "./src/middleware.ts"
+  },
+  "dependencies": {
+    "@repo/database": "*",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.47.0"
+  },
+  "peerDependencies": {
+    "next": "^16.0.0"
+  }
+}

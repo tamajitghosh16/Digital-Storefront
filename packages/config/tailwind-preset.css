@@ -1,0 +1,153 @@
+/* Shared design tokens — imported by apps/web and apps/admin globals.css
+   via `@import "@repo/config/tailwind-preset.css";` */
+
+/* Class-based dark mode (driven by next-themes' `attribute="class"` on
+   <html> in apps/web) instead of Tailwind v4's default prefers-color-scheme
+   variant — lets the toggle override the OS preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Brand */
+  --color-brand-navy: #1b2a4a;
+  --color-brand-navy-50: #eef1f6;
+  --color-brand-navy-100: #dde3ec;
+  --color-brand-accent: #c0392b;
+  --color-brand-accent-50: #fbecea;
+  --color-brand-slate: #34495e;
+  --color-brand-cream: #f6f3ec;
+
+  /* Mode-invariant brand fills — for spots that paint a solid navy/accent
+     block with white text on top (hero bands, primary buttons, selected
+     chips). `--color-brand-navy`/`--color-brand-accent` themselves get
+     lightened in `.dark` below so they stay legible used as *text* on a
+     dark page background — but that same lightening would wreck contrast
+     for white text sitting on a navy/accent fill, so those spots read
+     from these fixed tokens instead. */
+  --color-brand-navy-solid: #1b2a4a;
+  --color-brand-accent-solid: #c0392b;
+
+  /* Semantic surface/text tokens — hand-picked so a warm paper background
+     (not pure white) reads as a bookshop, not a generic SaaS app. */
+  --color-background: #fdfcfa;
+  --color-foreground: #1a2233;
+  --color-muted: #f3f0e8;
+  --color-muted-foreground: #6b7280;
+  --color-border: #e7e2d5;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a2233;
+  --color-ring: #1b2a4a;
+
+  /* Fonts — variables populated by next/font in apps/web/app/layout.tsx;
+     the fallback stacks here keep admin (which doesn't load next/font the
+     same way) and any pre-hydration paint sane. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-fraunces), "Iowan Old Style", Georgia, serif;
+
+  /* Accordion (packages/ui/src/components/accordion.tsx) open/close animation */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  /* Overlay + sheet (packages/ui/src/components/sheet.tsx) open/close animation */
+  --animate-fade-in: fade-in 0.2s ease-out;
+  --animate-fade-out: fade-out 0.2s ease-in;
+  --animate-slide-in-left: slide-in-left 0.25s ease-out;
+  --animate-slide-out-left: slide-out-left 0.2s ease-in;
+  --animate-slide-in-right: slide-in-right 0.25s ease-out;
+  --animate-slide-out-right: slide-out-right 0.2s ease-in;
+}
+
+/* Dark-mode token overrides — same custom property names, re-pointed to a
+   warm charcoal palette so it still reads as a bookshop at night rather
+   than a generic dark-mode gray. Only the tokens actually referenced by
+   `bg-*`/`text-*`/`border-*` utility classes across the app need values
+   here; unlisted @theme tokens (fonts, animations) don't change by mode. */
+.dark {
+  --color-brand-navy: #90a8d6;
+  --color-brand-navy-50: #1c2333;
+  --color-brand-navy-100: #262f45;
+  --color-brand-accent: #e2685a;
+  --color-brand-accent-50: #37211e;
+  --color-brand-slate: #9aa7b8;
+  --color-brand-cream: #26221b;
+
+  --color-background: #13151d;
+  --color-foreground: #eae6da;
+  --color-muted: #1d212c;
+  --color-muted-foreground: #97a0af;
+  --color-border: #2a2f3d;
+  --color-card: #191c26;
+  --color-card-foreground: #eae6da;
+  --color-ring: #90a8d6;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-out-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-out-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}

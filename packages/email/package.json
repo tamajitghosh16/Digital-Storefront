@@ -1,0 +1,12 @@
+{
+  "name": "@repo/email",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "dependencies": {
+    "resend": "^4.0.0",
+    "@react-email/components": "^0.0.31",
+    "react": "^19.0.0"
+  }
+}

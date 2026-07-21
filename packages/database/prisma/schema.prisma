@@ -1,0 +1,494 @@
+// Digital Storefront — Shashibhushan's New School Book Press
+// Prisma schema — mirrors the Data Model in the Technical Design Document
+// (Section 3.2) and the BRD's Data Model Overview (Section 7) one-to-one.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Connection URLs moved to prisma.config.ts (Prisma 7) — see that file
+// for the CLI/migrate connection and src/client.ts for the runtime adapter.
+datasource db {
+  provider = "postgresql"
+}
+
+// ────────────────────────────────────────────────────────────
+// Enums
+// ────────────────────────────────────────────────────────────
+
+enum Role {
+  GUEST
+  READER
+  SELF_PUB_AUTHOR
+  SUPPORT
+  EDITOR
+  OWNER
+}
+
+enum ProductType {
+  PHYSICAL_BOOK
+  EBOOK
+  SERVICE_PACKAGE
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  READY_FOR_DOWNLOAD
+  CANCELLED
+  REFUNDED
+}
+
+enum FulfillmentType {
+  SHIP
+  DIGITAL
+  SERVICE
+}
+
+enum ProjectStatus {
+  SUBMITTED
+  IN_REVIEW
+  IN_PRODUCTION
+  PROOF_READY
+  PUBLISHED
+  REJECTED
+}
+
+enum ServiceRequestStatus {
+  SUBMITTED
+  IN_PROGRESS
+  DELIVERED
+  CANCELLED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+}
+
+enum PaymentStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  UPI
+  NETBANKING
+  WALLET
+  OTHER
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum FileAssetKind {
+  MANUSCRIPT
+  COVER_IMAGE
+  PROOF
+  EBOOK_FILE
+  SOURCE_FILE
+  DELIVERY_FILE
+}
+
+enum NavLocation {
+  HEADER
+  FOOTER
+}
+
+// ────────────────────────────────────────────────────────────
+// Core models
+// ────────────────────────────────────────────────────────────
+
+/// Mirrors Supabase's auth.users via a 1:1 synced row (id = auth.users.id).
+/// A Postgres trigger (see prisma/sql/sync_user.sql, applied as a migration)
+/// inserts/updates this row whenever auth.users changes.
+model User {
+  id          String   @id @db.Uuid
+  name        String?
+  email       String   @unique
+  role        Role     @default(READER)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  addresses         Address[]
+  orders            Order[]
+  selfPubProjects   SelfPublishingProject[]
+  serviceRequests   ServiceRequest[]
+  reviews           Review[]
+  notifications     Notification[]
+  auditLogEntries   AuditLog[]
+
+  @@map("users")
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label      String? // "Home", "Office", ...
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String   @default("IN")
+  phone      String?
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@map("addresses")
+}
+
+model Product {
+  id          String      @id @default(cuid())
+  type        ProductType
+  title       String
+  author      String
+  slug        String      @unique
+  description String?
+  priceCents  Int
+  currency    String      @default("INR")
+  coverImageUrl String?
+
+  // Physical books only
+  stockQty    Int?
+  isbn        String?
+  weightGrams Int?
+
+  // E-books only
+  formats     String[]    @default([]) // EPUB, MOBI, PDF
+  sampleUrl   String?
+
+  // Service packages only
+  turnaroundDays Int?
+
+  // Set if this listing originated from a published self-publishing project
+  sourceProjectId String?               @unique
+  sourceProject   SelfPublishingProject? @relation(fields: [sourceProjectId], references: [id])
+
+  // Admin-controlled SEO/social metadata, rendered on the web product page.
+  metaTitle       String?
+  metaDescription String?
+  ogImageUrl      String?
+
+  isPublished Boolean   @default(true)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  fileAssets  FileAsset[]
+  orderItems  OrderItem[]
+  reviews     Review[]
+
+  @@index([type])
+  @@index([slug])
+  @@map("products")
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  userId         String?     @db.Uuid // null for guest checkout
+  user           User?       @relation(fields: [userId], references: [id])
+  guestEmail     String?
+  status         OrderStatus @default(PENDING)
+
+  subtotalCents  Int
+  taxCents       Int         @default(0)
+  shippingCents  Int         @default(0)
+  totalCents     Int
+
+  shippingAddressId String?
+  billingAddressId  String?
+
+  trackingNumber String?
+  carrier        String?
+
+  items          OrderItem[]
+  payment        Payment?
+
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String          @id @default(cuid())
+  orderId         String
+  order           Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product         @relation(fields: [productId], references: [id])
+  quantity        Int             @default(1)
+  unitPriceCents  Int
+  fulfillmentType FulfillmentType
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model SelfPublishingProject {
+  id               String        @id @default(cuid())
+  authorId         String        @db.Uuid
+  author           User          @relation(fields: [authorId], references: [id])
+  bookTitle        String
+  synopsis         String?
+  selectedPackage  String        // "Starter" | "Guided" | "Full-Service"
+  addOns           String[]      @default([])
+  status           ProjectStatus @default(SUBMITTED)
+  targetPriceCents Int?
+  royaltyRateBps   Int?          // basis points, e.g. 7000 = 70%
+
+  linkedProduct    Product?
+
+  fileAssets       FileAsset[]
+  royalties        Royalty[]
+  payments         Payment[]
+
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([authorId])
+  @@index([status])
+  @@map("self_publishing_projects")
+}
+
+model ServiceRequest {
+  id            String                @id @default(cuid())
+  customerId    String                @db.Uuid
+  customer      User                  @relation(fields: [customerId], references: [id])
+  serviceType   String                // "conversion-only", "formatting", ...
+  targetFormats String[]              @default([])
+  status        ServiceRequestStatus  @default(SUBMITTED)
+  etaDate       DateTime?
+
+  fileAssets    FileAsset[]
+
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([customerId])
+  @@index([status])
+  @@map("service_requests")
+}
+
+model Royalty {
+  id             String       @id @default(cuid())
+  projectId      String
+  project        SelfPublishingProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  salesPeriodStart DateTime
+  salesPeriodEnd   DateTime
+  grossSalesCents  Int
+  royaltyRateBps   Int
+  amountOwedCents  Int
+  payoutStatus     PayoutStatus @default(PENDING)
+  payoutRef        String?      // RazorpayX payout id
+  createdAt        DateTime     @default(now())
+
+  @@index([projectId])
+  @@map("royalties")
+}
+
+model Review {
+  id               String            @id @default(cuid())
+  productId        String
+  product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId           String            @db.Uuid
+  user             User              @relation(fields: [userId], references: [id])
+  rating           Int               // 1-5
+  title            String?
+  body             String?
+  moderationStatus ModerationStatus  @default(PENDING)
+  createdAt        DateTime          @default(now())
+
+  @@index([productId])
+  @@unique([productId, userId]) // one review per verified purchaser
+  @@map("reviews")
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String?       @unique
+  order             Order?        @relation(fields: [orderId], references: [id])
+  projectId         String?
+  project           SelfPublishingProject? @relation(fields: [projectId], references: [id])
+
+  gatewayOrderId    String?       // Razorpay order_id
+  gatewayPaymentId  String?       // Razorpay payment_id
+  gatewaySignature  String?
+
+  amountCents       Int
+  currency          String        @default("INR")
+  status            PaymentStatus @default(CREATED)
+  method            PaymentMethod?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([gatewayOrderId])
+  @@map("payments")
+}
+
+/// Manuscripts, cover images, proofs, e-book files, and service deliverables.
+/// Physically stored in Vercel Blob; this row is the metadata + entitlement
+/// record used to mint short-lived signed download URLs.
+model FileAsset {
+  id                String        @id @default(cuid())
+  kind              FileAssetKind
+  blobPath          String        // path within Vercel Blob
+  fileName          String
+  mimeType          String
+  sizeBytes         Int
+  malwareScanStatus String        @default("PENDING") // PENDING | CLEAN | INFECTED
+  downloadCount     Int           @default(0)
+  maxDownloads      Int?          // FR-9.2 device/redownload limit
+
+  productId         String?
+  product           Product?      @relation(fields: [productId], references: [id])
+  selfPubProjectId  String?
+  selfPubProject    SelfPublishingProject? @relation(fields: [selfPubProjectId], references: [id])
+  serviceRequestId  String?
+  serviceRequest    ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
+
+  createdAt         DateTime      @default(now())
+
+  @@index([productId])
+  @@index([selfPubProjectId])
+  @@index([serviceRequestId])
+  @@map("file_assets")
+}
+
+/// FR-12: order/shipping/project-status/submission notifications, fanned out
+/// to email (Resend) by an Inngest function; this row is the in-app record.
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // "order.confirmed" | "project.status_changed" | ...
+  title     String
+  body      String?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+/// FR-11.6 / NFR-9: every admin mutation on orders, royalties, and content
+/// is recorded here for audit purposes.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String   @db.Uuid
+  actor     User     @relation(fields: [actorId], references: [id])
+  action    String   // "order.status_changed", "product.updated", ...
+  entity    String   // "Order", "Product", "SelfPublishingProject", ...
+  entityId  String
+  diff      Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@map("audit_logs")
+}
+
+// ────────────────────────────────────────────────────────────
+// CMS: site-wide content controlled entirely from apps/admin and
+// rendered read-only by apps/web. No runtime call between the two
+// apps — admin writes these rows, web reads them straight from
+// Postgres, same as it does for Product.
+// ────────────────────────────────────────────────────────────
+
+/// Singleton row (fixed id, see @repo/database's SITE_SETTINGS_ID) holding
+/// site-wide branding, default SEO metadata, and contact/social info that
+/// apps/web renders in its root layout (<head> metadata, header, footer).
+model SiteSettings {
+  id              String   @id @default(cuid())
+  siteName        String   @default("Shashibhushan's New School Book Press")
+  tagline         String?
+  metaTitle       String?
+  metaDescription String?
+  ogImageUrl      String?
+  logoUrl         String?
+  contactEmail    String?
+  contactPhone    String?
+  addressLine     String?
+  socialLinks     Json? // { "twitter": "...", "facebook": "...", "instagram": "..." }
+  updatedAt       DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
+/// Header and footer navigation, fully admin-managed (replaces the
+/// hardcoded <nav> links that used to live in apps/web/app/layout.tsx).
+model NavLink {
+  id        String      @id @default(cuid())
+  label     String
+  href      String
+  location  NavLocation
+  order     Int         @default(0)
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([location])
+  @@map("nav_links")
+}
+
+/// Homepage hero/promo banners.
+model Banner {
+  id        String   @id @default(cuid())
+  title     String
+  subtitle  String?
+  imageUrl  String?
+  ctaText   String?
+  ctaHref   String?
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("banners")
+}
+
+/// Storefront FAQ entries.
+model Faq {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("faqs")
+}
+
+/// Customer/author testimonials shown on the homepage.
+model Testimonial {
+  id         String   @id @default(cuid())
+  authorName String
+  quote      String
+  rating     Int? // 1-5
+  imageUrl   String?
+  order      Int      @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("testimonials")
+}
