@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Star, Truck, Download, PenLine, BookOpen, Tablet, Sparkles, PenSquare, ArrowRight } from "lucide-react";
+import { Star, BookOpen, Tablet, Target, PenLine, ArrowRight } from "lucide-react";
 import { prisma } from "@repo/database";
 import { Button } from "@repo/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@repo/ui/accordion";
@@ -8,7 +8,18 @@ import { ProductCard } from "@/components/product-card";
 import { withFallback } from "@/lib/safe-fetch";
 import { SAMPLE_PRODUCTS, SAMPLE_BANNERS, SAMPLE_TESTIMONIALS, SAMPLE_FAQS, SAMPLE_CATEGORIES } from "@/lib/sample-data";
 
-const categoryIcons = { "Physical Books": BookOpen, "E-Books": Tablet, "Publishing Services": Sparkles, "Self-Publishing": PenSquare } as const;
+const categoryStyle = {
+  "Physical Books": { Icon: BookOpen, badge: "bg-brand-navy-50 text-brand-navy", hover: "group-hover:bg-brand-navy-solid" },
+  "E-Books": { Icon: Tablet, badge: "bg-brand-accent-50 text-brand-accent", hover: "group-hover:bg-brand-accent-solid" },
+  "Publishing Services": { Icon: Target, badge: "bg-amber-500/10 text-amber-600", hover: "group-hover:bg-amber-500" },
+  "Self-Publishing": { Icon: PenLine, badge: "bg-emerald-600/10 text-emerald-700", hover: "group-hover:bg-emerald-600" },
+} as const;
+
+const trustItems = [
+  { title: "Nationwide shipping", body: "Physical editions packed and shipped across India." },
+  { title: "Instant e-book delivery", body: "Read on any device the moment your order is placed." },
+  { title: "Guided self-publishing", body: "From manuscript to marketplace, with royalties tracked for you." },
+];
 
 // FR-1.1: homepage featuring bestsellers, new releases, and promoted services.
 // Hero/promo banners, testimonials, and FAQs are all admin-controlled
@@ -32,30 +43,42 @@ export default async function HomePage() {
   const [heroBanner, ...restBanners] = banners;
 
   return (
-    <div>
+    <div className="bg-brand-cream dark:bg-background">
       <Hero banner={heroBanner} />
 
-      <section className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
+      <section className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
         <div className="flex items-baseline justify-between">
           <h2 className="font-serif text-2xl font-medium text-brand-navy sm:text-3xl">Explore the storefront</h2>
         </div>
-        <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-4">
           {SAMPLE_CATEGORIES.map((cat) => {
-            const Icon = categoryIcons[cat.title as keyof typeof categoryIcons];
+            const { Icon, badge, hover } = categoryStyle[cat.title as keyof typeof categoryStyle];
             return (
               <Link
                 key={cat.title}
                 href={cat.href}
-                className="group rounded-2xl border border-border bg-card p-5 text-center transition-all hover:-translate-y-0.5 hover:border-brand-navy/40 hover:shadow-md"
+                className="group rounded-xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:shadow-md"
               >
-                <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-brand-navy-50 transition-colors group-hover:bg-brand-navy-solid group-hover:text-white">
-                  <Icon className="h-5 w-5 text-brand-navy transition-colors group-hover:text-white" strokeWidth={1.75} />
+                <div className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors group-hover:text-white ${badge} ${hover}`}>
+                  <Icon className="h-5 w-5" strokeWidth={1.75} />
                 </div>
-                <p className="mt-3 text-sm font-semibold text-foreground">{cat.title}</p>
+                <p className="mt-3.5 text-sm font-semibold text-foreground">{cat.title}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{cat.body}</p>
               </Link>
             );
           })}
+        </div>
+
+        <div className="mt-12 grid gap-7 border-t border-border pt-10 sm:grid-cols-3">
+          {trustItems.map((item) => (
+            <div key={item.title} className="flex items-start gap-3.5">
+              <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{item.body}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -63,7 +86,7 @@ export default async function HomePage() {
         <section className="mx-auto max-w-6xl px-5 pb-14 sm:px-8">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {restBanners.map((banner) => (
-              <div key={banner.id} className="rounded-xl border border-border bg-brand-cream/60 p-5">
+              <div key={banner.id} className="rounded-xl border border-border bg-card p-5">
                 <p className="font-serif text-base font-medium text-brand-navy">{banner.title}</p>
                 {banner.subtitle && <p className="mt-1 text-sm text-muted-foreground">{banner.subtitle}</p>}
                 {banner.ctaText && banner.ctaHref && (
@@ -76,8 +99,6 @@ export default async function HomePage() {
           </div>
         </section>
       )}
-
-      <ValueProps />
 
       <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
         <div className="flex items-baseline justify-between">
@@ -99,20 +120,20 @@ export default async function HomePage() {
       </section>
 
       {testimonials.length > 0 && (
-        <section className="border-t border-border bg-brand-cream/50 py-16">
+        <section className="border-t border-border bg-muted py-16">
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
             <h2 className="font-serif text-2xl font-medium text-brand-navy sm:text-3xl">What readers say</h2>
             <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {testimonials.map((t) => (
                 <figure key={t.id} className="rounded-2xl border border-border bg-card p-6">
                   {t.rating && (
-                    <div className="flex gap-0.5 text-brand-accent">
+                    <div className="flex gap-0.5 text-amber-500">
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star key={i} className="h-3.5 w-3.5" fill={i < t.rating! ? "currentColor" : "none"} strokeWidth={1.5} />
                       ))}
                     </div>
                   )}
-                  <blockquote className="mt-3 text-sm leading-relaxed text-foreground/90">&ldquo;{t.quote}&rdquo;</blockquote>
+                  <blockquote className="mt-3 font-serif text-sm italic leading-relaxed text-foreground/90">&ldquo;{t.quote}&rdquo;</blockquote>
                   <figcaption className="mt-4 flex items-center gap-3">
                     {t.imageUrl ? (
                       <Image src={t.imageUrl} alt={t.authorName} width={32} height={32} className="h-8 w-8 rounded-full object-cover" />
@@ -156,56 +177,25 @@ function Hero({ banner }: { banner?: { title: string; subtitle: string | null; c
   const ctaHref = banner?.ctaHref ?? "/self-publishing";
 
   return (
-    <section className="relative overflow-hidden border-b border-border bg-brand-navy-solid">
-      <div
-        className="absolute inset-0 opacity-[0.07]"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(to bottom, rgba(255,255,255,0.9) 0, rgba(255,255,255,0.9) 1px, transparent 1px, transparent 34px)",
-          maskImage: "linear-gradient(to bottom, transparent, black 20%, black 75%, transparent)",
-          WebkitMaskImage: "linear-gradient(to bottom, transparent, black 20%, black 75%, transparent)",
-        }}
-      />
+    <section className="relative overflow-hidden bg-gradient-to-b from-[#000000] to-[#021743] text-center">
       {banner?.imageUrl && (
         <Image src={banner.imageUrl} alt="" fill priority className="object-cover opacity-25" />
       )}
-      <div className="relative mx-auto flex max-w-6xl flex-col items-start gap-6 px-5 py-20 sm:px-8 sm:py-28">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
+      <div className="relative mx-auto flex max-w-[760px] flex-col items-center gap-[22px] px-5 py-[88px] sm:px-8">
+        <p className="text-[13px] font-semibold uppercase tracking-[2.5px] text-amber-400">
           Physical Books · E-Books · Self-Publishing
         </p>
-        <h1 className="max-w-2xl font-serif text-4xl font-medium leading-[1.1] text-white sm:text-5xl">
+        <h1 className="max-w-2xl font-serif text-[38px] font-semibold leading-[1.15] text-white sm:text-[52px]">
           {title}
         </h1>
-        <p className="max-w-lg text-base text-white/70">{subtitle}</p>
-        <Button asChild size="lg" variant="accent">
+        <p className="max-w-[560px] text-[17px] leading-[1.6] text-white/85">{subtitle}</p>
+        <Button
+          asChild
+          size="lg"
+          className="mt-2 rounded-lg bg-[#6f2419] px-8 py-[15px] text-[15px] shadow-lg shadow-black/35 hover:bg-[#82301f]"
+        >
           <Link href={ctaHref}>{ctaText}</Link>
         </Button>
-      </div>
-    </section>
-  );
-}
-
-function ValueProps() {
-  const items = [
-    { Icon: Truck, title: "Nationwide shipping", body: "Physical editions packed and shipped across India." },
-    { Icon: Download, title: "Instant e-book delivery", body: "Read on any device the moment your order is placed." },
-    { Icon: PenLine, title: "Guided self-publishing", body: "From manuscript to marketplace, with royalties tracked for you." },
-  ];
-
-  return (
-    <section className="mx-auto max-w-6xl px-5 py-12 sm:px-8">
-      <div className="grid gap-6 sm:grid-cols-3">
-        {items.map(({ Icon, title, body }) => (
-          <div key={title} className="flex items-start gap-3.5">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-navy-50">
-              <Icon className="h-[18px] w-[18px] text-brand-navy" strokeWidth={1.75} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">{title}</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">{body}</p>
-            </div>
-          </div>
-        ))}
       </div>
     </section>
   );

@@ -33,14 +33,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
 
   return (
     <Link href={`/${meta.path}/${product.slug}`} className="group block">
-      <div
-        className="relative aspect-[3/4] overflow-hidden rounded-xl ring-1 ring-border"
-        style={
-          hasCoverGradient
-            ? { backgroundImage: `linear-gradient(135deg, ${product.coverFrom}, ${product.coverTo})` }
-            : undefined
-        }
-      >
+      <div className="relative aspect-[3/4] overflow-hidden rounded-lg shadow-md shadow-black/10 ring-1 ring-border">
         {product.coverImageUrl ? (
           <Image
             src={product.coverImageUrl}
@@ -49,25 +42,20 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             sizes="(min-width: 1024px) 220px, (min-width: 640px) 33vw, 45vw"
             className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           />
-        ) : (
+        ) : hasCoverGradient ? (
           <div
-            className={
-              hasCoverGradient
-                ? "flex h-full items-center justify-center"
-                : "flex h-full items-center justify-center bg-gradient-to-br from-brand-navy-50 to-brand-cream"
-            }
+            className="flex h-full items-center justify-center"
+            style={{
+              backgroundColor: product.coverFrom,
+              backgroundImage:
+                "repeating-linear-gradient(135deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 2px, transparent 2px, transparent 9px)",
+            }}
           >
-            {hasCoverGradient ? (
-              <span className="font-serif text-2xl font-semibold text-white/90">
-                {product.title
-                  .split(" ")
-                  .map((w) => w[0])
-                  .slice(0, 2)
-                  .join("")}
-              </span>
-            ) : (
-              <meta.Icon className="h-9 w-9 text-brand-navy/25" strokeWidth={1.5} />
-            )}
+            <span className="font-mono text-[10.5px] uppercase tracking-widest text-white/55">cover art</span>
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center bg-gradient-to-br from-brand-navy-50 to-brand-cream">
+            <meta.Icon className="h-9 w-9 text-brand-navy/25" strokeWidth={1.5} />
           </div>
         )}
         <Badge variant="muted" className="absolute left-2 top-2 bg-card/90 backdrop-blur">
@@ -81,23 +69,24 @@ export function ProductCard({ product }: { product: ProductCardData }) {
       </div>
       <div className="mt-3 space-y-0.5">
         {product.genre && (
-          <p className="text-[10.5px] font-semibold uppercase tracking-wide text-brand-accent">{product.genre}</p>
+          <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{product.genre}</p>
         )}
-        <p className="truncate text-sm font-medium text-foreground transition-colors group-hover:text-brand-navy">
+        <p className="truncate font-serif text-[15px] font-semibold text-foreground transition-colors group-hover:text-brand-navy">
           {product.title}
         </p>
         <p className="truncate text-xs text-muted-foreground">{product.author}</p>
-        {typeof product.rating === "number" && (
-          <div className="flex items-center gap-1 pt-0.5 text-brand-accent">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Star key={i} className="h-3 w-3" fill={i < product.rating! ? "currentColor" : "none"} strokeWidth={1.5} />
-            ))}
-            {typeof product.reviewCount === "number" && (
-              <span className="ml-1 text-[11px] text-muted-foreground">({product.reviewCount})</span>
-            )}
-          </div>
-        )}
-        <p className="pt-0.5 text-sm font-semibold text-brand-navy">₹{(product.priceCents / 100).toFixed(2)}</p>
+        <div className="flex items-center justify-between pt-0.5">
+          {typeof product.rating === "number" ? (
+            <div className="flex items-center gap-0.5 text-amber-500">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} className="h-3 w-3" fill={i < product.rating! ? "currentColor" : "none"} strokeWidth={1.5} />
+              ))}
+            </div>
+          ) : (
+            <span />
+          )}
+          <p className="font-mono text-[13px] text-muted-foreground">₹{(product.priceCents / 100).toFixed(2)}</p>
+        </div>
       </div>
     </Link>
   );

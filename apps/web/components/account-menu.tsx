@@ -29,7 +29,12 @@ export function AccountMenu({ user }: { user: AccountMenuUser | null }) {
 
   if (!user) {
     return (
-      <Button asChild variant="outline" size="sm">
+      <Button
+        asChild
+        variant="outline"
+        size="sm"
+        className="rounded-full border-brand-navy/70 px-5 font-semibold hover:bg-brand-navy hover:text-white"
+      >
         <Link href="/sign-in">Sign in</Link>
       </Button>
     );

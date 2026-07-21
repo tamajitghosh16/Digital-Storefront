@@ -23,23 +23,36 @@ export async function SiteHeader() {
   ]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
-        <div className="flex items-center gap-2">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 dark:bg-black dark:supports-[backdrop-filter]:bg-black">
+      <div className="mx-auto flex h-[76px] max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
+        <div className="flex items-center gap-2.5">
           <MobileNav
             links={links}
             catalogGroups={groupCatalogItemsByCategory()}
             siteName={settings.siteName}
             signedIn={!!user}
           />
-          <Link href="/" className="font-serif text-xl font-medium tracking-tight text-brand-navy">
-            {settings.siteName}
+          <Link href="/" className="flex items-center" aria-label={settings.siteName}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- static vector logo, no benefit from next/image optimization */}
+            <img
+              src="/logo.svg"
+              alt={settings.siteName}
+              className="h-12 w-auto dark:hidden sm:h-[52px]"
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element -- static vector logo, no benefit from next/image optimization */}
+            <img
+              src="/logo-dark.svg"
+              alt={settings.siteName}
+              className="hidden h-12 w-auto dark:block sm:h-[52px]"
+            />
           </Link>
         </div>
 
-        <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <CartIndicator />
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-0.5">
+            <ThemeToggle />
+            <CartIndicator />
+          </div>
           <AccountMenu user={user ? { name: user.name, email: user.email, role: user.role } : null} />
         </div>
       </div>

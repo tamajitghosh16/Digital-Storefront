@@ -41,7 +41,10 @@ export function MobileNav({
       </SheetTrigger>
       <SheetContent side="left" className="overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>{siteName}</SheetTitle>
+          <SheetTitle className="flex items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static vector logo, no benefit from next/image optimization */}
+            <img src="/logo.svg" alt={siteName} className="h-11 w-auto" />
+          </SheetTitle>
         </SheetHeader>
         <Separator />
         <nav className="flex flex-col gap-1">
