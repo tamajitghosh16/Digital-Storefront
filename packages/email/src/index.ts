@@ -2,7 +2,18 @@ import { Resend } from "resend";
 import { OrderConfirmation } from "./templates/OrderConfirmation";
 import { ProjectStatusChanged } from "./templates/ProjectStatusChanged";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Built lazily, not at module load — Resend's constructor throws
+// synchronously if no API key is available (env or arg), and this module is
+// imported transitively by apps/web/app/api/inngest/route.ts, which Next.js
+// imports during the build's "collect page data" step. Constructing eagerly
+// meant any build without RESEND_API_KEY set would fail outright.
+let resend: Resend | undefined;
+function getResendClient(): Resend {
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return resend;
+}
 const FROM = process.env.EMAIL_FROM ?? "Book Press <orders@example.com>";
 
 export async function sendOrderConfirmation(params: {
@@ -11,7 +22,7 @@ export async function sendOrderConfirmation(params: {
   items: { title: string; quantity: number; priceCents: number }[];
   totalCents: number;
 }) {
-  return resend.emails.send({
+  return getResendClient().emails.send({
     from: FROM,
     to: params.to,
     subject: `Order confirmed — #${params.orderId}`,
@@ -20,7 +31,7 @@ export async function sendOrderConfirmation(params: {
 }
 
 export async function sendProjectStatusChanged(params: { to: string; bookTitle: string; status: string }) {
-  return resend.emails.send({
+  return getResendClient().emails.send({
     from: FROM,
     to: params.to,
     subject: `Your project "${params.bookTitle}" is now ${params.status}`,
@@ -28,4 +39,4 @@ export async function sendProjectStatusChanged(params: { to: string; bookTitle: 
   });
 }
 
-export { resend };
+export { getResendClient };
