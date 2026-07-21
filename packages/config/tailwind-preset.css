@@ -1,6 +1,12 @@
 /* Shared design tokens — imported by apps/web and apps/admin globals.css
    via `@import "@repo/config/tailwind-preset.css";` */
 
+/* Tailwind v4's automatic source detection only walks the importing app's
+   own directory tree, so classes that appear only inside this shared
+   package (e.g. packages/ui/src/components/sheet.tsx's `fixed`) are never
+   generated unless scanned explicitly here. */
+@source "../ui/src";
+
 /* Class-based dark mode (driven by next-themes' `attribute="class"` on
    <html> in apps/web) instead of Tailwind v4's default prefers-color-scheme
    variant — lets the toggle override the OS preference. */
