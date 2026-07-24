@@ -66,7 +66,13 @@
    warm charcoal palette so it still reads as a bookshop at night rather
    than a generic dark-mode gray. Only the tokens actually referenced by
    `bg-*`/`text-*`/`border-*` utility classes across the app need values
-   here; unlisted @theme tokens (fonts, animations) don't change by mode. */
+   here; unlisted @theme tokens (fonts, animations) don't change by mode.
+
+   Surface steps (background < card < muted < border) are spaced further
+   apart in lightness than a typical dark-mode ramp, and the hue is pulled
+   off neutral/blue toward brown, so page canvas, cards, alternate-section
+   bands, and hairlines stay visually distinct instead of reading as one
+   flat black slab. */
 .dark {
   --color-brand-navy: #90a8d6;
   --color-brand-navy-50: #1c2333;
@@ -76,12 +82,12 @@
   --color-brand-slate: #9aa7b8;
   --color-brand-cream: #26221b;
 
-  --color-background: #13151d;
+  --color-background: #171410;
   --color-foreground: #eae6da;
-  --color-muted: #1d212c;
-  --color-muted-foreground: #97a0af;
-  --color-border: #2a2f3d;
-  --color-card: #191c26;
+  --color-muted: #2c2620;
+  --color-muted-foreground: #a8a096;
+  --color-border: #423826;
+  --color-card: #262019;
   --color-card-foreground: #eae6da;
   --color-ring: #90a8d6;
 }

@@ -11,7 +11,7 @@ export function CartIndicator() {
     <Link
       href="/cart"
       aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`}
-      className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
+      className="relative inline-flex h-11 w-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted"
     >
       <ShoppingBag className="h-[18px] w-[18px]" strokeWidth={1.75} />
       {count > 0 && (

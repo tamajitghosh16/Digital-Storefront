@@ -163,7 +163,7 @@ model Product {
   currency    String      @default("INR")
   coverImageUrl String?
 
-  // Physical books only
+  // Books only
   stockQty    Int?
   isbn        String?
   weightGrams Int?

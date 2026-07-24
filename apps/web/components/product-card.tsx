@@ -62,14 +62,14 @@ export function ProductCard({ product }: { product: ProductCardData }) {
           {meta.label}
         </Badge>
         {outOfStock && (
-          <div className="absolute inset-x-0 bottom-0 bg-foreground/85 py-1 text-center text-[11px] font-medium uppercase tracking-wide text-white">
+          <div className="absolute inset-x-0 bottom-0 bg-brand-navy-solid/90 py-1 text-center text-[11px] font-medium uppercase tracking-wide text-white">
             Out of stock
           </div>
         )}
       </div>
       <div className="mt-3 space-y-0.5">
         {product.genre && (
-          <p className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{product.genre}</p>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{product.genre}</p>
         )}
         <p className="truncate font-serif text-[15px] font-semibold text-foreground transition-colors group-hover:text-brand-navy">
           {product.title}

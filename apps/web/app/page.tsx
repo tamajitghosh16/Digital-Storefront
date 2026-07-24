@@ -177,7 +177,7 @@ function Hero({ banner }: { banner?: { title: string; subtitle: string | null; c
   const ctaHref = banner?.ctaHref ?? "/self-publishing";
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-[#000000] to-[#021743] text-center">
+    <section className="relative overflow-hidden bg-gradient-to-b from-[#0a0f1c] to-brand-navy-solid text-center">
       {banner?.imageUrl && (
         <Image src={banner.imageUrl} alt="" fill priority className="object-cover opacity-25" />
       )}
@@ -192,7 +192,8 @@ function Hero({ banner }: { banner?: { title: string; subtitle: string | null; c
         <Button
           asChild
           size="lg"
-          className="mt-2 rounded-lg bg-[#6f2419] px-8 py-[15px] text-[15px] shadow-lg shadow-black/35 hover:bg-[#82301f]"
+          variant="accent"
+          className="mt-2 rounded-lg px-8 py-[15px] text-[15px] shadow-lg shadow-black/35"
         >
           <Link href={ctaHref}>{ctaText}</Link>
         </Button>

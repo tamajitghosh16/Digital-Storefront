@@ -23,7 +23,7 @@ export async function SiteHeader() {
   ]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 dark:bg-black dark:supports-[backdrop-filter]:bg-black">
+    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/95 shadow-[0_1px_20px_-4px_rgba(0,0,0,0.18)] backdrop-blur supports-[backdrop-filter]:bg-background/80 dark:bg-black dark:shadow-none dark:supports-[backdrop-filter]:bg-black">
       <div className="mx-auto flex h-[76px] max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
         <div className="flex items-center gap-2.5">
           <MobileNav
@@ -33,23 +33,25 @@ export async function SiteHeader() {
             signedIn={!!user}
           />
           <Link href="/" className="flex items-center" aria-label={settings.siteName}>
+            {/* Sized by width (not height) with object-contain: under flex pressure on
+                narrow viewports this scales down without distorting the wordmark. */}
             {/* eslint-disable-next-line @next/next/no-img-element -- static vector logo, no benefit from next/image optimization */}
             <img
               src="/logo.svg"
               alt={settings.siteName}
-              className="h-12 w-auto dark:hidden sm:h-[52px]"
+              className="h-auto w-28 object-contain dark:hidden sm:w-52 lg:w-80"
             />
             {/* eslint-disable-next-line @next/next/no-img-element -- static vector logo, no benefit from next/image optimization */}
             <img
               src="/logo-dark.svg"
               alt={settings.siteName}
-              className="hidden h-12 w-auto dark:block sm:h-[52px]"
+              className="hidden h-auto w-28 object-contain dark:block sm:w-52 lg:w-80"
             />
           </Link>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-1">
             <ThemeToggle />
             <CartIndicator />
           </div>

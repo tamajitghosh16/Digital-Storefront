@@ -39,7 +39,7 @@ export const CATALOG_ITEMS: CatalogItem[] = [
     flowLabel: "Automated e-commerce",
     description:
       "Published under the Ink & Imagination sub-brand. Direct shopping-cart checkout, with 25% of every sale contributed to the Sashibhusan Chattopadhyay Memorial Trust.",
-    ctaLabel: "Browse physical books",
+    ctaLabel: "Browse Books",
     ctaHref: "/books",
   },
   {
@@ -52,7 +52,7 @@ export const CATALOG_ITEMS: CatalogItem[] = [
     flowLabel: "Automated e-commerce",
     description:
       "Published under Ink & Imagination. Direct checkout via domestic payment aggregators, with 25% of sale volume allocated to trust initiatives.",
-    ctaLabel: "Browse physical books",
+    ctaLabel: "Browse Books",
     ctaHref: "/books",
   },
   {
@@ -65,7 +65,7 @@ export const CATALOG_ITEMS: CatalogItem[] = [
     flowLabel: "Automated e-commerce",
     description:
       "Published under Ink & Imagination. Direct digital purchase, with 25% of sale volume going to the trust.",
-    ctaLabel: "Browse physical books",
+    ctaLabel: "Browse Books",
     ctaHref: "/books",
   },
   {
@@ -77,7 +77,7 @@ export const CATALOG_ITEMS: CatalogItem[] = [
     flow: "ecommerce",
     flowLabel: "Automated e-commerce",
     description: "Published under Ink & Imagination. Transactional storefront listing, with 25% of sale volume contributed to the trust.",
-    ctaLabel: "Browse physical books",
+    ctaLabel: "Browse Books",
     ctaHref: "/books",
   },
   {
@@ -88,7 +88,7 @@ export const CATALOG_ITEMS: CatalogItem[] = [
     flow: "ecommerce",
     flowLabel: "Automated e-commerce",
     description: "Online retail checkout, with 25% of sale volume pledged to the memorial trust fund.",
-    ctaLabel: "Browse physical books",
+    ctaLabel: "Browse Books",
     ctaHref: "/books",
   },
   {
@@ -99,7 +99,7 @@ export const CATALOG_ITEMS: CatalogItem[] = [
     flow: "ecommerce",
     flowLabel: "Automated e-commerce",
     description: "Physical legal stationery with integrated shipping. 25% of sale volume is pledged to the trust.",
-    ctaLabel: "Browse physical books",
+    ctaLabel: "Browse Books",
     ctaHref: "/books",
   },
   {

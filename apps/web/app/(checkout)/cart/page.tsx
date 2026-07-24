@@ -10,7 +10,7 @@ import { Badge } from "@repo/ui/badge";
 const fulfillmentLabel = { SHIP: "Physical", DIGITAL: "E-book", SERVICE: "Service" } as const;
 const fulfillmentIcon = { SHIP: BookOpen, DIGITAL: Tablet, SERVICE: Sparkles } as const;
 
-// FR-3.1: single cart containing mixed items (physical books, e-books, services).
+// FR-3.1: single cart containing mixed items (Books, e-books, services).
 export default function CartPage() {
   const { items, removeItem, updateQuantity } = useCartStore();
   const subtotal = items.reduce((sum, i) => sum + i.priceCents * i.quantity, 0);

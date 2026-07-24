@@ -34,7 +34,7 @@ export function MobileNav({
       <SheetTrigger asChild>
         <button
           aria-label="Open menu"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Menu className="h-5 w-5" strokeWidth={1.75} />
         </button>
@@ -43,7 +43,13 @@ export function MobileNav({
         <SheetHeader>
           <SheetTitle className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element -- static vector logo, no benefit from next/image optimization */}
-            <img src="/logo.svg" alt={siteName} className="h-11 w-auto" />
+            <img src="/logo.svg" alt={siteName} className="h-auto w-48 object-contain dark:hidden" />
+            {/* eslint-disable-next-line @next/next/no-img-element -- static vector logo, no benefit from next/image optimization */}
+            <img
+              src="/logo-dark.svg"
+              alt={siteName}
+              className="hidden h-auto w-48 object-contain dark:block"
+            />
           </SheetTitle>
         </SheetHeader>
         <Separator />
