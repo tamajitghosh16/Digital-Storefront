@@ -1,61 +1,82 @@
-import { Download, Library } from "lucide-react";
-import { Card, CardContent } from "@repo/ui/card";
-import { Badge } from "@repo/ui/badge";
+import type { Metadata } from "next";
+import Link from "next/link";
 import { SAMPLE_LIBRARY_ITEMS } from "@/lib/sample-data";
+import { SectionHead, buttonClass } from "@/components/primitives";
+import { BookJacket, ProductShot } from "@/components/commerce/book-jacket";
 
-// FR-8.2: instant digital delivery via the account library.
-// Real download links are minted by GET /api/library/[assetId] (signed, expiring, entitlement-checked).
-// Shows sample purchased titles so the layout can be reviewed without seeding orders.
+export const metadata: Metadata = { title: "Digital library" };
+
+// FR-8.2: instant digital delivery via the account library. Real download
+// links are minted by GET /api/library/[assetId] (signed, expiring,
+// entitlement-checked); the button is inert until that lands.
+const DOWNLOAD_LIMIT = 5;
+
 export default function DigitalLibraryPage() {
-  return (
-    <div>
-      <h1 className="font-serif text-xl font-medium text-brand-navy">Digital library</h1>
+  const items = SAMPLE_LIBRARY_ITEMS;
 
-      {SAMPLE_LIBRARY_ITEMS.length === 0 ? (
-        <Card className="mt-4">
-          <CardContent className="flex flex-col items-center gap-3 py-14 text-center">
-            <Library className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-            <p className="text-sm text-muted-foreground">
-              Your purchased e-books and delivered service files will appear here.
-            </p>
-          </CardContent>
-        </Card>
+  return (
+    <section>
+      <SectionHead title="Digital library" standfirst="Every e-book you own, with downloads remaining." />
+
+      {items.length === 0 ? (
+        <div className="rounded-tile bg-tile px-6 py-14 text-center inset-ring inset-ring-card-edge">
+          <h3>Nothing here yet</h3>
+          <p className="mx-auto mt-2 max-w-[46ch] text-sm text-ink-muted">
+            Purchased e-books and delivered service files appear here the moment payment clears.
+          </p>
+          <Link href="/ebooks" className={buttonClass("secondary", "md", "mt-5")}>
+            Shop e-books
+          </Link>
+        </div>
       ) : (
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {SAMPLE_LIBRARY_ITEMS.map((item) => (
-            <Card key={item.id}>
-              <CardContent className="p-5">
-                <div
-                  className="flex h-24 w-full items-center justify-center rounded-lg text-lg font-semibold text-white/90"
-                  style={{ backgroundImage: `linear-gradient(135deg, ${item.coverFrom}, ${item.coverTo})` }}
-                >
-                  {item.title
-                    .split(" ")
-                    .map((w) => w[0])
-                    .slice(0, 2)
-                    .join("")}
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+          {items.map((item, index) => {
+            // Sample data has no download ledger yet; vary it so the
+            // exhausted state is visible in review.
+            const remaining = index === 2 ? 0 : DOWNLOAD_LIMIT - index;
+            return (
+              <div
+                key={item.id}
+                className="flex gap-4 rounded-tile bg-tile p-6 inset-ring inset-ring-card-edge"
+              >
+                <ProductShot square className="w-[74px] shrink-0 rounded-[10px] bg-ground p-2">
+                  <BookJacket
+                    title={item.title}
+                    from={item.coverFrom}
+                    to={item.coverTo}
+                    className="w-[66%]"
+                    sizes="60px"
+                  />
+                </ProductShot>
+
+                <div className="min-w-0 flex-1">
+                  <h4>{item.title}</h4>
+                  <p className="mt-1 text-sm text-ink-muted">
+                    {item.author} · {item.formats.join(", ")}
+                  </p>
+                  <p
+                    className={
+                      remaining === 0
+                        ? "mt-2 text-xs font-bold text-sale"
+                        : "mt-2 text-xs tabular-nums text-ink-muted"
+                    }
+                  >
+                    {remaining === 0 ? "No downloads left" : `${remaining} of ${DOWNLOAD_LIMIT} downloads left`}
+                  </p>
+                  <button
+                    type="button"
+                    disabled
+                    title="Sample data preview — no file to download"
+                    className={buttonClass(remaining === 0 ? "secondary" : "primary", "sm", "mt-3.5")}
+                  >
+                    {remaining === 0 ? "Request a reset" : "Download"}
+                  </button>
                 </div>
-                <p className="mt-3 text-sm font-medium text-foreground">{item.title}</p>
-                <p className="text-xs text-muted-foreground">by {item.author}</p>
-                {item.formats.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {item.formats.map((format) => (
-                      <Badge key={format} variant="outline">{format}</Badge>
-                    ))}
-                  </div>
-                )}
-                <button
-                  disabled
-                  title="Sample data preview — no file to download"
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-md border border-border py-2 text-sm font-medium text-muted-foreground"
-                >
-                  <Download className="h-4 w-4" strokeWidth={1.75} /> Download
-                </button>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
-    </div>
+    </section>
   );
 }

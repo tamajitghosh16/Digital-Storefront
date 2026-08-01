@@ -1,5 +1,21 @@
 /* Shared design tokens — imported by apps/web and apps/admin globals.css
-   via `@import "@repo/config/tailwind-preset.css";` */
+   via `@import "@repo/config/tailwind-preset.css";`
+
+   ── The system ──────────────────────────────────────────────────────
+   GEOMETRY comes from Vistaprint's "Swan" design system, measured off
+   vistaprint.in: a 16px tile radius, an 8px button radius, pill
+   callouts, 700-weight display type on tight negative tracking, and a
+   12px/700/+0.083em uppercase caps style.
+
+   COLOUR comes from the press's own mark — apps/web/public/logo.svg
+   (#007ACC blue, #1D1C5E navy) and logo-dark.svg (#38A0F0 blue,
+   #F1F4F9 off-white). Swan's cyan-with-black-text CTA is deliberately
+   not used: the geometry is borrowed, the palette is ours.
+
+   Nothing sits on plain white. The page ground is a low-saturation
+   tint of the brand (#F4F7FB), tiles step one deeper (#E9EFF8), and
+   only raised surfaces — inputs, the buy box, mega panels — stay true
+   white. */
 
 /* Tailwind v4's automatic source detection only walks the importing app's
    own directory tree, so classes that appear only inside this shared
@@ -13,41 +29,85 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* Brand */
-  --color-brand-navy: #1b2a4a;
-  --color-brand-navy-50: #eef1f6;
-  --color-brand-navy-100: #dde3ec;
-  --color-brand-accent: #c0392b;
-  --color-brand-accent-50: #fbecea;
-  --color-brand-slate: #34495e;
-  --color-brand-cream: #f6f3ec;
+  /* ── Brand ──────────────────────────────────────────────────────── */
+  --color-brand: #007acc;
+  --color-brand-press: #0068ae;
+  --color-on-brand: #ffffff;
+  --color-brand-soft: rgba(0, 122, 204, 0.12);
 
-  /* Mode-invariant brand fills — for spots that paint a solid navy/accent
-     block with white text on top (hero bands, primary buttons, selected
-     chips). `--color-brand-navy`/`--color-brand-accent` themselves get
-     lightened in `.dark` below so they stay legible used as *text* on a
-     dark page background — but that same lightening would wreck contrast
-     for white text sitting on a navy/accent fill, so those spots read
-     from these fixed tokens instead. */
-  --color-brand-navy-solid: #1b2a4a;
-  --color-brand-accent-solid: #c0392b;
+  /* ── Surfaces ───────────────────────────────────────────────────── */
+  --color-page: #f4f7fb; /* body */
+  --color-ground: #ffffff; /* raised: inputs, buy box, mega panel */
+  --color-tile: #e9eff8; /* product shots, cards, bands */
+  --color-tile-2: #d9e4f2;
+  --color-tile-3: #eef3fa;
 
-  /* Semantic surface/text tokens — hand-picked so a warm paper background
-     (not pure white) reads as a bookshop, not a generic SaaS app. */
-  --color-background: #fdfcfa;
-  --color-foreground: #1a2233;
-  --color-muted: #f3f0e8;
-  --color-muted-foreground: #6b7280;
-  --color-border: #e7e2d5;
+  /* ── Ink ────────────────────────────────────────────────────────── */
+  --color-ink: #1d1c5e; /* the logo's navy, never pure black */
+  --color-ink-muted: #4e5478;
+  --color-ink-subtle: #626987;
+
+  /* ── Rules ──────────────────────────────────────────────────────── */
+  --color-line: rgba(29, 28, 94, 0.14);
+  --color-line-strong: rgba(29, 28, 94, 0.3);
+  /* Transparent in light, a hairline in dark — keeps tiles from melting
+     into the page once every surface is a dark blue-grey. */
+  --color-card-edge: transparent;
+
+  /* ── Status ─────────────────────────────────────────────────────── */
+  --color-ok: #0f6b55;
+  --color-warn: #8a5a00;
+  --color-sale: #c0392b;
+
+  /* ── Author-services band ───────────────────────────────────────── */
+  /* Paired so the featured plan card, its body copy and its button all
+     stay legible whichever ground they land on. */
+  --color-band: #1d1c5e;
+  --color-band-ink: #f1f4f9;
+  --color-band-muted: rgba(241, 244, 249, 0.76);
+  --color-band-plan: rgba(241, 244, 249, 0.09);
+  --color-band-plan-edge: rgba(241, 244, 249, 0.2);
+  --color-band-feature: #38a0f0;
+  --color-band-feature-ink: #0f1033;
+  --color-band-feature-muted: #16173d;
+  --color-band-button: #0f1033;
+  --color-band-button-ink: #f1f4f9;
+
+  /* ── Promo strip ────────────────────────────────────────────────── */
+  --color-promo: #007acc;
+  --color-promo-ink: #ffffff;
+
+  /* ── Legacy semantic aliases ────────────────────────────────────── */
+  /* packages/ui's primitives (and therefore apps/admin, which imports
+     them) are written against these names. Re-pointed onto the palette
+     above so there is one system, not two. */
+  --color-background: #f4f7fb;
+  --color-foreground: #1d1c5e;
+  --color-muted: #e9eff8;
+  --color-muted-foreground: #4e5478;
+  --color-border: rgba(29, 28, 94, 0.14);
   --color-card: #ffffff;
-  --color-card-foreground: #1a2233;
-  --color-ring: #1b2a4a;
+  --color-card-foreground: #1d1c5e;
+  --color-ring: #007acc;
+  --color-brand-navy: #1d1c5e;
+  --color-brand-accent: #c0392b;
 
-  /* Fonts — variables populated by next/font in apps/web/app/layout.tsx;
-     the fallback stacks here keep admin (which doesn't load next/font the
-     same way) and any pre-hydration paint sane. */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-fraunces), "Iowan Old Style", Georgia, serif;
+  /* ── Radii — Swan's three steps ─────────────────────────────────── */
+  --radius-tile: 16px;
+  --radius-btn: 8px;
+
+  /* ── Shadows ────────────────────────────────────────────────────── */
+  --shadow-tile: 0 2px 10px rgba(0, 0, 0, 0.06);
+  --shadow-pop: 0 12px 34px rgba(0, 0, 0, 0.14);
+  --shadow-book: 6px 10px 20px rgba(0, 0, 0, 0.22);
+
+  /* ── Type ───────────────────────────────────────────────────────── */
+  /* Graphik is the reference face; it isn't licensed here, so the stack
+     falls through to the platform grotesque. --font-sans is populated by
+     next/font in apps/web/app/layout.tsx. */
+  --font-sans: var(--font-inter), "Graphik", system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
 
   /* Accordion (packages/ui/src/components/accordion.tsx) open/close animation */
   --animate-accordion-down: accordion-down 0.2s ease-out;
@@ -60,36 +120,60 @@
   --animate-slide-out-left: slide-out-left 0.2s ease-in;
   --animate-slide-in-right: slide-in-right 0.25s ease-out;
   --animate-slide-out-right: slide-out-right 0.2s ease-in;
+
+  /* Promo marquee */
+  --animate-marquee: marquee 36s linear infinite;
 }
 
-/* Dark-mode token overrides — same custom property names, re-pointed to a
-   warm charcoal palette so it still reads as a bookshop at night rather
-   than a generic dark-mode gray. Only the tokens actually referenced by
-   `bg-*`/`text-*`/`border-*` utility classes across the app need values
-   here; unlisted @theme tokens (fonts, animations) don't change by mode.
-
-   Surface steps (background < card < muted < border) are spaced further
-   apart in lightness than a typical dark-mode ramp, and the hue is pulled
-   off neutral/blue toward brown, so page canvas, cards, alternate-section
-   bands, and hairlines stay visually distinct instead of reading as one
-   flat black slab. */
+/* Dark mode. Vistaprint ships light-only; this ground is a navy-tinted
+   #0D131E rather than a neutral black, so the same brand hue carries
+   through, and the brand itself lifts to the dark logo's #38A0F0. */
 .dark {
-  --color-brand-navy: #90a8d6;
-  --color-brand-navy-50: #1c2333;
-  --color-brand-navy-100: #262f45;
-  --color-brand-accent: #e2685a;
-  --color-brand-accent-50: #37211e;
-  --color-brand-slate: #9aa7b8;
-  --color-brand-cream: #26221b;
+  --color-brand: #38a0f0;
+  --color-brand-press: #5cb4f5;
+  --color-on-brand: #0d131e;
+  --color-brand-soft: rgba(56, 160, 240, 0.16);
 
-  --color-background: #171410;
-  --color-foreground: #eae6da;
-  --color-muted: #2c2620;
-  --color-muted-foreground: #a8a096;
-  --color-border: #423826;
-  --color-card: #262019;
-  --color-card-foreground: #eae6da;
-  --color-ring: #90a8d6;
+  --color-page: #0d131e;
+  --color-ground: #16202f;
+  --color-tile: #1a2534;
+  --color-tile-2: #273349;
+  --color-tile-3: #172130;
+
+  --color-ink: #f1f4f9;
+  --color-ink-muted: rgba(241, 244, 249, 0.74);
+  --color-ink-subtle: #97a3ba;
+
+  --color-line: rgba(241, 244, 249, 0.16);
+  --color-line-strong: rgba(241, 244, 249, 0.34);
+  --color-card-edge: rgba(241, 244, 249, 0.08);
+
+  --color-ok: #5fd3af;
+  --color-warn: #e3b65c;
+  --color-sale: #ff8a7a;
+
+  --color-band: #171744;
+  --color-band-plan: rgba(241, 244, 249, 0.08);
+  --color-band-plan-edge: rgba(241, 244, 249, 0.18);
+
+  /* Damped, so the strip stops being the brightest thing on a dark page. */
+  --color-promo: rgba(56, 160, 240, 0.16);
+  --color-promo-ink: #7cc0f5;
+
+  --color-background: #0d131e;
+  --color-foreground: #f1f4f9;
+  --color-muted: #1a2534;
+  --color-muted-foreground: rgba(241, 244, 249, 0.74);
+  --color-border: rgba(241, 244, 249, 0.16);
+  --color-card: #16202f;
+  --color-card-foreground: #f1f4f9;
+  --color-ring: #38a0f0;
+  --color-brand-navy: #8fb8e8;
+  --color-brand-accent: #ff8a7a;
+
+  --shadow-tile: 0 2px 10px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 12px 34px rgba(0, 0, 0, 0.65);
+  --shadow-book: 6px 10px 20px rgba(0, 0, 0, 0.6);
 }
 
 @keyframes accordion-down {
@@ -160,6 +244,12 @@
     transform: translateX(0);
   }
   to {
-    transform: translateX(100%);
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes marquee {
+  to {
+    transform: translateX(-100%);
   }
 }

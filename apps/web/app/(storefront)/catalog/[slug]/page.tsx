@@ -1,19 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, Sparkles, Mail, Smartphone, ShoppingBag } from "lucide-react";
 import { getSiteSettings } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
 import { SAMPLE_SITE_SETTINGS } from "@/lib/sample-data";
-import { CATALOG_ITEMS, findCatalogItem } from "@/lib/catalog-data";
-import { Badge } from "@repo/ui/badge";
-import { Button } from "@repo/ui/button";
-import { Separator } from "@repo/ui/separator";
+import { CATALOG_ITEMS, findCatalogItem } from "@/lib/catalog";
+import { Breadcrumb, Callout, PageHeader, SectionHead, Standfirst, Wrap, buttonClass } from "@/components/primitives";
+import { TrustBand } from "@/components/marketing";
 
-// Static informational pages for the 12 product/service verticals in the
-// client's master PRD sheet (Ultimate_Master_PRD_All_Mandates.xlsx). These
-// verticals aren't backed by the Prisma `Product` model yet, so content
-// here is static rather than DB-driven — see apps/web/lib/catalog-data.ts.
+// Static informational pages for the twelve product/service verticals in
+// the client's master PRD sheet. These aren't backed by the Prisma
+// `Product` model yet, so content here is static — see lib/catalog.ts.
 export function generateStaticParams() {
   return CATALOG_ITEMS.map((item) => ({ slug: item.slug }));
 }
@@ -21,14 +18,22 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const item = findCatalogItem(slug);
-  if (!item) return {};
-  return { title: item.title };
+  return item ? { title: item.title } : {};
 }
 
-const FLOW_ICON = {
-  ecommerce: ShoppingBag,
-  lead: Mail,
-  licensing: Smartphone,
+const FLOW_COPY = {
+  ecommerce: {
+    glyph: "▤",
+    blurb: "Buy it straight from the storefront — add to cart, pay, done.",
+  },
+  lead: {
+    glyph: "✉",
+    blurb: "Tell us what you need and we'll come back with a quote and a timeline.",
+  },
+  licensing: {
+    glyph: "◫",
+    blurb: "Access is granted per account once your request is approved.",
+  },
 } as const;
 
 export default async function CatalogItemPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -37,66 +42,86 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ sl
   if (!item) notFound();
 
   const settings = await withFallback(() => getSiteSettings(), SAMPLE_SITE_SETTINGS);
-  const Icon = FLOW_ICON[item.flow];
+  const flow = FLOW_COPY[item.flow];
+  const siblings = CATALOG_ITEMS.filter(
+    (candidate) => candidate.category === item.category && candidate.slug !== item.slug
+  );
+
+  const mailto = (subject: string) =>
+    settings.contactEmail ? `mailto:${settings.contactEmail}?subject=${encodeURIComponent(subject)}` : "/services";
+
+  const href =
+    item.ctaHref ??
+    mailto(item.flow === "licensing" ? `Access request: ${item.title}` : `Inquiry: ${item.title}`);
+  const external = !item.ctaHref;
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
-      <nav className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Link href="/" className="hover:text-brand-navy">Home</Link>
-        <ChevronRight className="h-3 w-3" />
-        <span className="text-foreground">{item.title}</span>
-      </nav>
+    <>
+      <Wrap>
+        <Breadcrumb trail={[{ label: "Home", href: "/" }, { label: item.category }, { label: item.title }]} />
+      </Wrap>
 
-      <div className="mt-6 rounded-2xl border border-border bg-card p-8">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-navy-50">
-          <Icon className="h-5 w-5 text-brand-navy" strokeWidth={1.75} />
+      <PageHeader>
+        <div className="flex flex-wrap items-center gap-2">
+          <Callout tone="tile">{item.category}</Callout>
+          {item.subBrand && <Callout tone="tile">{item.subBrand}</Callout>}
+        </div>
+        <h1 className="mt-4">{item.title}</h1>
+        <Standfirst>{item.description}</Standfirst>
+      </PageHeader>
+
+      <Wrap className="grid gap-9 py-12 min-[980px]:grid-cols-[1fr_372px] min-[980px]:items-start min-[980px]:gap-12">
+        <div className="min-w-0">
+          <h2>What this covers</h2>
+          <p className="mt-3.5 max-w-[66ch] text-base leading-[1.65] text-ink-muted">{item.description}</p>
+          <p className="mt-3.5 max-w-[66ch] text-base leading-[1.65] text-ink-muted">
+            25% of the sale volume from this listing is contributed to the Sashibhusan Book Press Memorial Trust.
+          </p>
+          <p className="mt-6 text-sm text-ink-subtle">
+            This vertical isn&rsquo;t backed by the product data model yet — see README&rsquo;s &ldquo;What&rsquo;s
+            real vs. what&rsquo;s a stub&rdquo; section.
+          </p>
+
+          {siblings.length > 0 && (
+            <div className="mt-10">
+              <SectionHead title={`More in ${item.category}`} />
+              <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+                {siblings.map((sibling) => (
+                  <Link
+                    key={sibling.slug}
+                    href={`/catalog/${sibling.slug}`}
+                    className="rounded-tile bg-tile p-5 transition-colors hover:bg-tile-2 inset-ring inset-ring-card-edge"
+                  >
+                    <strong className="block text-sm">{sibling.title}</strong>
+                    <small className="mt-1 block text-xs text-ink-muted">{sibling.flowLabel}</small>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <Badge variant="muted">{item.category}</Badge>
-          {item.subBrand && <Badge variant="muted">{item.subBrand}</Badge>}
+        <div className="min-w-0 min-[980px]:sticky min-[980px]:top-[68px]">
+          <div className="rounded-tile bg-ground p-6 inset-ring inset-ring-line">
+            <span aria-hidden className="grid h-11 w-11 place-items-center rounded-full bg-tile text-lg">
+              {flow.glyph}
+            </span>
+            <p className="caps mt-4 text-ink-muted">{item.flowLabel}</p>
+            <p className="mt-1.5 text-[15px] leading-[1.55] text-ink-muted">{flow.blurb}</p>
+            {external ? (
+              <a href={href} className={buttonClass("primary", "lg", "mt-5 w-full")}>
+                {item.ctaLabel}
+              </a>
+            ) : (
+              <Link href={href} className={buttonClass("primary", "lg", "mt-5 w-full")}>
+                {item.ctaLabel}
+              </Link>
+            )}
+          </div>
         </div>
+      </Wrap>
 
-        <h1 className="mt-3 font-serif text-3xl font-medium leading-tight text-brand-navy">{item.title}</h1>
-        <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{item.flowLabel}</p>
-
-        <p className="mt-5 text-sm leading-relaxed text-foreground/90">{item.description}</p>
-
-        <div className="mt-6 flex items-center gap-2 rounded-lg bg-brand-cream/60 px-4 py-3 text-xs text-foreground/80">
-          <Sparkles className="h-4 w-4 shrink-0 text-brand-navy" strokeWidth={1.75} />
-          25% of the sale volume from this listing is contributed to the Sashibhusan Chattopadhyay Memorial Trust.
-        </div>
-
-        <Separator className="my-7" />
-
-        {item.flow === "ecommerce" && item.ctaHref && (
-          <Button asChild size="lg">
-            <Link href={item.ctaHref}>{item.ctaLabel}</Link>
-          </Button>
-        )}
-        {item.flow === "lead" && !item.ctaHref && (
-          <Button asChild size="lg">
-            <a href={`mailto:${settings.contactEmail}?subject=${encodeURIComponent(`Inquiry: ${item.title}`)}`}>
-              {item.ctaLabel}
-            </a>
-          </Button>
-        )}
-        {item.flow === "lead" && item.ctaHref && (
-          <Button asChild size="lg">
-            <Link href={item.ctaHref}>{item.ctaLabel}</Link>
-          </Button>
-        )}
-        {item.flow === "licensing" && (
-          <Button asChild size="lg">
-            <a href={`mailto:${settings.contactEmail}?subject=${encodeURIComponent(`Access request: ${item.title}`)}`}>
-              {item.ctaLabel}
-            </a>
-          </Button>
-        )}
-        <p className="mt-3 text-xs text-muted-foreground">
-          This is a Phase 0 placeholder page — see README.md&apos;s &quot;What&apos;s real vs. what&apos;s a stub&quot; section.
-        </p>
-      </div>
-    </div>
+      <TrustBand />
+    </>
   );
 }

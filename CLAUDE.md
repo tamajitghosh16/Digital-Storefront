@@ -111,7 +111,11 @@ staging → malware-scan → promote pattern. The scan itself
 always returns `"CLEAN"` — it needs a real Cloudmersive or ClamAV
 integration before any upload pipeline built on top of it is safe to ship.
 
-**Shared UI/config:** `packages/ui` (a shadcn/ui-style `Button` +
-`cn()`), `packages/config` (shared `tsconfig`, ESLint flat config, and
-Tailwind v4 design tokens via `@theme` in `tailwind-preset.css`, which both
-apps' `globals.css` import).
+**Shared UI/config:** `packages/ui` holds the *behavioural* primitives
+both apps share (Button, Sheet, DropdownMenu, Accordion + `cn()`);
+`apps/web/components/primitives` holds the storefront's *presentational*
+ones. `packages/config` carries the shared `tsconfig`, the ESLint flat
+config, and the single set of Tailwind v4 design tokens in
+`tailwind-preset.css`, which both apps' `globals.css` import — Swan
+geometry with a palette sampled from `apps/web/public/logo*.svg`. See
+`apps/web/CLAUDE.md` for what the tokens mean.

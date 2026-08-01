@@ -2,6 +2,7 @@
 import { useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { ICON_BUTTON_CLASS, ICON_LABEL_CLASS } from "./icon-button";
 
 const noopSubscribe = () => () => {};
 
@@ -16,7 +17,7 @@ export function ThemeToggle() {
   const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
   if (!mounted) {
-    return <div className="h-11 w-11" aria-hidden="true" />;
+    return <div className="h-[46px] w-[38px]" aria-hidden />;
   }
 
   const isDark = resolvedTheme === "dark";
@@ -26,9 +27,12 @@ export function ThemeToggle() {
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="inline-flex h-11 w-11 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      className={ICON_BUTTON_CLASS}
     >
-      {isDark ? <Sun className="h-[18px] w-[18px]" strokeWidth={1.75} /> : <Moon className="h-[18px] w-[18px]" strokeWidth={1.75} />}
+      <span className="text-lg leading-none">
+        {isDark ? <Sun className="h-[18px] w-[18px]" strokeWidth={1.9} /> : <Moon className="h-[18px] w-[18px]" strokeWidth={1.9} />}
+      </span>
+      <span className={ICON_LABEL_CLASS}>Theme</span>
     </button>
   );
 }

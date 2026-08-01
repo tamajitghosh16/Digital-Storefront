@@ -1,32 +1,41 @@
 import type { Metadata } from "next";
 import { prisma } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
-import { SAMPLE_BOOKS } from "@/lib/sample-data";
-import { CatalogueGrid } from "@/components/catalogue-grid";
+import { SAMPLE_BOOKS, SAMPLE_EBOOKS } from "@/lib/sample-data";
+import { CataloguePage } from "@/components/commerce/catalogue-page";
+import type { CatalogueQuery } from "@/components/commerce/catalogue-toolbar";
+import type { ProductTileData } from "@/components/commerce/product-tile";
 
-export const metadata: Metadata = { title: "Physical Books" };
+export const metadata: Metadata = { title: "Books" };
 
-// FR-2.1: physical-book catalogue with genre filtering. This listing page
-// didn't exist before — only the /books/[slug] detail page did — so the
-// header's "Physical Books" link had nowhere real to go.
-export default async function BooksCataloguePage() {
-  const books = await withFallback(
-    () =>
-      prisma.product.findMany({
-        where: { type: "PHYSICAL_BOOK", isPublished: true },
-        orderBy: { createdAt: "desc" },
-      }),
-    SAMPLE_BOOKS
+// FR-2.1: physical-book catalogue with genre filtering and sorting.
+export default async function BooksCataloguePage({ searchParams }: { searchParams: Promise<CatalogueQuery> }) {
+  const [books, ebooks, query] = await Promise.all([
+    withFallback(
+      () => prisma.product.findMany({ where: { type: "PHYSICAL_BOOK", isPublished: true }, orderBy: { createdAt: "desc" } }),
+      SAMPLE_BOOKS
+    ),
+    withFallback(
+      () => prisma.product.findMany({ where: { type: "EBOOK", isPublished: true }, orderBy: { createdAt: "desc" } }),
+      SAMPLE_EBOOKS
+    ),
+    searchParams,
+  ]);
+
+  // The e-book edition of the same title, keyed by the shared base slug,
+  // so each tile can show "E-book ₹999" under the printed price.
+  const companionPrices = new Map(
+    (ebooks as ProductTileData[]).map((ebook) => [ebook.slug.replace(/-ebook$/, ""), ebook.priceCents])
   );
 
   return (
-    <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
-      <h1 className="font-serif text-3xl font-medium text-brand-navy">Physical Books</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Printed titles, shipped to your door.</p>
-
-      <div className="mt-8">
-        <CatalogueGrid products={books} emptyLabel="No titles in this genre yet." />
-      </div>
-    </div>
+    <CataloguePage
+      basePath="/books"
+      title="Books"
+      standfirst="Every printed title we publish, from the Ink & Imagination schoolroom list to the trade fiction imprint. Most are available as an e-book too."
+      products={books as ProductTileData[]}
+      query={query}
+      companionPrices={companionPrices}
+    />
   );
 }

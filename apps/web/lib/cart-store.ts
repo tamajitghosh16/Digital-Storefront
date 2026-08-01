@@ -5,9 +5,16 @@ import { persist } from "zustand/middleware";
 export interface CartItem {
   productId: string;
   title: string;
+  /** What the customer pays per unit, after any bundle saving. */
   priceCents: number;
   quantity: number;
   fulfillmentType: "SHIP" | "DIGITAL" | "SERVICE";
+  /** Undiscounted per-unit price, so the cart can show what was saved. */
+  listPriceCents?: number;
+  /** Drives the GST already included in `priceCents` — see lib/pricing.ts. */
+  taxType?: "PHYSICAL_BOOK" | "EBOOK" | "SERVICE_PACKAGE";
+  /** One line of fulfilment detail under the title. */
+  note?: string;
 }
 
 interface CartState {

@@ -1,84 +1,161 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import { Check, FileText, Upload, Package, PlusCircle, ClipboardCheck, CreditCard } from "lucide-react";
-import { Button } from "@repo/ui/button";
-import { Card, CardContent } from "@repo/ui/card";
-import { Badge } from "@repo/ui/badge";
+import {
+  Callout,
+  CheckList,
+  PageHeader,
+  SectionHead,
+  Standfirst,
+  TABLE_CLASS,
+  TD_CLASS,
+  TH_CLASS,
+  TableWrap,
+  Wrap,
+  buttonClass,
+} from "@/components/primitives";
+import { PlanBand } from "@/components/marketing";
 
-// FR-6.1: entry point for the guided self-publishing wizard.
-// Real implementation: a multi-step Server Action flow persisting a draft
-// SelfPublishingProject row per step (see Technical Design Document 3.5).
-const steps = [
-  { title: "Author & book details", Icon: FileText },
-  { title: "Manuscript upload", Icon: Upload },
-  { title: "Package selection", Icon: Package },
-  { title: "Add-ons", Icon: PlusCircle },
-  { title: "Review", Icon: ClipboardCheck },
-  { title: "Payment", Icon: CreditCard },
+export const metadata: Metadata = { title: "Self-Publishing" };
+
+// FR-6.1: entry point for the guided self-publishing wizard. The real
+// implementation is a multi-step Server Action flow persisting a draft
+// SelfPublishingProject per step (Technical Design Document 3.5).
+
+const PACKAGES = [
+  {
+    name: "Starter",
+    price: "₹9,999",
+    meta: "Digital only · 3 weeks",
+    points: ["E-book production (EPUB, MOBI)", "Template cover", "Listing on this storefront", "70% digital royalty"],
+  },
+  {
+    name: "Guided",
+    price: "₹24,999",
+    meta: "Digital + short print run · 5 weeks",
+    points: [
+      "Everything in Starter",
+      "Custom interior typesetting",
+      "ISBN registration",
+      "50 printed copies",
+      "Named project manager",
+    ],
+    featured: true,
+  },
+  {
+    name: "Full-Service",
+    price: "₹49,999",
+    meta: "Full launch · 8 weeks",
+    points: [
+      "Everything in Guided",
+      "Cover designed from scratch",
+      "250 printed copies",
+      "Distribution to Indian retailers",
+      "Launch page & press kit",
+    ],
+  },
 ];
 
-const packages = [
-  { name: "Starter", price: "₹9,999", blurb: "Formatting and cover design to get you listed fast.", features: ["Print + e-book formatting", "1 stock cover design", "ISBN registration"] },
-  { name: "Guided", price: "₹24,999", blurb: "Editorial support alongside production.", features: ["Everything in Starter", "1 round of copy editing", "Custom cover design", "Marketing checklist"], highlighted: true },
-  { name: "Full-Service", price: "₹49,999", blurb: "End-to-end production and launch support.", features: ["Everything in Guided", "Developmental edit", "Launch campaign support", "Dedicated project manager"] },
+const ROYALTIES = [
+  { sold: "E-book, this storefront", list: "₹999", rate: "70%", each: "₹699", paid: "7th monthly" },
+  { sold: "Paperback, this storefront", list: "₹2,499", rate: "40%", each: "₹999", paid: "7th monthly" },
+  { sold: "Paperback, retail distribution", list: "₹2,499", rate: "22%", each: "₹549", paid: "Quarterly" },
+  { sold: "Class set, 30+ copies", list: "₹2,049", rate: "35%", each: "₹717", paid: "7th monthly" },
+];
+
+const WIZARD = [
+  { tag: "Step 1 · now", title: "Your book", points: ["Title, subtitle, genre", "Blurb and author bio"], featured: true },
+  { tag: "Step 2", title: "Manuscript", points: ["Upload the file", "Scanned before we open it"] },
+  { tag: "Step 3", title: "Package", points: ["Starter, Guided, or Full-Service", "Add-ons if you need them"] },
+  { tag: "Step 4", title: "Review & pay", points: ["Fixed quote, no deposit games", "Production starts on payment"] },
 ];
 
 export default function SelfPublishingLandingPage() {
   return (
-    <div>
-      <section className="border-b border-border bg-brand-navy-solid">
-        <div className="mx-auto max-w-4xl px-5 py-20 text-center sm:px-8">
-          <h1 className="font-serif text-4xl font-medium leading-tight text-white sm:text-5xl">
-            Start your self-publishing project
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-white/70">
-            From manuscript to marketplace — editing, design, and royalties, guided every step of the way.
-          </p>
-          <Button asChild size="lg" variant="accent" className="mt-8">
-            <Link href="/self-publishing/wizard/step-1">Begin your project</Link>
-          </Button>
+    <>
+      <PageHeader>
+        <Callout>Self-publishing programme</Callout>
+        <h1 className="mt-4">From manuscript to storefront listing.</h1>
+        <Standfirst>
+          The full route: production, ISBN, print run, listing, and royalties. Start the wizard and we&rsquo;ll take it
+          from wherever your book currently is.
+        </Standfirst>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/self-publishing/wizard/step-1" className={buttonClass("primary", "lg")}>
+            Start a project
+          </Link>
+          <Link href="/account/publishing" className={buttonClass("secondary", "lg")}>
+            Open my dashboard
+          </Link>
         </div>
-      </section>
+      </PageHeader>
 
-      <section className="mx-auto max-w-5xl px-5 py-14 sm:px-8">
-        <h2 className="text-center font-serif text-2xl font-medium text-brand-navy">How it works</h2>
-        <ol className="mt-10 grid gap-6 sm:grid-cols-3">
-          {steps.map((step, i) => (
-            <li key={step.title} className="relative rounded-2xl border border-border bg-card p-5">
-              <span className="text-xs font-semibold text-muted-foreground">Step {i + 1}</span>
-              <div className="mt-3 flex h-10 w-10 items-center justify-center rounded-full bg-brand-navy-50">
-                <step.Icon className="h-[18px] w-[18px] text-brand-navy" strokeWidth={1.75} />
-              </div>
-              <p className="mt-3 text-sm font-medium text-foreground">{step.title}</p>
-            </li>
+      <Wrap as="section" className="py-12">
+        <SectionHead title="Pick a package" standfirst="All three end with a book people can buy." />
+        <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+          {PACKAGES.map((pkg) => (
+            <div
+              key={pkg.name}
+              className={
+                pkg.featured
+                  ? "rounded-tile bg-ground p-6 inset-ring-[3px] inset-ring-ink"
+                  : "rounded-tile bg-ground p-6 inset-ring inset-ring-line"
+              }
+            >
+              <Callout tone={pkg.featured ? "brand" : "tile"}>
+                {pkg.featured ? `${pkg.name} · most chosen` : pkg.name}
+              </Callout>
+              <p className="mt-3.5 text-[34px] font-bold tracking-[-0.03em] tabular-nums">{pkg.price}</p>
+              <p className="text-sm text-ink-muted">{pkg.meta}</p>
+              <CheckList className="mt-[18px]" items={pkg.points} />
+              <Link
+                href="/self-publishing/wizard/step-1"
+                className={buttonClass(pkg.featured ? "primary" : "secondary", "md", "mt-[22px] w-full")}
+              >
+                Choose {pkg.name}
+              </Link>
+            </div>
           ))}
-        </ol>
-      </section>
-
-      <section className="border-t border-border bg-brand-cream/50 py-14">
-        <div className="mx-auto max-w-5xl px-5 sm:px-8">
-          <h2 className="text-center font-serif text-2xl font-medium text-brand-navy">Choose your package</h2>
-          <div className="mt-10 grid gap-6 sm:grid-cols-3">
-            {packages.map((pkg) => (
-              <Card key={pkg.name} className={pkg.highlighted ? "border-brand-navy shadow-md ring-1 ring-brand-navy" : ""}>
-                <CardContent className="p-6">
-                  {pkg.highlighted && <Badge className="mb-3">Most popular</Badge>}
-                  <p className="font-serif text-lg font-medium text-brand-navy">{pkg.name}</p>
-                  <p className="mt-1 text-2xl font-semibold text-foreground">{pkg.price}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">{pkg.blurb}</p>
-                  <ul className="mt-5 space-y-2.5">
-                    {pkg.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2 text-sm text-foreground/90">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-navy" strokeWidth={2} />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
         </div>
-      </section>
-    </div>
+      </Wrap>
+
+      <Wrap as="section" className="pb-12">
+        <SectionHead title="What you earn" standfirst="Royalty rates are the same whichever package you start on." />
+        <TableWrap>
+          <table className={TABLE_CLASS}>
+            <thead>
+              <tr>
+                <th className={TH_CLASS}>Sold as</th>
+                <th className={TH_CLASS}>List price</th>
+                <th className={TH_CLASS}>Your royalty</th>
+                <th className={TH_CLASS}>Per copy</th>
+                <th className={TH_CLASS}>Paid</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ROYALTIES.map((row) => (
+                <tr key={row.sold}>
+                  <td className={TD_CLASS}>{row.sold}</td>
+                  <td className={`${TD_CLASS} tabular-nums`}>{row.list}</td>
+                  <td className={`${TD_CLASS} tabular-nums`}>{row.rate}</td>
+                  <td className={`${TD_CLASS} tabular-nums`}>{row.each}</td>
+                  <td className={TD_CLASS}>{row.paid}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableWrap>
+        <p className="mt-3.5 text-sm text-ink-muted">
+          Payouts are made by bank transfer once the balance passes ₹1,000. Statements are downloadable as CSV from
+          your dashboard.
+        </p>
+      </Wrap>
+
+      <PlanBand
+        eyebrow="The wizard"
+        title="Four screens, then it's with us."
+        standfirst="You can leave and come back — the project saves at every step."
+        plans={WIZARD}
+      />
+    </>
   );
 }

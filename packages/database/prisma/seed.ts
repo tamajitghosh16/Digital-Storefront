@@ -11,7 +11,7 @@ async function main() {
     create: {
       type: "PHYSICAL_BOOK",
       title: "Geographic Atlas of Bengal",
-      author: "Shashibhushan Chattopadhyay",
+      author: "Shashibhushan Book Press",
       slug: "geographic-atlas-of-bengal",
       description: "A landmark geographic atlas from the Press's publishing history.",
       priceCents: 149900,
@@ -26,7 +26,7 @@ async function main() {
     create: {
       type: "EBOOK",
       title: "Geographic Atlas of Bengal (E-Book)",
-      author: "Shashibhushan Chattopadhyay",
+      author: "Shashibhushan Book Press",
       slug: "geographic-atlas-of-bengal-ebook",
       priceCents: 89900,
       formats: ["EPUB", "PDF"],
@@ -65,7 +65,7 @@ async function main() {
   });
 
   const headerLinks = [
-    { label: "Physical Books", href: "/books", order: 0 },
+    { label: "Books", href: "/books", order: 0 },
     { label: "E-Books", href: "/ebooks", order: 1 },
     { label: "Publishing Services", href: "/services", order: 2 },
     { label: "Self-Publishing", href: "/self-publishing", order: 3 },
@@ -100,7 +100,7 @@ async function main() {
       id: "banner-welcome",
       title: "New & Featured",
       subtitle: "Fresh releases from the Press, curated every week.",
-      ctaText: "Browse Physical Books",
+      ctaText: "Browse Books",
       ctaHref: "/books",
       order: 0,
     },

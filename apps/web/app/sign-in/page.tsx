@@ -1,20 +1,24 @@
 "use client";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BookOpen } from "lucide-react";
 import { createClient } from "@repo/auth/client";
-import { Button } from "@repo/ui/button";
-import { Card, CardContent } from "@repo/ui/card";
-import { Input } from "@repo/ui/input";
-import { Label } from "@repo/ui/label";
-import { Separator } from "@repo/ui/separator";
 import { cn } from "@repo/ui/utils";
+import { Callout, CheckList, Wrap, buttonClass } from "@/components/primitives";
 
-// FR-5.1: registration/login via email or social sign-in (Supabase Auth).
+// FR-5.1: registration and login via email or Google (Supabase Auth).
+// The benefits column is here because this storefront allows guest
+// checkout — the page has to earn the account rather than assume it.
+
+const BENEFITS = [
+  "Re-download every e-book you've bought, on any device",
+  "Track orders and shipments without digging through email",
+  "Follow your self-publishing projects and royalty balance",
+];
+
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/account/orders";
+  const next = searchParams.get("next") || "/account/library";
 
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [email, setEmail] = useState("");
@@ -23,20 +27,20 @@ function SignInForm() {
   const [loading, setLoading] = useState(false);
   const [checkInbox, setCheckInbox] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
     setError(null);
     setLoading(true);
     const supabase = createClient();
 
-    const { error } =
+    const { error: authError } =
       mode === "sign-in"
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({ email, password });
 
     setLoading(false);
-    if (error) {
-      setError(error.message);
+    if (authError) {
+      setError(authError.message);
       return;
     }
     if (mode === "sign-up") {
@@ -50,84 +54,123 @@ function SignInForm() {
   async function handleGoogle() {
     setError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { error: authError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}${next}` },
     });
-    if (error) setError(error.message);
+    if (authError) setError(authError.message);
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col items-center justify-center px-5 py-16 sm:px-8">
-      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-navy-50">
-        <BookOpen className="h-5 w-5 text-brand-navy" strokeWidth={1.75} />
-      </div>
-      <h1 className="mt-4 font-serif text-2xl font-medium text-brand-navy">
-        {mode === "sign-in" ? "Welcome back" : "Create your account"}
-      </h1>
+    <Wrap className="py-12 pb-20">
+      <div className="mx-auto grid max-w-[880px] gap-10 lg:grid-cols-2">
+        <div className="hidden lg:block">
+          <Callout>Your account</Callout>
+          <h1 className="mt-4 text-[32px]">{mode === "sign-in" ? "Welcome back." : "Create your account."}</h1>
+          <p className="mt-3 text-[17px] leading-[1.55] text-ink-muted">
+            One account covers the shop, your digital library and — if you publish with us — your royalty ledger.
+          </p>
+          <CheckList className="mt-6" items={BENEFITS} />
+        </div>
 
-      <div className="mt-6 flex w-full rounded-full border border-border bg-muted p-1">
-        {(["sign-in", "sign-up"] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => {
-              setMode(m);
-              setError(null);
-            }}
-            className={cn(
-              "flex-1 rounded-full py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-muted",
-              mode === m ? "bg-card text-brand-navy shadow-sm" : "text-muted-foreground"
-            )}
-          >
-            {m === "sign-in" ? "Sign in" : "Sign up"}
-          </button>
-        ))}
-      </div>
+        <div>
+          <h1 className="text-[26px] lg:hidden">{mode === "sign-in" ? "Welcome back." : "Create your account."}</h1>
 
-      <Card className="mt-4 w-full">
-        <CardContent className="p-6">
-          {checkInbox ? (
-            <p className="text-center text-sm text-muted-foreground">
-              Check <span className="font-medium text-foreground">{email}</span> for a confirmation link to finish creating your account.
-            </p>
-          ) : (
-            <>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
+          <div className="mt-4 flex rounded-btn bg-tile p-1 lg:mt-0">
+            {(["sign-in", "sign-up"] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                aria-pressed={mode === option}
+                onClick={() => {
+                  setMode(option);
+                  setError(null);
+                }}
+                className={cn(
+                  "flex-1 rounded-[5px] py-2.5 text-sm font-bold transition-colors",
+                  mode === option ? "bg-ink text-ground" : "text-ink-muted hover:text-ink"
+                )}
+              >
+                {option === "sign-in" ? "Sign in" : "Sign up"}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-tile bg-ground p-6 inset-ring inset-ring-line">
+            {checkInbox ? (
+              <p className="text-[15px] leading-relaxed text-ink-muted">
+                Check <span className="font-bold text-ink">{email}</span> for a confirmation link to finish creating
+                your account.
+              </p>
+            ) : (
+              <>
+                <form onSubmit={handleSubmit} className="grid gap-4">
+                  <Field id="email" label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
+                  <Field
                     id="password"
+                    label="Password"
                     type="password"
-                    required
-                    minLength={6}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={setPassword}
                     placeholder="••••••••"
+                    minLength={6}
                   />
+                  {error && <p className="text-sm font-bold text-sale">{error}</p>}
+                  <button type="submit" disabled={loading} className={buttonClass("primary", "lg", "w-full")}>
+                    {loading ? "Please wait…" : mode === "sign-in" ? "Sign in" : "Create account"}
+                  </button>
+                </form>
+
+                <div className="my-5 flex items-center gap-3">
+                  <span className="h-px flex-1 bg-line" />
+                  <span className="text-xs text-ink-subtle">or continue with</span>
+                  <span className="h-px flex-1 bg-line" />
                 </div>
-                {error && <p className="text-sm text-brand-accent">{error}</p>}
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Please wait…" : mode === "sign-in" ? "Sign in" : "Create account"}
-                </Button>
-              </form>
 
-              <div className="my-5 flex items-center gap-3">
-                <Separator className="flex-1" />
-                <span className="text-xs text-muted-foreground">or continue with</span>
-                <Separator className="flex-1" />
-              </div>
+                <button type="button" onClick={handleGoogle} className={buttonClass("secondary", "md", "w-full")}>
+                  Google
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </Wrap>
+  );
+}
 
-              <Button variant="outline" className="w-full" onClick={handleGoogle}>
-                Google
-              </Button>
-            </>
-          )}
-        </CardContent>
-      </Card>
+function Field({
+  id,
+  label,
+  type,
+  value,
+  onChange,
+  placeholder,
+  minLength,
+}: {
+  id: string;
+  label: string;
+  type: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  minLength?: number;
+}) {
+  return (
+    <div className="flex flex-col gap-[7px]">
+      <label htmlFor={id} className="caps text-ink-muted">
+        {label}
+      </label>
+      <input
+        id={id}
+        type={type}
+        required
+        minLength={minLength}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-12 rounded-btn border-2 border-line-strong bg-ground px-3.5 text-[15px] focus:border-ink focus:outline-none"
+      />
     </div>
   );
 }

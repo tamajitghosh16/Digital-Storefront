@@ -1,36 +1,68 @@
 import Link from "next/link";
-import Image from "next/image";
-import { Star, BookOpen, Tablet, Target, PenLine, ArrowRight } from "lucide-react";
 import { prisma } from "@repo/database";
-import { Button } from "@repo/ui/button";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@repo/ui/accordion";
-import { ProductCard } from "@/components/product-card";
 import { withFallback } from "@/lib/safe-fetch";
-import { SAMPLE_PRODUCTS, SAMPLE_BANNERS, SAMPLE_TESTIMONIALS, SAMPLE_FAQS, SAMPLE_CATEGORIES } from "@/lib/sample-data";
+import {
+  SAMPLE_BANNERS,
+  SAMPLE_BOOKS,
+  SAMPLE_EBOOKS,
+  SAMPLE_FAQS,
+  SAMPLE_SERVICES,
+  SAMPLE_TESTIMONIALS,
+} from "@/lib/sample-data";
+import { CLASS_SET_TIERS, tierUnitCents } from "@/lib/pricing";
+import { formatINRWhole } from "@/lib/format";
+import { Callout, SectionHead, Stars, Wrap, buttonClass } from "@/components/primitives";
+import { ProductScroller, ProductTile, type ProductTileData } from "@/components/commerce/product-tile";
+import {
+  CategoryCircles,
+  FaqList,
+  Hero,
+  Newsletter,
+  PlanBand,
+  TrustBand,
+  type CategoryCircle,
+} from "@/components/marketing";
 
-const categoryStyle = {
-  "Physical Books": { Icon: BookOpen, badge: "bg-brand-navy-50 text-brand-navy", hover: "group-hover:bg-brand-navy-solid" },
-  "E-Books": { Icon: Tablet, badge: "bg-brand-accent-50 text-brand-accent", hover: "group-hover:bg-brand-accent-solid" },
-  "Publishing Services": { Icon: Target, badge: "bg-amber-500/10 text-amber-600", hover: "group-hover:bg-amber-500" },
-  "Self-Publishing": { Icon: PenLine, badge: "bg-emerald-600/10 text-emerald-700", hover: "group-hover:bg-emerald-600" },
-} as const;
+// FR-1.1: homepage featuring bestsellers, new releases, and promoted
+// services. The hero banner, testimonials and FAQs are admin-controlled
+// (apps/admin: Homepage Banners / Testimonials / FAQs); everything falls
+// back to sample data when no database is reachable.
 
-const trustItems = [
-  { title: "Nationwide shipping", body: "Physical editions packed and shipped across India." },
-  { title: "Instant e-book delivery", body: "Read on any device the moment your order is placed." },
-  { title: "Guided self-publishing", body: "From manuscript to marketplace, with royalties tracked for you." },
+const CATEGORY_CIRCLES: CategoryCircle[] = [
+  { label: "Literary Fiction", href: "/books?genre=Literary%20Fiction", glyph: "✒", from: "#3b53b8", to: "#22307a" },
+  { label: "Fantasy", href: "/books?genre=Fantasy", glyph: "⚔", from: "#2f8b52", to: "#1c5733" },
+  { label: "Sci-Fi", href: "/books?genre=Sci-Fi", glyph: "◎", from: "#0f8a95", to: "#0a5960" },
+  { label: "Poetry", href: "/books?genre=Poetry", glyph: "❦", from: "#7a44b0", to: "#4a2870" },
+  { label: "Non-Fiction", href: "/books?genre=Non-Fiction", glyph: "▦", from: "#c05f1c", to: "#7d3c11" },
+  { label: "Children's", href: "/catalog/books-for-primary-students", glyph: "★", from: "#7d9420", to: "#4e5c14" },
+  { label: "E-Books", href: "/ebooks", glyph: "◫", from: "#b02a86", to: "#6e1a53" },
+  { label: "Author Services", href: "/services", glyph: "✎", from: "#b08600", to: "#6f5400" },
+  { label: "Self-Publishing", href: "/self-publishing", glyph: "▲", from: "#bd3140", to: "#7c1f2a" },
 ];
 
-// FR-1.1: homepage featuring bestsellers, new releases, and promoted services.
-// Hero/promo banners, testimonials, and FAQs are all admin-controlled
-// (apps/admin: Homepage Banners / Testimonials / FAQs) rather than hardcoded.
-// Falls back to static sample data when there's no reachable database, so
-// the frontend can be reviewed without seeding anything.
 export default async function HomePage() {
-  const [featured, banners, testimonials, faqs] = await Promise.all([
+  const [books, ebooks, services, banners, testimonials, faqs] = await Promise.all([
     withFallback(
-      () => prisma.product.findMany({ where: { isPublished: true }, orderBy: { createdAt: "desc" }, take: 8 }),
-      SAMPLE_PRODUCTS.slice(0, 8)
+      () =>
+        prisma.product.findMany({
+          where: { type: "PHYSICAL_BOOK", isPublished: true },
+          orderBy: { createdAt: "desc" },
+          take: 24,
+        }),
+      SAMPLE_BOOKS
+    ),
+    withFallback(
+      () =>
+        prisma.product.findMany({ where: { type: "EBOOK", isPublished: true }, orderBy: { createdAt: "desc" }, take: 24 }),
+      SAMPLE_EBOOKS
+    ),
+    withFallback(
+      () =>
+        prisma.product.findMany({
+          where: { type: "SERVICE_PACKAGE", isPublished: true },
+          orderBy: { priceCents: "asc" },
+        }),
+      SAMPLE_SERVICES
     ),
     withFallback(() => prisma.banner.findMany({ where: { isActive: true }, orderBy: { order: "asc" } }), SAMPLE_BANNERS),
     withFallback(
@@ -40,164 +72,160 @@ export default async function HomePage() {
     withFallback(() => prisma.faq.findMany({ where: { isActive: true }, orderBy: { order: "asc" } }), SAMPLE_FAQS),
   ]);
 
-  const [heroBanner, ...restBanners] = banners;
+  const allBooks = books as ProductTileData[];
+  const ebookPrice = new Map(
+    (ebooks as ProductTileData[]).map((ebook) => [ebook.slug.replace(/-ebook$/, ""), ebook.priceCents])
+  );
+
+  const popular = [...allBooks].sort((a, b) => (b.reviewCount ?? 0) - (a.reviewCount ?? 0)).slice(0, 8);
+  const banner = banners[0];
 
   return (
-    <div className="bg-brand-cream dark:bg-background">
-      <Hero banner={heroBanner} />
+    <>
+      <Hero
+        eyebrow="New this season"
+        title={banner?.title ?? "Your story, published your way."}
+        standfirst={
+          banner?.subtitle ??
+          "Shop the catalogue, commission an e-book conversion, or launch your own title — manuscript to storefront listing in as little as three weeks."
+        }
+        primary={{ label: banner?.ctaText ?? "Start self-publishing", href: banner?.ctaHref ?? "/self-publishing" }}
+        secondary={{ label: "Shop books", href: "/books" }}
+        jackets={allBooks.slice(0, 4).map((book) => ({
+          title: book.title,
+          author: book.author,
+          from: book.coverFrom,
+          to: book.coverTo,
+        }))}
+      />
 
-      <section className="mx-auto max-w-6xl px-5 py-20 sm:px-8">
-        <div className="flex items-baseline justify-between">
-          <h2 className="font-serif text-2xl font-medium text-brand-navy sm:text-3xl">Explore the storefront</h2>
-        </div>
-        <div className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-4">
-          {SAMPLE_CATEGORIES.map((cat) => {
-            const { Icon, badge, hover } = categoryStyle[cat.title as keyof typeof categoryStyle];
-            return (
-              <Link
-                key={cat.title}
-                href={cat.href}
-                className="group rounded-xl border border-border bg-card p-6 transition-all hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <div className={`flex h-11 w-11 items-center justify-center rounded-xl transition-colors group-hover:text-white ${badge} ${hover}`}>
-                  <Icon className="h-5 w-5" strokeWidth={1.75} />
-                </div>
-                <p className="mt-3.5 text-sm font-semibold text-foreground">{cat.title}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{cat.body}</p>
-              </Link>
-            );
-          })}
-        </div>
+      <Wrap as="section" className="pb-4 pt-12">
+        <SectionHead title="Explore all categories" href="/books" />
+        <CategoryCircles categories={CATEGORY_CIRCLES} />
+      </Wrap>
 
-        <div className="mt-12 grid gap-7 border-t border-border pt-10 sm:grid-cols-3">
-          {trustItems.map((item) => (
-            <div key={item.title} className="flex items-start gap-3.5">
-              <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-              <div>
-                <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{item.body}</p>
-              </div>
-            </div>
+      <Wrap as="section" className="py-8">
+        <SectionHead
+          title="Our most popular titles"
+          standfirst="What readers are ordering most this week."
+          href="/books"
+        />
+        <ProductScroller>
+          {popular.map((product, index) => (
+            <ProductTile
+              key={product.id}
+              product={product}
+              flag={index === 0 ? { label: "Bestseller" } : index === 2 ? { label: "New", tone: "tile" } : undefined}
+              ebookCents={ebookPrice.get(product.slug)}
+            />
           ))}
-        </div>
-      </section>
+        </ProductScroller>
+      </Wrap>
 
-      {restBanners.length > 0 && (
-        <section className="mx-auto max-w-6xl px-5 pb-14 sm:px-8">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {restBanners.map((banner) => (
-              <div key={banner.id} className="rounded-xl border border-border bg-card p-5">
-                <p className="font-serif text-base font-medium text-brand-navy">{banner.title}</p>
-                {banner.subtitle && <p className="mt-1 text-sm text-muted-foreground">{banner.subtitle}</p>}
-                {banner.ctaText && banner.ctaHref && (
-                  <Link href={banner.ctaHref} className="mt-3 inline-block text-sm font-medium text-brand-accent hover:underline">
-                    {banner.ctaText} →
-                  </Link>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <TrustBand />
 
-      <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8">
-        <div className="flex items-baseline justify-between">
-          <h2 className="font-serif text-2xl font-medium text-brand-navy sm:text-3xl">New &amp; Featured</h2>
-          <Link href="/books" className="flex items-center gap-1 text-sm font-medium text-brand-accent hover:underline">
-            View all <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-        <div className="mt-8 grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 lg:grid-cols-4">
-          {featured.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-          {featured.length === 0 && (
-            <p className="col-span-full rounded-xl border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-              No products yet — run <code className="rounded bg-muted px-1.5 py-0.5">npm run seed --workspace=@repo/database</code> to add sample data.
-            </p>
-          )}
-        </div>
-      </section>
+      <ClassSetBand />
+
+      <PlanBand
+        eyebrow="Author services"
+        title="Publish it yourself — we'll guide you."
+        standfirst="Every package takes your manuscript to a finished e-book. Add a printed edition, ISBN registration, and a storefront listing whenever you're ready."
+        plans={(services as ServiceLike[]).map((service, index) => ({
+          tag: index === 1 ? "Most popular" : undefined,
+          title: service.title,
+          price: formatINRWhole(service.priceCents),
+          meta: service.turnaroundDays != null ? `${service.turnaroundDays}-day turnaround` : undefined,
+          points: (service.description ?? "").split("\n").filter(Boolean).slice(0, 4),
+          cta: { label: `Choose ${service.title.split(" ")[0]}`, href: `/services/${service.slug}` },
+          featured: index === 1,
+        }))}
+      />
 
       {testimonials.length > 0 && (
-        <section className="border-t border-border bg-muted py-16">
-          <div className="mx-auto max-w-6xl px-5 sm:px-8">
-            <h2 className="font-serif text-2xl font-medium text-brand-navy sm:text-3xl">What readers say</h2>
-            <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {testimonials.map((t) => (
-                <figure key={t.id} className="rounded-2xl border border-border bg-card p-6">
-                  {t.rating && (
-                    <div className="flex gap-0.5 text-amber-500">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star key={i} className="h-3.5 w-3.5" fill={i < t.rating! ? "currentColor" : "none"} strokeWidth={1.5} />
-                      ))}
-                    </div>
-                  )}
-                  <blockquote className="mt-3 font-serif text-sm italic leading-relaxed text-foreground/90">&ldquo;{t.quote}&rdquo;</blockquote>
-                  <figcaption className="mt-4 flex items-center gap-3">
-                    {t.imageUrl ? (
-                      <Image src={t.imageUrl} alt={t.authorName} width={32} height={32} className="h-8 w-8 rounded-full object-cover" />
-                    ) : (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-navy-50 text-xs font-medium text-brand-navy">
-                        {t.authorName.charAt(0)}
-                      </div>
-                    )}
-                    <span className="text-sm font-medium text-foreground">{t.authorName}</span>
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
+        <Wrap as="section" className="py-12">
+          <SectionHead title="From our readers & authors" />
+          <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+            {testimonials.map((testimonial) => (
+              <figure key={testimonial.id} className="m-0 rounded-tile bg-tile p-6 inset-ring inset-ring-card-edge">
+                <Stars rating={testimonial.rating ?? 5} />
+                <blockquote className="mt-3.5 text-base leading-[1.55]">{testimonial.quote}</blockquote>
+                <figcaption className="mt-4 text-sm font-bold">{testimonial.authorName}</figcaption>
+              </figure>
+            ))}
           </div>
-        </section>
+        </Wrap>
       )}
 
+      <Newsletter />
+
       {faqs.length > 0 && (
-        <section className="mx-auto max-w-3xl px-5 py-16 sm:px-8">
-          <h2 className="font-serif text-2xl font-medium text-brand-navy sm:text-3xl">Frequently asked questions</h2>
-          <Accordion type="single" collapsible className="mt-6">
-            {faqs.map((f) => (
-              <AccordionItem key={f.id} value={f.id}>
-                <AccordionTrigger>{f.question}</AccordionTrigger>
-                <AccordionContent>{f.answer}</AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </section>
+        <Wrap as="section" className="py-12">
+          <SectionHead title="Common questions" />
+          <FaqList items={faqs} />
+        </Wrap>
       )}
-    </div>
+    </>
   );
 }
 
-function Hero({ banner }: { banner?: { title: string; subtitle: string | null; ctaText: string | null; ctaHref: string | null; imageUrl: string | null } }) {
-  const title = banner?.title ?? "Stories worth printing, worth publishing.";
-  const subtitle =
-    banner?.subtitle ??
-    "Physical books, e-books, and end-to-end self-publishing services — all under one roof.";
-  const ctaText = banner?.ctaText ?? "Browse the catalogue";
-  const ctaHref = banner?.ctaHref ?? "/self-publishing";
+/** Only the fields the band renders — works with a Prisma row or sample data. */
+interface ServiceLike {
+  id: string;
+  slug: string;
+  title: string;
+  priceCents: number;
+  description: string | null;
+  turnaroundDays: number | null;
+}
+
+/**
+ * The quantity-tier mechanic, retargeted at class sets. Schools order one
+ * title in bulk, so the per-copy price is shown falling as the tier rises
+ * — no quote, no waiting on a rep.
+ */
+function ClassSetBand() {
+  const base = 49_900;
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-[#0a0f1c] to-brand-navy-solid text-center">
-      {banner?.imageUrl && (
-        <Image src={banner.imageUrl} alt="" fill priority className="object-cover opacity-25" />
-      )}
-      <div className="relative mx-auto flex max-w-[760px] flex-col items-center gap-[22px] px-5 py-[88px] sm:px-8">
-        <p className="text-[13px] font-semibold uppercase tracking-[2.5px] text-amber-400">
-          Physical Books · E-Books · Self-Publishing
-        </p>
-        <h1 className="max-w-2xl font-serif text-[38px] font-semibold leading-[1.15] text-white sm:text-[52px]">
-          {title}
-        </h1>
-        <p className="max-w-[560px] text-[17px] leading-[1.6] text-white/85">{subtitle}</p>
-        <Button
-          asChild
-          size="lg"
-          variant="accent"
-          className="mt-2 rounded-lg px-8 py-[15px] text-[15px] shadow-lg shadow-black/35"
-        >
-          <Link href={ctaHref}>{ctaText}</Link>
-        </Button>
+    <Wrap as="section" className="py-12">
+      <div className="rounded-tile bg-tile p-6 inset-ring inset-ring-card-edge">
+        <div className="grid gap-7 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+          <div>
+            <Callout>Class sets</Callout>
+            <h2 className="mt-3.5">Buy more, save more.</h2>
+            <p className="mt-3 max-w-[42ch] text-base leading-[1.55] text-ink-muted">
+              Schools and reading groups order the same title in quantity. Pick a tier — the per-copy price drops
+              automatically. No quote, no waiting on a rep.
+            </p>
+            <Link href="/books" className={buttonClass("primary", "md", "mt-5")}>
+              Shop class sets
+            </Link>
+          </div>
+
+          <div>
+            <p className="caps mb-2.5 text-ink-muted">Books for Primary Students · per copy</p>
+            <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(134px,1fr))]">
+              {CLASS_SET_TIERS.map((tier) => (
+                <div
+                  key={tier.quantity}
+                  className="rounded-btn bg-ground px-3.5 py-3 inset-ring-2 inset-ring-line-strong"
+                >
+                  <span className="caps block">Buy {tier.quantity}</span>
+                  <span className="mt-1 block text-lg font-bold tracking-[-0.02em] tabular-nums">
+                    {formatINRWhole(tierUnitCents(base, tier.discount))}
+                  </span>
+                  <span className="mt-px block text-xs font-bold text-ok">
+                    {tier.discount > 0 ? `Save ${Math.round(tier.discount * 100)}%` : " "}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3.5 text-sm text-ink-muted">
+              MRP (inclusive of all taxes). Delivery billed at checkout.
+            </p>
+          </div>
+        </div>
       </div>
-    </section>
+    </Wrap>
   );
 }

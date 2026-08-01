@@ -1,15 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, Sparkles, Clock, Check } from "lucide-react";
 import { prisma } from "@repo/database";
-import { Badge } from "@repo/ui/badge";
-import { Separator } from "@repo/ui/separator";
-import { AddToCartButton } from "@/components/add-to-cart-button";
 import { withFallback } from "@/lib/safe-fetch";
-import { findSampleProduct } from "@/lib/sample-data";
+import { findSampleProduct, SERVICE_ADDONS } from "@/lib/sample-data";
+import { formatINRWhole } from "@/lib/format";
+import {
+  Breadcrumb,
+  Callout,
+  CheckList,
+  Rule,
+  TABLE_CLASS,
+  TD_CLASS,
+  ROW_TH_CLASS,
+  TableWrap,
+  Wrap,
+  buttonClass,
+} from "@/components/primitives";
+import { AddToCartButton } from "@/components/commerce/add-to-cart-button";
 
-// Admin-controlled per-product SEO — see apps/admin catalogue edit form.
+// Admin-controlled per-product SEO — see the apps/admin catalogue form.
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const product = (await withFallback(() => prisma.product.findUnique({ where: { slug } }), null)) ?? findSampleProduct(slug);
@@ -21,8 +31,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-// FR-2.3: service package comparison — features, price, turnaround time.
-// Falls back to sample data when there's no reachable database.
+const PROCESS = [
+  { step: "1", title: "Send the manuscript", body: "Word, Docs or plain text — whatever you wrote it in." },
+  { step: "2", title: "We set and design", body: "Interior layout, front and back matter, and the cover." },
+  { step: "3", title: "You review", body: "One consolidated round of changes, marked up however you like." },
+  { step: "4", title: "Files delivered", body: "Store-ready files, yours to publish anywhere you choose." },
+];
+
+// FR-2.3: service package detail — features, price, turnaround.
 export default async function ServiceDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = (await withFallback(() => prisma.product.findUnique({ where: { slug } }), null)) ?? findSampleProduct(slug);
@@ -31,57 +47,100 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
   const features = (product.description ?? "").split("\n").filter(Boolean);
 
   return (
-    <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8">
-      <nav className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Link href="/" className="hover:text-brand-navy">Home</Link>
-        <ChevronRight className="h-3 w-3" />
-        <span className="text-foreground">{product.title}</span>
-      </nav>
+    <>
+      <Wrap>
+        <Breadcrumb
+          trail={[
+            { label: "Home", href: "/" },
+            { label: "Publishing Services", href: "/services" },
+            { label: product.title },
+          ]}
+        />
+      </Wrap>
 
-      <div className="mt-6 rounded-2xl border border-border bg-card p-8">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-navy-50">
-          <Sparkles className="h-5 w-5 text-brand-navy" strokeWidth={1.75} />
-        </div>
+      <Wrap className="grid gap-9 pb-11 min-[980px]:grid-cols-[1fr_372px] min-[980px]:items-start min-[980px]:gap-12">
+        <div className="min-w-0">
+          <Callout>E-book creation package</Callout>
+          <h1 className="mt-4">{product.title}</h1>
 
-        <Badge variant="muted" className="mt-5">Service package</Badge>
-        <h1 className="mt-3 font-serif text-3xl font-medium leading-tight text-brand-navy">{product.title}</h1>
-
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          <p className="text-2xl font-semibold text-foreground">₹{(product.priceCents / 100).toFixed(2)}</p>
-          {product.turnaroundDays != null && (
-            <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Clock className="h-4 w-4" strokeWidth={1.75} /> {product.turnaroundDays}-day turnaround
-            </span>
+          {features.length > 0 && (
+            <>
+              <h2 className="mt-8">What&rsquo;s included</h2>
+              <CheckList className="mt-3.5" items={features} />
+            </>
           )}
+
+          <Rule className="my-9" />
+
+          <h2>How it works</h2>
+          <ol className="mt-4 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
+            {PROCESS.map((step) => (
+              <li key={step.step} className="rounded-tile bg-tile p-5 inset-ring inset-ring-card-edge">
+                <span className="grid h-[26px] w-[26px] place-items-center rounded-full bg-brand text-[11px] font-bold text-on-brand">
+                  {step.step}
+                </span>
+                <h3 className="mt-2.5">{step.title}</h3>
+                <p className="mt-1 text-sm leading-[1.5] text-ink-muted">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+
+          <Rule className="my-9" />
+
+          <h2 className="mb-4">Add-ons you can stack on</h2>
+          <TableWrap>
+            <table className={TABLE_CLASS}>
+              <tbody>
+                {SERVICE_ADDONS.map((addon) => (
+                  <tr key={addon.name}>
+                    <th scope="row" className={ROW_TH_CLASS}>
+                      {addon.name}
+                    </th>
+                    <td className={`${TD_CLASS} tabular-nums`}>+{formatINRWhole(addon.priceCents)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
         </div>
 
-        <div className="mt-6">
-          <AddToCartButton
-            product={{
-              productId: product.id,
-              title: product.title,
-              priceCents: product.priceCents,
-              fulfillmentType: "SERVICE",
-            }}
-          />
-        </div>
+        <div className="min-w-0 min-[980px]:sticky min-[980px]:top-[68px]">
+          <div className="rounded-tile bg-ground p-[26px] inset-ring inset-ring-line">
+            <p className="text-4xl font-bold leading-none tracking-[-0.03em] tabular-nums">
+              {formatINRWhole(product.priceCents)}
+            </p>
+            <p className="mt-2 text-sm text-ink-muted">One-off price, inclusive of 18% GST</p>
 
-        <Separator className="my-7" />
+            <CheckList
+              className="mt-5"
+              items={[
+                product.turnaroundDays != null
+                  ? `${product.turnaroundDays}-day turnaround from manuscript receipt`
+                  : "Turnaround confirmed on upload",
+                "You keep every right to the finished files",
+                "A named contact for the whole project",
+              ]}
+            />
 
-        {features.length > 0 && (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What&apos;s included</p>
-            <ul className="mt-3 space-y-2.5">
-              {features.map((feature) => (
-                <li key={feature} className="flex items-start gap-2 text-sm text-foreground/90">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-navy" strokeWidth={2} />
-                  {feature}
-                </li>
-              ))}
-            </ul>
+            <div className="mt-5 grid gap-2.5">
+              <AddToCartButton
+                className="w-full"
+                product={{
+                  productId: product.id,
+                  title: product.title,
+                  priceCents: product.priceCents,
+                  fulfillmentType: "SERVICE",
+                  taxType: "SERVICE_PACKAGE",
+                  note: `E-book creation service · ${product.turnaroundDays ?? 5}-day turnaround`,
+                }}
+              />
+              <Link href="/services" className={buttonClass("secondary", "lg", "w-full")}>
+                Compare packages
+              </Link>
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      </Wrap>
+    </>
   );
 }

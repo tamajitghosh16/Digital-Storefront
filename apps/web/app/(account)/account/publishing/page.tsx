@@ -1,24 +1,33 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { FileEdit, LayoutDashboard, BookCheck, TrendingUp, Wallet } from "lucide-react";
 import { getCurrentUser } from "@repo/auth/server";
 import { prisma } from "@repo/database";
-import { Card, CardContent } from "@repo/ui/card";
-import { Badge } from "@repo/ui/badge";
-import { Button } from "@repo/ui/button";
 import { withFallback } from "@/lib/safe-fetch";
 import { SAMPLE_PUBLISHING_PROJECTS } from "@/lib/sample-data";
+import { formatINRWhole } from "@/lib/format";
+import {
+  Callout,
+  SectionHead,
+  TABLE_CLASS,
+  TD_CLASS,
+  TH_CLASS,
+  TableWrap,
+  buttonClass,
+} from "@/components/primitives";
 
-const statusVariant = {
-  SUBMITTED: "muted",
-  IN_REVIEW: "default",
-  IN_PRODUCTION: "default",
-  PROOF_READY: "success",
-  PUBLISHED: "success",
-  REJECTED: "accent",
-} as const;
+export const metadata: Metadata = { title: "Publishing & royalties" };
 
 // FR-13.1: author dashboard — project status, sales, royalty balance.
+const PROJECT_STATUS: Record<string, { label: string; tone: "ok" | "brand" | "tile"; progress: number }> = {
+  SUBMITTED: { label: "Submitted · step 1 of 4", tone: "tile", progress: 25 },
+  IN_REVIEW: { label: "In review · step 2 of 4", tone: "brand", progress: 50 },
+  IN_PRODUCTION: { label: "In production · step 3 of 4", tone: "brand", progress: 72 },
+  PROOF_READY: { label: "Proof ready · step 3 of 4", tone: "brand", progress: 85 },
+  PUBLISHED: { label: "Published", tone: "ok", progress: 100 },
+  REJECTED: { label: "Not accepted", tone: "tile", progress: 100 },
+};
+
 export default async function PublishingDashboardPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "SELF_PUB_AUTHOR") redirect("/unauthorized");
@@ -33,83 +42,129 @@ export default async function PublishingDashboardPage() {
     SAMPLE_PUBLISHING_PROJECTS
   );
 
-  const activeProjects = projects.filter((p) => p.status !== "PUBLISHED" && p.status !== "REJECTED").length;
-  const publishedTitles = projects.filter((p) => p.status === "PUBLISHED").length;
-  const royaltyBalance = projects.reduce(
-    (sum, p) => sum + p.royalties.reduce((rSum, r) => rSum + r.amountOwedCents, 0),
-    0
-  );
-  const totalSales = projects.reduce(
-    (sum, p) => sum + p.royalties.reduce((rSum, r) => rSum + r.grossSalesCents, 0),
-    0
+  const royalties = projects.flatMap((project) =>
+    project.royalties.map((royalty) => ({ ...royalty, bookTitle: project.bookTitle }))
   );
 
+  const pending = royalties.filter((royalty) => royalty.payoutStatus === "PENDING");
+  const paid = royalties.filter((royalty) => royalty.payoutStatus === "PAID");
+
   const stats = [
-    { label: "Active projects", value: String(activeProjects), Icon: LayoutDashboard },
-    { label: "Published titles", value: String(publishedTitles), Icon: BookCheck },
-    { label: "Total sales (all time)", value: `₹${(totalSales / 100).toFixed(2)}`, Icon: TrendingUp },
-    { label: "Royalty balance", value: `₹${(royaltyBalance / 100).toFixed(2)}`, Icon: Wallet },
+    {
+      label: "Next payout",
+      value: formatINRWhole(pending.reduce((sum, royalty) => sum + royalty.amountOwedCents, 0)),
+      note: "Paid on the 7th",
+    },
+    {
+      label: "Paid to date",
+      value: formatINRWhole(paid.reduce((sum, royalty) => sum + royalty.amountOwedCents, 0)),
+      note: `Across ${projects.length} project${projects.length === 1 ? "" : "s"}`,
+    },
+    {
+      label: "Published titles",
+      value: String(projects.filter((project) => project.status === "PUBLISHED").length),
+      note: `${projects.length} in the programme`,
+    },
   ];
 
   return (
-    <div>
-      <div className="flex items-center justify-between">
-        <h1 className="font-serif text-xl font-medium text-brand-navy">Publishing dashboard</h1>
-        <Button asChild size="sm" variant="outline">
-          <Link href="/self-publishing">New project</Link>
-        </Button>
-      </div>
+    <div className="grid gap-10">
+      <section>
+        <SectionHead title="Publishing projects" href="/self-publishing" hrefLabel="Start another" />
 
-      {projects.length > 0 && (
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {stats.map(({ label, value, Icon }) => (
-            <Card key={label}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <Icon className="h-3.5 w-3.5" strokeWidth={1.75} /> {label}
+        {projects.length === 0 ? (
+          <div className="rounded-tile bg-tile px-6 py-14 text-center inset-ring inset-ring-card-edge">
+            <h3>No projects yet</h3>
+            <p className="mx-auto mt-2 max-w-[46ch] text-sm text-ink-muted">
+              Start a self-publishing project and it&rsquo;ll appear here with its status and royalties.
+            </p>
+            <Link href="/self-publishing" className={buttonClass("primary", "md", "mt-5")}>
+              Start your first project
+            </Link>
+          </div>
+        ) : (
+          <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+            {projects.map((project) => {
+              const status = PROJECT_STATUS[project.status] ?? {
+                label: project.status,
+                tone: "tile" as const,
+                progress: 50,
+              };
+              return (
+                <div key={project.id} className="rounded-tile bg-tile p-6 inset-ring inset-ring-card-edge">
+                  <Callout tone={status.tone}>{status.label}</Callout>
+                  <h3 className="mt-3.5">{project.bookTitle}</h3>
+                  <p className="mt-1.5 text-sm text-ink-muted">
+                    {project.selectedPackage} package · updated{" "}
+                    {new Date(project.updatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                  </p>
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-tile-2">
+                    <span className="block h-full rounded-full bg-ink" style={{ width: `${status.progress}%` }} />
+                  </div>
+                  <Link
+                    href="/self-publishing"
+                    className={buttonClass(project.status === "PUBLISHED" ? "secondary" : "primary", "sm", "mt-[18px]")}
+                  >
+                    {project.status === "PUBLISHED" ? "View listing" : "Review the proof"}
+                  </Link>
                 </div>
-                <p className="mt-1.5 text-xl font-semibold text-brand-navy">{value}</p>
-              </CardContent>
-            </Card>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section>
+        <SectionHead title="Royalties" standfirst="Paid on the 7th, for the previous month." />
+
+        <div className="mb-5 grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+          {stats.map((stat) => (
+            <div key={stat.label} className="rounded-tile bg-tile p-[22px] inset-ring inset-ring-card-edge">
+              <p className="caps text-ink-muted">{stat.label}</p>
+              <p className="mt-2 text-[30px] font-bold tracking-[-0.03em] tabular-nums">{stat.value}</p>
+              <p className="text-sm text-ink-muted">{stat.note}</p>
+            </div>
           ))}
         </div>
-      )}
 
-      {projects.length === 0 ? (
-        <Card className="mt-4">
-          <CardContent className="flex flex-col items-center gap-3 py-14 text-center">
-            <FileEdit className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-            <p className="text-sm text-muted-foreground">No self-publishing projects yet.</p>
-            <Button asChild size="sm">
-              <Link href="/self-publishing">Start your first project</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <ul className="mt-4 space-y-3">
-          {projects.map((project) => {
-            const royaltyOwed = project.royalties.reduce((sum, r) => sum + r.amountOwedCents, 0);
-            return (
-              <li key={project.id}>
-                <Card>
-                  <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
-                    <div>
-                      <p className="font-medium text-foreground">{project.bookTitle}</p>
-                      <Badge variant={statusVariant[project.status]} className="mt-1.5">
-                        {project.status.replaceAll("_", " ")}
-                      </Badge>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">Royalty balance</p>
-                      <p className="text-sm font-semibold text-foreground">₹{(royaltyOwed / 100).toFixed(2)}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+        {royalties.length > 0 && (
+          <TableWrap>
+            <table className={TABLE_CLASS}>
+              <thead>
+                <tr>
+                  <th className={TH_CLASS}>Period</th>
+                  <th className={TH_CLASS}>Title</th>
+                  <th className={TH_CLASS}>Gross sales</th>
+                  <th className={TH_CLASS}>Rate</th>
+                  <th className={TH_CLASS}>Earned</th>
+                  <th className={TH_CLASS}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {royalties.map((royalty) => (
+                  <tr key={royalty.id}>
+                    <td className={TD_CLASS}>
+                      {new Date(royalty.salesPeriodEnd).toLocaleDateString("en-IN", {
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </td>
+                    <td className={TD_CLASS}>{royalty.bookTitle}</td>
+                    <td className={`${TD_CLASS} tabular-nums`}>{formatINRWhole(royalty.grossSalesCents)}</td>
+                    <td className={`${TD_CLASS} tabular-nums`}>{royalty.royaltyRateBps / 100}%</td>
+                    <td className={`${TD_CLASS} tabular-nums`}>{formatINRWhole(royalty.amountOwedCents)}</td>
+                    <td className={TD_CLASS}>
+                      <Callout tone={royalty.payoutStatus === "PAID" ? "ok" : "tile"}>
+                        {royalty.payoutStatus === "PAID" ? "Paid" : "Pending"}
+                      </Callout>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+      </section>
     </div>
   );
 }

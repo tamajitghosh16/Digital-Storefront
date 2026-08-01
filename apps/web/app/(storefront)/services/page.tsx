@@ -1,90 +1,224 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Check, Clock } from "lucide-react";
 import { prisma } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
 import { SAMPLE_SERVICES, SERVICE_ADDONS } from "@/lib/sample-data";
-import { Card, CardContent } from "@repo/ui/card";
-import { Badge } from "@repo/ui/badge";
-import { Button } from "@repo/ui/button";
+import { formatINRWhole } from "@/lib/format";
+import {
+  Callout,
+  PageHeader,
+  SectionHead,
+  Standfirst,
+  TABLE_CLASS,
+  TD_CLASS,
+  TH_CLASS,
+  ROW_TH_CLASS,
+  TableWrap,
+  Wrap,
+  buttonClass,
+} from "@/components/primitives";
+import { FaqList, PlanBand } from "@/components/marketing";
 
 export const metadata: Metadata = { title: "Publishing Services" };
 
-const FEATURED_SLUG = "standard-formatting";
+// FR-2.3: service-package catalogue. The comparison table is the centre
+// of this page — three fixed prices, and what separates them.
 
-// FR-2.3: service-package catalogue (Basic/Standard/Premium e-book
-// creation) plus optional add-ons — mirrors the mockup's Services page,
-// which this app previously had no listing for (only /services/[slug]).
+const PROCESS = [
+  { tag: "Step 1", title: "Upload", points: ["DOCX, ODT, or PDF", "We confirm the word count", "Quote fixed within a day"] },
+  { tag: "Step 2", title: "Set", points: ["Interior typeset to package", "Cover drafted or selected", "First proof in your dashboard"] },
+  { tag: "Step 3", title: "Revise", points: ["You mark up the proof", "We apply your included round", "Extra rounds ₹2,500 each"] },
+  { tag: "Step 4", title: "Deliver", points: ["Final files to your library", "Optional ISBN registration", "Optional storefront listing"] },
+];
+
+const ADDON_DETAIL: Record<string, { turnaround: string; covers: string }> = {
+  "Extra revision round": { turnaround: "+2 days", covers: "One more markup-and-apply cycle on the proof" },
+  Proofreading: { turnaround: "+2 days", covers: "A read for typos, spacing and broken references" },
+  "Copy Editing": { turnaround: "+5 days", covers: "Line-level editing for sense, grammar and consistency" },
+  "ISBN Registration Assistance": {
+    turnaround: "+3 days",
+    covers: "Filed with the Raja Rammohun Roy National Agency on your behalf",
+  },
+  "Metadata & Keyword Optimization": { turnaround: "+1 day", covers: "Categories and search terms set for the retailers" },
+};
+
+const FAQS = [
+  {
+    id: "edit",
+    question: "Do you edit the writing itself?",
+    answer:
+      "No. We set and produce — typesetting, formatting, cover, files. If the manuscript needs a copy-editor we'll say so and point you at one, but we won't quietly rewrite your sentences.",
+  },
+  {
+    id: "rights",
+    question: "Who owns the finished files?",
+    answer:
+      "You do, completely. We keep no rights to the text, the cover, or the production files, and you can take them anywhere.",
+  },
+  {
+    id: "mess",
+    question: "What if the manuscript is a mess?",
+    answer:
+      "Most are. Track changes, mixed fonts, images pasted inline — all normal. We'll flag anything that genuinely blocks production before we start.",
+  },
+  {
+    id: "sell",
+    question: "Can I sell it here afterwards?",
+    answer:
+      "Yes, and listing is free. You keep 70% of the digital list price and 40% of the printed price, paid on the 7th of each month.",
+  },
+];
+
+interface ServiceLike {
+  id: string;
+  slug: string;
+  title: string;
+  priceCents: number;
+  description: string | null;
+  turnaroundDays: number | null;
+}
+
 export default async function ServicesCataloguePage() {
-  const services = await withFallback(
-    () =>
-      prisma.product.findMany({
-        where: { type: "SERVICE_PACKAGE", isPublished: true },
-        orderBy: { priceCents: "asc" },
-      }),
+  const services = (await withFallback(
+    () => prisma.product.findMany({ where: { type: "SERVICE_PACKAGE", isPublished: true }, orderBy: { priceCents: "asc" } }),
     SAMPLE_SERVICES
-  );
+  )) as ServiceLike[];
+
+  const featureRows = [
+    { label: "Turnaround", values: services.map((s) => (s.turnaroundDays != null ? `${s.turnaroundDays} days` : "—")) },
+    { label: "EPUB & MOBI", values: services.map(() => "✓") },
+    { label: "Interior formatting", values: ["Standard", "Custom", "Custom + illustrations"] },
+    { label: "Cover", values: ["Template", "Template", "Designed from scratch"] },
+    { label: "Front & back matter", values: ["—", "✓", "✓"] },
+    { label: "Revision rounds", values: ["—", "1", "2"] },
+    { label: "Formats delivered", values: ["2", "3", "All, incl. print-ready PDF"] },
+  ];
 
   return (
-    <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
-      <h1 className="font-serif text-3xl font-medium text-brand-navy">Digital Services — E-Book Creation</h1>
-      <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-        Have a finished manuscript? Choose a package below and we&apos;ll turn it into a polished, publish-ready
-        e-book — formatting, cover design, and multi-format delivery included.
-      </p>
+    <>
+      <PageHeader>
+        <Callout>E-book creation</Callout>
+        <h1 className="mt-4">E-book creation, done properly.</h1>
+        <Standfirst>
+          Send a manuscript. Get back files that open cleanly on every reader, with a cover that doesn&rsquo;t look
+          like a template — unless you want the template, which is fine too.
+        </Standfirst>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/self-publishing/wizard/step-1" className={buttonClass("primary", "lg")}>
+            Upload a manuscript
+          </Link>
+          <Link href="#questions" className={buttonClass("secondary", "lg")}>
+            Get a quote first
+          </Link>
+        </div>
+      </PageHeader>
 
-      <div className="mt-8 grid gap-6 sm:grid-cols-3">
-        {services.map((service) => {
-          const highlighted = service.slug === FEATURED_SLUG;
-          const features = (service.description ?? "").split("\n").filter(Boolean);
-          return (
-            <Card
-              key={service.id}
-              className={highlighted ? "relative border-brand-accent shadow-md ring-1 ring-brand-accent" : "relative"}
-            >
-              {highlighted && (
-                <Badge variant="accent" className="absolute -top-3 right-5">
-                  Most popular
-                </Badge>
-              )}
-              <CardContent className="p-6">
-                <p className="font-serif text-lg font-medium text-brand-navy">{service.title}</p>
-                <p className="mt-2 text-2xl font-semibold text-foreground">₹{(service.priceCents / 100).toFixed(2)}</p>
-                {service.turnaroundDays != null && (
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5" strokeWidth={1.75} /> {service.turnaroundDays}-day turnaround
-                  </p>
-                )}
-                <ul className="mt-5 space-y-2.5">
-                  {features.map((feature) => (
-                    <li key={feature} className="flex items-start gap-2 text-sm text-foreground/90">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-navy" strokeWidth={2} />
-                      {feature}
-                    </li>
+      <Wrap as="section" className="py-12">
+        <SectionHead title="Three packages" standfirst="Prices are fixed. No hourly billing, no surprise line items." />
+        <TableWrap>
+          <table className={TABLE_CLASS}>
+            <thead>
+              <tr>
+                <th className={TH_CLASS}>What you get</th>
+                {services.map((service) => (
+                  <th key={service.id} className={TH_CLASS}>
+                    {service.title}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row" className={ROW_TH_CLASS}>
+                  Price
+                </th>
+                {services.map((service, index) => (
+                  <td key={service.id} className={`${TD_CLASS} tabular-nums`}>
+                    <strong className="text-[17px]">{formatINRWhole(service.priceCents)}</strong>
+                    {index === 1 && (
+                      <span className="mt-1.5 block">
+                        <Callout>Most popular</Callout>
+                      </span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+              {featureRows.map((row) => (
+                <tr key={row.label}>
+                  <th scope="row" className={ROW_TH_CLASS}>
+                    {row.label}
+                  </th>
+                  {services.map((service, index) => (
+                    <td key={service.id} className={TD_CLASS}>
+                      {row.values[index] ?? "—"}
+                    </td>
                   ))}
-                </ul>
-                <Button asChild className="mt-6 w-full" variant={highlighted ? "accent" : "outline"}>
-                  <Link href={`/services/${service.slug}`}>Select package</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                </tr>
+              ))}
+              <tr>
+                <td className={TD_CLASS} />
+                {services.map((service, index) => (
+                  <td key={service.id} className={TD_CLASS}>
+                    <Link
+                      href={`/services/${service.slug}`}
+                      className={buttonClass(index === 1 ? "primary" : "secondary", "sm")}
+                    >
+                      Choose {service.title.split(" ")[0]}
+                    </Link>
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </TableWrap>
+      </Wrap>
 
-      <div className="mt-14">
-        <h2 className="font-serif text-2xl font-medium text-brand-navy">Optional add-ons</h2>
-        <Card className="mt-5 max-w-xl">
-          <CardContent className="divide-y divide-border p-0">
-            {SERVICE_ADDONS.map((addon) => (
-              <div key={addon.name} className="flex items-center justify-between px-6 py-4 text-sm">
-                <span className="text-foreground/90">{addon.name}</span>
-                <span className="font-semibold text-brand-navy">+₹{(addon.priceCents / 100).toFixed(2)}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      <PlanBand
+        eyebrow="The process"
+        title="Four steps, in this order."
+        standfirst="Every project moves through the same sequence — you can see which step yours is on from your dashboard at any time."
+        plans={PROCESS.map((step) => ({ tag: step.tag, title: step.title, points: step.points }))}
+      />
+
+      <Wrap as="section" className="py-12">
+        <SectionHead title="Add-ons" standfirst="Bolt these onto any package." />
+        <TableWrap>
+          <table className={TABLE_CLASS}>
+            <thead>
+              <tr>
+                <th className={TH_CLASS}>Add-on</th>
+                <th className={TH_CLASS}>Price</th>
+                <th className={TH_CLASS}>Adds to turnaround</th>
+                <th className={TH_CLASS}>What it covers</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SERVICE_ADDONS.map((addon) => {
+                const detail = ADDON_DETAIL[addon.name];
+                return (
+                  <tr key={addon.name}>
+                    <td className={TD_CLASS}>{addon.name}</td>
+                    <td className={`${TD_CLASS} tabular-nums`}>{formatINRWhole(addon.priceCents)}</td>
+                    <td className={`${TD_CLASS} tabular-nums`}>{detail?.turnaround ?? "—"}</td>
+                    <td className={TD_CLASS}>{detail?.covers ?? "—"}</td>
+                  </tr>
+                );
+              })}
+              <tr>
+                <td className={TD_CLASS}>Storefront listing</td>
+                <td className={TD_CLASS}>Free</td>
+                <td className={`${TD_CLASS} tabular-nums`}>+1 day</td>
+                <td className={TD_CLASS}>Your title goes live here, royalties paid monthly</td>
+              </tr>
+            </tbody>
+          </table>
+        </TableWrap>
+      </Wrap>
+
+      <Wrap as="section" id="questions" className="scroll-mt-6 pb-12">
+        <SectionHead title="Questions authors ask first" />
+        <FaqList items={FAQS} />
+      </Wrap>
+    </>
   );
 }

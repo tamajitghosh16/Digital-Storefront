@@ -38,7 +38,7 @@ export const CATALOG_ITEMS: CatalogItem[] = [
     flow: "ecommerce",
     flowLabel: "Automated e-commerce",
     description:
-      "Published under the Ink & Imagination sub-brand. Direct shopping-cart checkout, with 25% of every sale contributed to the Sashibhusan Chattopadhyay Memorial Trust.",
+      "Published under the Ink & Imagination sub-brand. Direct shopping-cart checkout, with 25% of every sale contributed to the Sashibhusan Book Press Memorial Trust.",
     ctaLabel: "Browse Books",
     ctaHref: "/books",
   },

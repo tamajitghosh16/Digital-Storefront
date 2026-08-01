@@ -1,30 +1,8 @@
-import type {
-  Product,
-  Banner,
-  Testimonial,
-  Faq,
-  NavLink,
-  Order,
-  OrderItem,
-  SelfPublishingProject,
-  Royalty,
-} from "@repo/database";
+// The catalogue's 58 sample titles. One seed becomes two listings — a
+// printed edition and an e-book — the way one manuscript does in the
+// real data model.
 
-/**
- * Static sample data for previewing the storefront UI without a live
- * Supabase/Postgres connection. Nothing here is written to the database —
- * pages fall back to this data only when the real `prisma` call throws
- * (no DATABASE_URL reachable) or returns an empty result (fresh DB).
- *
- * Remove this file once the admin app has real content and
- * `npm run seed --workspace=@repo/database` has been run against a live DB.
- */
-
-// ────────────────────────────────────────────────────────────
-// Books — one row of source truth, projected into PHYSICAL_BOOK and
-// EBOOK product rows below (mirrors how one manuscript becomes two
-// catalogue listings in the real data model).
-// ────────────────────────────────────────────────────────────
+import { baseProductFields, type DisplayProduct } from "./shared";
 
 interface BookSeed {
   id: string;
@@ -55,7 +33,7 @@ const BOOK_SEEDS: BookSeed[] = [
       "A sweeping literary novel following three generations of a coastal family bound together — and torn apart — by the sea they call home.",
     physicalPriceCents: 249900,
     ebookPriceCents: 99900,
-    rating: 5,
+    rating: 4.8,
     reviewCount: 128,
     stockQty: 34,
     isbn: "978-1-9821-0341-2",
@@ -73,7 +51,7 @@ const BOOK_SEEDS: BookSeed[] = [
       "When a bookkeeper discovers her ledgers can rewrite reality, she must decide what the world owes her — and what she owes it.",
     physicalPriceCents: 279900,
     ebookPriceCents: 119900,
-    rating: 4,
+    rating: 4.2,
     reviewCount: 87,
     stockQty: 21,
     isbn: "978-1-9821-0342-9",
@@ -91,7 +69,7 @@ const BOOK_SEEDS: BookSeed[] = [
       "A deep-space communications officer receives a message from a ship that was decommissioned twenty years ago.",
     physicalPriceCents: 229900,
     ebookPriceCents: 89900,
-    rating: 4,
+    rating: 4.3,
     reviewCount: 63,
     stockQty: 40,
     isbn: "978-1-9821-0343-6",
@@ -108,7 +86,7 @@ const BOOK_SEEDS: BookSeed[] = [
     description: "A collection of poems on solitude, work, and the small hours of the morning.",
     physicalPriceCents: 169900,
     ebookPriceCents: 69900,
-    rating: 5,
+    rating: 4.9,
     reviewCount: 41,
     stockQty: 18,
     isbn: "978-1-9821-0344-3",
@@ -125,7 +103,7 @@ const BOOK_SEEDS: BookSeed[] = [
     description: "An 18th-century mapmaker is commissioned to chart territory that, by treaty, should not exist.",
     physicalPriceCents: 259900,
     ebookPriceCents: 109900,
-    rating: 4,
+    rating: 4.4,
     reviewCount: 55,
     stockQty: 12,
     isbn: "978-1-9821-0345-0",
@@ -143,7 +121,7 @@ const BOOK_SEEDS: BookSeed[] = [
       "In a city where trees broadcast memories, a young technician is hired to silence one particular grove.",
     physicalPriceCents: 269900,
     ebookPriceCents: 114900,
-    rating: 5,
+    rating: 4.7,
     reviewCount: 96,
     stockQty: 27,
     isbn: "978-1-9821-0346-7",
@@ -161,7 +139,7 @@ const BOOK_SEEDS: BookSeed[] = [
       "A field guide to the informal markets that keep coastal towns running when the formal ones fail.",
     physicalPriceCents: 299900,
     ebookPriceCents: 139900,
-    rating: 4,
+    rating: 4.0,
     reviewCount: 32,
     stockQty: 0,
     isbn: "978-1-9821-0347-4",
@@ -178,7 +156,7 @@ const BOOK_SEEDS: BookSeed[] = [
     description: "A theater understudy keeps a diary of every role she never got to play — until one night, she does.",
     physicalPriceCents: 239900,
     ebookPriceCents: 94900,
-    rating: 3,
+    rating: 3.3,
     reviewCount: 19,
     stockQty: 8,
     isbn: "978-1-9821-0348-1",
@@ -188,14 +166,14 @@ const BOOK_SEEDS: BookSeed[] = [
   },
   {
     id: "book-9",
-    slug: "the-well-of-ascension",
-    title: "The Well of Ascension",
+    slug: "emberwright",
+    title: "Emberwright",
     author: "William Hernandez",
     genre: "Fantasy",
     description: "A hilarious comedy that will make you laugh out loud.",
     physicalPriceCents: 252508,
     ebookPriceCents: 96979,
-    rating: 4,
+    rating: 4.4,
     reviewCount: 199,
     stockQty: 33,
     isbn: "978-1-9821-4436-0",
@@ -205,14 +183,14 @@ const BOOK_SEEDS: BookSeed[] = [
   },
   {
     id: "book-10",
-    slug: "mistborn",
-    title: "Mistborn",
+    slug: "the-quiet-handoff",
+    title: "The Quiet Handoff",
     author: "Aria Gonzalez",
     genre: "Thriller",
     description: "A poignant tale of love and loss.",
     physicalPriceCents: 155444,
     ebookPriceCents: 116368,
-    rating: 4,
+    rating: 4.1,
     reviewCount: 28,
     stockQty: 75,
     isbn: "978-1-9821-8118-2",
@@ -229,7 +207,7 @@ const BOOK_SEEDS: BookSeed[] = [
     description: "A poignant tale of love and loss.",
     physicalPriceCents: 317983,
     ebookPriceCents: 102127,
-    rating: 4,
+    rating: 4.1,
     reviewCount: 130,
     stockQty: 48,
     isbn: "978-1-9821-2007-4",
@@ -1038,33 +1016,6 @@ const BOOK_SEEDS: BookSeed[] = [
   },
 ];
 
-const now = new Date();
-
-function baseProductFields(overrides: Partial<Product> = {}) {
-  return {
-    currency: "INR",
-    weightGrams: null,
-    sourceProjectId: null,
-    metaTitle: null,
-    metaDescription: null,
-    ogImageUrl: null,
-    isPublished: true,
-    publishedAt: now,
-    createdAt: now,
-    updatedAt: now,
-    ...overrides,
-  };
-}
-
-/** Extra display-only fields (not part of the Prisma schema) used by cards/detail pages. */
-export type DisplayProduct = Product & {
-  genre: string;
-  rating: number;
-  reviewCount: number;
-  coverFrom: string;
-  coverTo: string;
-};
-
 export const SAMPLE_BOOKS: DisplayProduct[] = BOOK_SEEDS.map((b) => ({
   ...baseProductFields(),
   id: `${b.id}-physical`,
@@ -1081,6 +1032,7 @@ export const SAMPLE_BOOKS: DisplayProduct[] = BOOK_SEEDS.map((b) => ({
   formats: [],
   sampleUrl: null,
   turnaroundDays: null,
+  pages: b.pages,
   genre: b.genre,
   rating: b.rating,
   reviewCount: b.reviewCount,
@@ -1103,379 +1055,10 @@ export const SAMPLE_EBOOKS: DisplayProduct[] = BOOK_SEEDS.map((b) => ({
   formats: ["EPUB", "MOBI", "PDF"],
   sampleUrl: null,
   turnaroundDays: null,
+  pages: b.pages,
   genre: b.genre,
   rating: b.rating,
   reviewCount: Math.round(b.reviewCount * 0.6),
   coverFrom: b.coverFrom,
   coverTo: b.coverTo,
 })) as DisplayProduct[];
-
-// ────────────────────────────────────────────────────────────
-// Digital services — e-book creation packages
-// ────────────────────────────────────────────────────────────
-
-interface ServiceSeed {
-  id: string;
-  slug: string;
-  title: string;
-  description: string;
-  priceCents: number;
-  turnaroundDays: number;
-  features: string[];
-  featured?: boolean;
-}
-
-export const SERVICE_SEEDS: ServiceSeed[] = [
-  {
-    id: "service-basic",
-    slug: "basic-conversion",
-    title: "Basic Conversion",
-    description: "Manuscript to EPUB & MOBI with standard formatting and a template cover.",
-    priceCents: 790000,
-    turnaroundDays: 5,
-    features: ["Manuscript → EPUB & MOBI", "Standard formatting", "Template cover", "3–5 day turnaround"],
-  },
-  {
-    id: "service-standard",
-    slug: "standard-formatting",
-    title: "Standard Formatting",
-    description: "Custom interior formatting with front/back matter and a round of revisions.",
-    priceCents: 1790000,
-    turnaroundDays: 7,
-    features: [
-      "Everything in Basic",
-      "Custom interior formatting",
-      "Table of contents & front/back matter",
-      "1 round of revisions",
-      "5–7 day turnaround",
-    ],
-    featured: true,
-  },
-  {
-    id: "service-premium",
-    slug: "premium-design",
-    title: "Premium Design",
-    description: "Custom cover design, illustration placement, and multi-format delivery.",
-    priceCents: 3490000,
-    turnaroundDays: 10,
-    features: [
-      "Everything in Standard",
-      "Custom cover design",
-      "Image & illustration placement",
-      "2 rounds of revisions",
-      "Multi-format delivery",
-    ],
-  },
-];
-
-export const SAMPLE_SERVICES: DisplayProduct[] = SERVICE_SEEDS.map((s) => ({
-  ...baseProductFields(),
-  id: s.id,
-  type: "SERVICE_PACKAGE",
-  title: s.title,
-  author: "New School Book Press",
-  slug: s.slug,
-  description: s.features.join("\n"),
-  priceCents: s.priceCents,
-  coverImageUrl: null,
-  stockQty: null,
-  isbn: null,
-  formats: [],
-  sampleUrl: null,
-  turnaroundDays: s.turnaroundDays,
-  genre: "Digital Service",
-  rating: 5,
-  reviewCount: 12,
-  coverFrom: "#c9973b",
-  coverTo: "#8a641f",
-})) as DisplayProduct[];
-
-export const SERVICE_ADDONS = [
-  { name: "Proofreading", priceCents: 4500 },
-  { name: "Copy Editing", priceCents: 12000 },
-  { name: "ISBN Registration Assistance", priceCents: 2500 },
-  { name: "Metadata & Keyword Optimization", priceCents: 3500 },
-];
-
-export const SAMPLE_PRODUCTS: DisplayProduct[] = [...SAMPLE_BOOKS, ...SAMPLE_EBOOKS, ...SAMPLE_SERVICES];
-
-export function findSampleProduct(slug: string): DisplayProduct | undefined {
-  return SAMPLE_PRODUCTS.find((p) => p.slug === slug);
-}
-
-// ────────────────────────────────────────────────────────────
-// Homepage CMS content (Banners / Testimonials / FAQs / NavLinks)
-// ────────────────────────────────────────────────────────────
-
-export const SAMPLE_BANNERS: Banner[] = [
-  {
-    id: "banner-hero",
-    title: "Your story, published your way.",
-    subtitle:
-      "Shop the catalogue, order custom e-book creation, or launch your own book through our guided self-publishing program.",
-    imageUrl: null,
-    ctaText: "Start self-publishing",
-    ctaHref: "/self-publishing",
-    order: 0,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-  },
-];
-
-export const SAMPLE_TESTIMONIALS: Testimonial[] = [
-  {
-    id: "testimonial-1",
-    authorName: "Ananya Kulkarni",
-    quote: "The Guided package took my manuscript from a Word doc to a real listing in under a month. Royalties show up like clockwork.",
-    rating: 5,
-    imageUrl: null,
-    order: 0,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "testimonial-2",
-    authorName: "Rohan Mehta",
-    quote: "Ordered three physical copies for a book club — shipping was fast and the packaging was excellent.",
-    rating: 5,
-    imageUrl: null,
-    order: 1,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "testimonial-3",
-    authorName: "Farah Sheikh",
-    quote: "Standard Formatting service made my EPUB look genuinely professional. Worth every rupee.",
-    rating: 4,
-    imageUrl: null,
-    order: 2,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-  },
-];
-
-export const SAMPLE_FAQS: Faq[] = [
-  {
-    id: "faq-1",
-    question: "How long does self-publishing take?",
-    answer:
-      "Most Guided-package projects go from submission to a live storefront listing in 3–5 weeks, depending on how many rounds of revisions you use.",
-    order: 0,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "faq-2",
-    question: "Can I buy the same book as a physical copy and an e-book?",
-    answer: "Yes — most titles are listed separately as a physical edition and an e-book so you can buy either or both.",
-    order: 1,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "faq-3",
-    question: "How are royalties paid out?",
-    answer: "Royalty balances accrue on every sale of a self-published title and are visible in your Publishing Dashboard under My Account.",
-    order: 2,
-    isActive: true,
-    createdAt: now,
-    updatedAt: now,
-  },
-];
-
-export const SAMPLE_HEADER_NAV: NavLink[] = [
-  { id: "nav-1", label: "Physical Books", href: "/books", location: "HEADER", order: 0, isActive: true, createdAt: now, updatedAt: now },
-  { id: "nav-2", label: "E-Books", href: "/ebooks", location: "HEADER", order: 1, isActive: true, createdAt: now, updatedAt: now },
-  { id: "nav-3", label: "Publishing Services", href: "/services", location: "HEADER", order: 2, isActive: true, createdAt: now, updatedAt: now },
-  { id: "nav-4", label: "Self-Publishing", href: "/self-publishing", location: "HEADER", order: 3, isActive: true, createdAt: now, updatedAt: now },
-];
-
-export const SAMPLE_FOOTER_NAV: NavLink[] = [
-  { id: "nav-f1", label: "Physical Books", href: "/books", location: "FOOTER", order: 0, isActive: true, createdAt: now, updatedAt: now },
-  { id: "nav-f2", label: "E-Books", href: "/ebooks", location: "FOOTER", order: 1, isActive: true, createdAt: now, updatedAt: now },
-  { id: "nav-f3", label: "Publishing Services", href: "/services", location: "FOOTER", order: 2, isActive: true, createdAt: now, updatedAt: now },
-  { id: "nav-f4", label: "Self-Publishing", href: "/self-publishing", location: "FOOTER", order: 3, isActive: true, createdAt: now, updatedAt: now },
-];
-
-export const SAMPLE_SITE_SETTINGS = {
-  id: "singleton",
-  siteName: "Shashibhushan's New School Book Press",
-  tagline: "Physical books, e-books, and self-publishing — all under one roof.",
-  metaTitle: null as string | null,
-  metaDescription: "Physical books, e-books, self-publishing, and e-book creation services.",
-  ogImageUrl: null as string | null,
-  logoUrl: null as string | null,
-  contactEmail: "hello@newschoolbookpress.example",
-  contactPhone: "+91 98765 43210",
-  addressLine: "14 Residency Road, Bengaluru, Karnataka 560025",
-  socialLinks: { twitter: "https://twitter.com", instagram: "https://instagram.com" } as unknown,
-  updatedAt: now,
-};
-
-// ────────────────────────────────────────────────────────────
-// Account area: order history, digital library, publishing dashboard
-// ────────────────────────────────────────────────────────────
-
-export type SampleOrder = Order & { items: OrderItem[] };
-
-function day(offset: number) {
-  const d = new Date(now);
-  d.setDate(d.getDate() - offset);
-  return d;
-}
-
-export const SAMPLE_ORDERS: SampleOrder[] = [
-  {
-    id: "order-10482",
-    userId: null,
-    guestEmail: null,
-    status: "DELIVERED",
-    subtotalCents: 249900,
-    taxCents: 17493,
-    shippingCents: 4990,
-    totalCents: 272383,
-    shippingAddressId: null,
-    billingAddressId: null,
-    trackingNumber: "IN482910422",
-    carrier: "BlueDart",
-    createdAt: day(12),
-    updatedAt: day(9),
-    items: [
-      { id: "item-1", orderId: "order-10482", productId: "book-1-physical", quantity: 1, unitPriceCents: 249900, fulfillmentType: "SHIP" },
-    ],
-  },
-  {
-    id: "order-10479",
-    userId: null,
-    guestEmail: null,
-    status: "READY_FOR_DOWNLOAD",
-    subtotalCents: 89900,
-    taxCents: 6293,
-    shippingCents: 0,
-    totalCents: 96193,
-    shippingAddressId: null,
-    billingAddressId: null,
-    trackingNumber: null,
-    carrier: null,
-    createdAt: day(15),
-    updatedAt: day(15),
-    items: [
-      { id: "item-2", orderId: "order-10479", productId: "book-3-ebook", quantity: 1, unitPriceCents: 89900, fulfillmentType: "DIGITAL" },
-    ],
-  },
-  {
-    id: "order-10465",
-    userId: null,
-    guestEmail: null,
-    status: "PROCESSING",
-    subtotalCents: 1790000,
-    taxCents: 125300,
-    shippingCents: 0,
-    totalCents: 1915300,
-    shippingAddressId: null,
-    billingAddressId: null,
-    trackingNumber: null,
-    carrier: null,
-    createdAt: day(21),
-    updatedAt: day(2),
-    items: [
-      { id: "item-3", orderId: "order-10465", productId: "service-standard", quantity: 1, unitPriceCents: 1790000, fulfillmentType: "SERVICE" },
-    ],
-  },
-];
-
-export const SAMPLE_LIBRARY_ITEMS: DisplayProduct[] = [SAMPLE_EBOOKS[2], SAMPLE_EBOOKS[4], SAMPLE_EBOOKS[5]].filter(
-  (p): p is DisplayProduct => !!p
-);
-
-export type SampleProject = SelfPublishingProject & { royalties: Royalty[] };
-
-export const SAMPLE_PUBLISHING_PROJECTS: SampleProject[] = [
-  {
-    id: "project-1",
-    authorId: "sample-author",
-    bookTitle: "The Last Lighthouse",
-    synopsis: "A keeper's final season on a decommissioned lighthouse.",
-    selectedPackage: "Guided",
-    addOns: ["Copy Editing"],
-    status: "IN_REVIEW",
-    targetPriceCents: 89900,
-    royaltyRateBps: 7000,
-    createdAt: day(3),
-    updatedAt: day(1),
-    royalties: [],
-  },
-  {
-    id: "project-2",
-    authorId: "sample-author",
-    bookTitle: "Root & Static",
-    synopsis: "In a city where trees broadcast memories.",
-    selectedPackage: "Guided",
-    addOns: [],
-    status: "IN_PRODUCTION",
-    targetPriceCents: 114900,
-    royaltyRateBps: 7000,
-    createdAt: day(18),
-    updatedAt: day(10),
-    royalties: [
-      {
-        id: "royalty-1",
-        projectId: "project-2",
-        salesPeriodStart: day(30),
-        salesPeriodEnd: day(1),
-        grossSalesCents: 45000,
-        royaltyRateBps: 7000,
-        amountOwedCents: 31500,
-        payoutStatus: "PENDING",
-        payoutRef: null,
-        createdAt: day(1),
-      },
-    ],
-  },
-  {
-    id: "project-3",
-    authorId: "sample-author",
-    bookTitle: "Quiet Hours",
-    synopsis: "A collection of poems on solitude, work, and the small hours of the morning.",
-    selectedPackage: "Full-Service",
-    addOns: ["Print-on-Demand Setup"],
-    status: "PUBLISHED",
-    targetPriceCents: 69900,
-    royaltyRateBps: 7500,
-    createdAt: day(60),
-    updatedAt: day(28),
-    royalties: [
-      {
-        id: "royalty-2",
-        projectId: "project-3",
-        salesPeriodStart: day(60),
-        salesPeriodEnd: day(30),
-        grossSalesCents: 128000,
-        royaltyRateBps: 7500,
-        amountOwedCents: 41260,
-        payoutStatus: "PAID",
-        payoutRef: "payout_sample_1",
-        createdAt: day(30),
-      },
-    ],
-  },
-] as SampleProject[];
-
-// ────────────────────────────────────────────────────────────
-// Homepage category grid (mirrors the manager's mockup — this section
-// didn't exist in the app before)
-// ────────────────────────────────────────────────────────────
-
-export const SAMPLE_CATEGORIES = [
-  { title: "Physical Books", body: "Printed titles, shipped to you", href: "/books" },
-  { title: "E-Books", body: "Instant digital delivery", href: "/ebooks" },
-  { title: "Publishing Services", body: "E-book creation & formatting", href: "/services" },
-  { title: "Self-Publishing", body: "Publish your own book with us", href: "/self-publishing" },
-];
