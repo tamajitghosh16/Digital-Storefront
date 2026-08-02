@@ -2,7 +2,7 @@
  * Minimal dev-data seed. Run with `pnpm db:seed` (wire up a "seed" script /
  * prisma.seed config once this repo has its first migration applied).
  */
-import { prisma, SITE_SETTINGS_ID } from "../src/client";
+import { prisma, PRICING_SETTINGS_ID, SITE_SETTINGS_ID } from "../src/client";
 
 async function main() {
   const physicalBook = await prisma.product.upsert({
@@ -93,15 +93,22 @@ async function main() {
     });
   }
 
+  // The first active banner *is* the homepage hero, so seed a complete one —
+  // it gives the Publisher something to edit on their first visit to the
+  // admin's Homepage hero screen instead of an empty list.
   await prisma.banner.upsert({
     where: { id: "banner-welcome" },
     update: {},
     create: {
       id: "banner-welcome",
-      title: "New & Featured",
-      subtitle: "Fresh releases from the Press, curated every week.",
-      ctaText: "Browse Books",
-      ctaHref: "/books",
+      eyebrow: "New this season",
+      title: "Your story, published your way.",
+      subtitle:
+        "Shop the catalogue, commission an e-book conversion, or launch your own title — manuscript to storefront listing in as little as three weeks.",
+      ctaText: "Start self-publishing",
+      ctaHref: "/self-publishing",
+      secondaryCtaText: "Shop books",
+      secondaryCtaHref: "/books",
       order: 0,
     },
   });
@@ -137,6 +144,34 @@ async function main() {
       rating: 5,
       order: 0,
     },
+  });
+
+  // Pricing rules. These match the numbers apps/web used to hardcode, so a
+  // freshly seeded database behaves exactly like the pre-CMS storefront until
+  // someone changes them from the admin. `ContentBlock` is deliberately *not*
+  // seeded: an absent row means "use the copy this build shipped with".
+  await prisma.pricingSettings.upsert({
+    where: { id: PRICING_SETTINGS_ID },
+    update: {},
+    create: { id: PRICING_SETTINGS_ID },
+  });
+
+  for (const tier of [
+    { quantity: 10, discountBps: 1000 },
+    { quantity: 30, discountBps: 1800 },
+    { quantity: 100, discountBps: 2400 },
+  ]) {
+    await prisma.classSetTier.upsert({
+      where: { quantity: tier.quantity },
+      update: {},
+      create: tier,
+    });
+  }
+
+  await prisma.discountCode.upsert({
+    where: { code: "SCHOOL5" },
+    update: {},
+    create: { code: "SCHOOL5", rateBps: 500, blurb: "5% off this order." },
   });
 
   console.log({ physicalBook: physicalBook.id, ebook: ebook.id, servicePackage: servicePackage.id });

@@ -38,18 +38,57 @@ sensitive; check for an explicit `assertRole` call.
 `royalties`, `reviews` (moderation queue), `analytics`, `settings/roles`,
 plus the storefront-CMS routes: `settings/site` (site branding/SEO/contact
 defaults), `settings/navigation` (header/footer links), `content/banners`
-(homepage hero/promo), `content/faqs`, `content/testimonials`.
+(homepage hero/promo), `content/homepage` (every other heading and
+description on the homepage), `content/faqs`, `content/testimonials`,
+`settings/pricing` (delivery, bundle, GST, class-set tiers, discount
+codes), and the `api/uploads` Route Handler behind the image fields.
 
 **Admin is a full CMS for `apps/web`'s content, not just the product
 catalogue.** `catalogue`, `settings/site`, `settings/navigation`,
-`content/banners`, `content/faqs`, and `content/testimonials` all have real
-create/update (and, for the CMS-only ones, delete) Server Actions — each
-validates with Zod, calls `assertRole()` (`CATALOGUE_WRITE_ROLES` for
-catalogue, `CONTENT_WRITE_ROLES` for the rest, both `EDITOR`/`OWNER`
-today), writes an `AuditLog` row, and `revalidatePath()`s its own list
-page. There's no cross-app cache to invalidate: `apps/web` reads these
-models with plain Prisma calls and no fetch cache/ISR, so it picks up
-changes on the next request automatically.
+`settings/pricing`, `content/banners`, `content/homepage`, `content/faqs`,
+and `content/testimonials` all have real create/update (and, for the
+CMS-only ones, delete) Server Actions — each validates with Zod, calls
+`assertRole()` (`CATALOGUE_WRITE_ROLES` for catalogue and pricing,
+`CONTENT_WRITE_ROLES` for the rest, both `EDITOR`/`OWNER` today), writes an
+`AuditLog` row, and `revalidatePath()`s its own list page. There's no
+cross-app cache to invalidate: `apps/web` reads these models with plain
+Prisma calls and no fetch cache/ISR, so it picks up changes on the next
+request automatically.
+
+**Homepage copy is a registry, not a table of columns.**
+`content/homepage` renders its fields from `CONTENT_GROUPS` in
+`packages/database/src/content.ts`, which holds every editable string's
+key, plain-English label, help text and *default copy*. `ContentBlock`
+rows store only overrides, and the save action **deletes** a row whose
+value matches the default — that's what makes "clear the box to restore
+the original wording" work, and what lets a copy change in a later release
+reach anyone who never overrode that field. Adding a new editable string
+is a one-line change to that registry: the admin form and `getContent()`
+both pick it up with no migration.
+
+**Every form is written for a non-technical operator.** The shared kit is
+`components/ui.tsx` (page furniture, labelled fields, tables, empty
+states), `components/form-controls.tsx` (`useFormStatus` submit buttons,
+confirm-before-delete), `components/image-field.tsx` (file picker →
+`/api/uploads` → preview, with paste-a-URL as the escape hatch) and
+`components/sidebar-nav.tsx`. Three rules the kit encodes: labels in
+ordinary English with help text under anything non-obvious; long forms
+split into titled sections; colour from the shared tokens in
+`packages/config/tailwind-preset.css`, never raw Tailwind greys.
+`catalogue/product-form.tsx` is a Client Component *because* of this — the
+product type is picked first and only the fields that apply to it render,
+and the web address is generated from the title.
+
+**Image uploads skip the malware-scan pipeline on purpose.**
+`api/uploads/route.ts` checks the caller's role, caps size at 4 MB (under
+Vercel's 4.5 MB request-body limit), and verifies the file's *magic bytes*
+rather than trusting `file.type`. It refuses SVG, which can carry script
+and isn't sanitised anywhere — an SVG logo has to be pointed at by URL. It
+calls `uploadImage()` in `packages/storage`, which writes straight to a
+public `images/` path instead of going through
+`uploadToStaging`/`promoteFromStaging`: that pipeline exists for untrusted
+customer manuscripts, and the scan behind it is still a stub that always
+returns `"CLEAN"`.
 
 **Still read-only stubs:** `orders`, `submissions`, `royalties`, `reviews`,
 `analytics`, `settings/roles` — these still do a direct read-only Prisma

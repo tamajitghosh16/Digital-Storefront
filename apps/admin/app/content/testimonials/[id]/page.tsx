@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@repo/database";
+import { PageHeader } from "@/components/ui";
 import { updateTestimonial } from "../actions";
 import { TestimonialForm } from "../testimonial-form";
 
@@ -17,7 +18,7 @@ export default async function EditTestimonialPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Edit Testimonial</h1>
+      <PageHeader title="Edit testimonial" backHref="/content/testimonials" backLabel="Testimonials" />
       <TestimonialForm action={updateTestimonial.bind(null, testimonial.id)} testimonial={testimonial} error={error} />
     </div>
   );

@@ -52,3 +52,86 @@ export async function getSiteSettings() {
   const settings = await prisma.siteSettings.findUnique({ where: { id: SITE_SETTINGS_ID } });
   return settings ?? DEFAULT_SITE_SETTINGS;
 }
+
+// ── Admin-editable copy and pricing ─────────────────────────────────
+// Both readers swallow database errors and fall back to the values this
+// build shipped with. That's deliberate and matches apps/web's existing
+// withFallback() posture: a storefront that renders last-known-good copy
+// beats one that 500s because a settings row is missing.
+
+export * from "./content";
+export * from "./pricing";
+
+import { mergeContent, type ContentMap } from "./content";
+import {
+  DEFAULT_PRICING_CONFIG,
+  PRICING_SETTINGS_ID,
+  bpsToRate,
+  type PricingConfig,
+} from "./pricing";
+
+/** Every storefront copy string, with the Publisher's overrides applied. */
+export async function getContent(): Promise<ContentMap> {
+  try {
+    const rows = await prisma.contentBlock.findMany();
+    return mergeContent(rows);
+  } catch {
+    return mergeContent([]);
+  }
+}
+
+/** The pricing rules the Publisher controls, as one serializable object. */
+export async function getPricingConfig(): Promise<PricingConfig> {
+  try {
+    const [settings, tiers, codes] = await Promise.all([
+      prisma.pricingSettings.findUnique({ where: { id: PRICING_SETTINGS_ID } }),
+      prisma.classSetTier.findMany({ where: { isActive: true }, orderBy: { quantity: "asc" } }),
+      prisma.discountCode.findMany({ where: { isActive: true }, orderBy: { code: "asc" } }),
+    ]);
+
+    const base = settings
+      ? {
+          delivery: {
+            freeOverCents: settings.freeDeliveryOverCents,
+            expressFeeCents: settings.expressFeeCents,
+            sameDayFeeCents: settings.sameDayFeeCents,
+            standardEta: settings.standardEta,
+            expressEta: settings.expressEta,
+            sameDayEta: settings.sameDayEta,
+          },
+          bundleEbookAddCents: settings.bundleEbookAddCents,
+          gstRates: {
+            PHYSICAL_BOOK: 0,
+            EBOOK: bpsToRate(settings.ebookGstBps),
+            SERVICE_PACKAGE: bpsToRate(settings.serviceGstBps),
+          },
+          classSetBaseCents: settings.classSetBaseCents,
+        }
+      : {
+          delivery: DEFAULT_PRICING_CONFIG.delivery,
+          bundleEbookAddCents: DEFAULT_PRICING_CONFIG.bundleEbookAddCents,
+          gstRates: DEFAULT_PRICING_CONFIG.gstRates,
+          classSetBaseCents: DEFAULT_PRICING_CONFIG.classSetBaseCents,
+        };
+
+    return {
+      ...base,
+      // The single-copy tier is the price everything else is a discount off,
+      // so it's synthesised rather than trusted to exist in the table — the
+      // buy box indexes tier[0] and must never find it missing.
+      classSetTiers: [
+        { quantity: 1, discount: 0 },
+        ...tiers
+          .filter((tier) => tier.quantity > 1)
+          .map((tier) => ({ quantity: tier.quantity, discount: bpsToRate(tier.discountBps) })),
+      ],
+      discountCodes: codes.map((code) => ({
+        code: code.code,
+        rate: bpsToRate(code.rateBps),
+        blurb: code.blurb ?? "",
+      })),
+    };
+  } catch {
+    return DEFAULT_PRICING_CONFIG;
+  }
+}

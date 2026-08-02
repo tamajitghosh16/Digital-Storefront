@@ -7,12 +7,12 @@ import { Breadcrumb, Callout, CheckList, Rule, Wrap, buttonClass } from "@/compo
 import { formatINRWhole } from "@/lib/format";
 import { useCartStore } from "@/lib/cart-store";
 import {
-  DELIVERY,
   deliveryFeeCents,
   deliveryOptions,
   includedGstCents,
   lookupDiscount,
   type DeliverySpeed,
+  type PricingConfig,
 } from "@/lib/pricing";
 import { BookJacket, ProductShot } from "./book-jacket";
 
@@ -29,9 +29,9 @@ import { BookJacket, ProductShot } from "./book-jacket";
 const REQUIRED_FIELDS = ["name", "email", "address", "city", "state", "pin"] as const;
 type FieldName = (typeof REQUIRED_FIELDS)[number] | "gst";
 
-export function CartScreen() {
+export function CartScreen({ pricing }: { pricing: PricingConfig }) {
   const { items, removeItem, updateQuantity } = useCartStore();
-  const speeds = useMemo(() => deliveryOptions(), []);
+  const speeds = useMemo(() => deliveryOptions(pricing), [pricing]);
 
   const [fields, setFields] = useState<Record<FieldName, string>>({
     name: "",
@@ -58,12 +58,12 @@ export function CartScreen() {
       listSubtotal += (item.listPriceCents ?? item.priceCents) * item.quantity;
       subtotal += net;
       units += item.quantity;
-      gst += includedGstCents(net, item.taxType ?? "PHYSICAL_BOOK");
+      gst += includedGstCents(net, item.taxType ?? "PHYSICAL_BOOK", pricing.gstRates);
     }
 
     const bundleSaving = listSubtotal - subtotal;
     const discount = coupon ? Math.round(subtotal * coupon.rate) : 0;
-    const delivery = deliveryFeeCents(subtotal, speed);
+    const delivery = deliveryFeeCents(pricing, subtotal, speed);
 
     return {
       listSubtotal,
@@ -75,7 +75,7 @@ export function CartScreen() {
       total: subtotal - discount + delivery,
       gst: coupon ? Math.round(gst * (1 - coupon.rate)) : gst,
     };
-  }, [items, coupon, speed]);
+  }, [items, coupon, speed, pricing]);
 
   const formValid = REQUIRED_FIELDS.every((name) => {
     const value = fields[name].trim();
@@ -94,13 +94,21 @@ export function CartScreen() {
       setCouponMessage(null);
       return;
     }
-    const match = lookupDiscount(code);
+    const match = lookupDiscount(pricing, code);
     if (match) {
       setCoupon({ code, rate: match.rate });
-      setCouponMessage({ text: `${code} applied — ${match.blurb}`, ok: true });
+      setCouponMessage({ text: `${code} applied${match.blurb ? ` — ${match.blurb}` : ""}`, ok: true });
     } else {
+      // Naming a live code beats a bare rejection, but only if there is one
+      // — the Publisher can turn every code off from the admin.
+      const suggestion = pricing.discountCodes[0]?.code;
+      setCouponMessage({
+        text: suggestion
+          ? `That code isn't valid on these items. Try ${suggestion}.`
+          : "That code isn't valid on these items.",
+        ok: false,
+      });
       setCoupon(null);
-      setCouponMessage({ text: "That code isn't valid on these items. Try SCHOOL5.", ok: false });
     }
   }
 
@@ -315,7 +323,7 @@ export function CartScreen() {
             items={[
               "E-books unlock the moment payment clears",
               "Easy returns on printed copies",
-              `Free delivery over ${formatINRWhole(DELIVERY.freeOverCents)}`,
+              `Free delivery over ${formatINRWhole(pricing.delivery.freeOverCents)}`,
             ]}
           />
         </aside>

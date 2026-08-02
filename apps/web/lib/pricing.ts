@@ -1,24 +1,33 @@
 /**
  * Storefront pricing rules.
  *
- * Three mechanics in the approved design are ahead of the data model —
- * `Product` in packages/database carries a single `priceCents` and no
- * quantity breaks, bundle price or tax class. They're derived here from
- * the printed price so the UI is honest and consistent, and so there is
- * one place to delete from when the schema catches up:
+ * The *numbers* — delivery thresholds and fees, the print + e-book bundle
+ * uplift, GST rates, class-set tiers, discount codes — live in the database
+ * and are edited from apps/admin (Pricing & delivery). This module holds the
+ * arithmetic that turns them into what a shopper sees.
  *
- *   1. class-set quantity tiers (1 / 10 / 30 / 100 copies)
- *   2. the print + e-book bundle
- *   3. per-line GST — printed books are nil-rated, services are 18%
+ * Everything here takes the config as an argument rather than importing it,
+ * because the buy box and the cart are Client Components: a Server Component
+ * loads `getPricingConfig()` once and hands the result down as a prop, so no
+ * Prisma code ends up in the browser bundle.
+ *
+ * Three mechanics are still ahead of the data model — `Product` carries a
+ * single `priceCents` with no quantity breaks, bundle price or tax class —
+ * so they're derived here from the printed price. This stays the one place
+ * to delete from when the schema catches up.
  *
  * Everything is in paise (cents) to match `Product.priceCents`.
  */
 
+import type { ClassSetTierConfig, PricingConfig } from "@repo/database";
+
+export type { ClassSetTierConfig, PricingConfig };
+export type TaxableType = keyof PricingConfig["gstRates"];
+
 // ── Local formatter ─────────────────────────────────────────────────
-// `lib/format.ts` owns the app-wide formatters; this module needs one at
-// module scope to build its copy constants, so it keeps a private
-// whole-rupee version rather than creating an import cycle. It has to be
-// declared before the constants that call it — `const` doesn't hoist.
+// `lib/format.ts` owns the app-wide formatters; this module needs one to
+// build the delivery labels, so it keeps a private whole-rupee version
+// rather than creating an import cycle.
 
 const rupees = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -34,13 +43,6 @@ function formatRupees(cents: number): string {
 // One source for the threshold, so the promo strip, the buy box and the
 // cart summary can never quote different numbers at each other.
 
-export const DELIVERY = {
-  freeOverCents: 150_000,
-  expressFeeCents: 14_900,
-  sameDayFeeCents: 24_900,
-  standardEta: "Tue 4 Aug",
-} as const;
-
 export type DeliverySpeed = "standard" | "express" | "same-day";
 
 export interface DeliveryOption {
@@ -49,66 +51,63 @@ export interface DeliveryOption {
   feeCents: number;
 }
 
-export function deliveryOptions(): DeliveryOption[] {
+export function deliveryOptions(config: PricingConfig): DeliveryOption[] {
+  const { freeOverCents, expressFeeCents, sameDayFeeCents, standardEta, expressEta, sameDayEta } = config.delivery;
   return [
     {
       value: "standard",
-      label: `Standard — free over ${formatRupees(DELIVERY.freeOverCents)}, arrives ${DELIVERY.standardEta}`,
+      label: `Standard — free over ${formatRupees(freeOverCents)}, arrives ${standardEta}`,
       feeCents: 0,
     },
     {
       value: "express",
-      label: `Express — ${formatRupees(DELIVERY.expressFeeCents)}, arrives Sat 1 Aug`,
-      feeCents: DELIVERY.expressFeeCents,
+      label: `Express — ${formatRupees(expressFeeCents)}, arrives ${expressEta}`,
+      feeCents: expressFeeCents,
     },
     {
       value: "same-day",
-      label: `Same Day Delivery (Kolkata) — ${formatRupees(DELIVERY.sameDayFeeCents)}, by 9pm today`,
-      feeCents: DELIVERY.sameDayFeeCents,
+      label: `Same Day Delivery (Kolkata) — ${formatRupees(sameDayFeeCents)}, ${sameDayEta}`,
+      feeCents: sameDayFeeCents,
     },
   ];
 }
 
 /** "Free delivery on orders over ₹1,500" — quoted in the promo strip and the buy box. */
-export const FREE_DELIVERY_COPY = `Free delivery on orders over ${formatRupees(DELIVERY.freeOverCents)}`;
+export function freeDeliveryCopy(config: PricingConfig): string {
+  return `Free delivery on orders over ${formatRupees(config.delivery.freeOverCents)}`;
+}
 
 /** Delivery charged on a subtotal, before any discount code. */
-export function deliveryFeeCents(subtotalCents: number, speed: DeliverySpeed = "standard"): number {
+export function deliveryFeeCents(
+  config: PricingConfig,
+  subtotalCents: number,
+  speed: DeliverySpeed = "standard"
+): number {
   if (subtotalCents <= 0) return 0;
-  if (speed === "express") return DELIVERY.expressFeeCents;
-  if (speed === "same-day") return DELIVERY.sameDayFeeCents;
-  return subtotalCents >= DELIVERY.freeOverCents ? 0 : DELIVERY.expressFeeCents;
+  if (speed === "express") return config.delivery.expressFeeCents;
+  if (speed === "same-day") return config.delivery.sameDayFeeCents;
+  return subtotalCents >= config.delivery.freeOverCents ? 0 : config.delivery.expressFeeCents;
 }
 
 // ── Class sets ──────────────────────────────────────────────────────
-// Schools and reading groups buy one title in quantity. The per-copy
-// price falls at 10, 30 and 100 copies; digital editions have no tiers
-// because there is nothing to print.
-
-export interface ClassSetTier {
-  quantity: number;
-  /** Fraction off the single-copy price, 0 at the base tier. */
-  discount: number;
-}
-
-export const CLASS_SET_TIERS: ClassSetTier[] = [
-  { quantity: 1, discount: 0 },
-  { quantity: 10, discount: 0.1 },
-  { quantity: 30, discount: 0.18 },
-  { quantity: 100, discount: 0.24 },
-];
+// Schools and reading groups buy one title in quantity. The per-copy price
+// falls at each tier the Publisher has configured; digital editions have no
+// tiers because there is nothing to print.
 
 /** Per-copy price at a tier, rounded to whole rupees the way a price list would be. */
 export function tierUnitCents(baseCents: number, discount: number): number {
   return Math.round((baseCents * (1 - discount)) / 100) * 100;
 }
 
+/** The configured tier matching a quantity, falling back to full price. */
+export function tierForQuantity(tiers: ClassSetTierConfig[], quantity: number): ClassSetTierConfig {
+  return tiers.find((tier) => tier.quantity === quantity) ?? tiers[0] ?? { quantity: 1, discount: 0 };
+}
+
 // ── Editions ────────────────────────────────────────────────────────
 // Most titles are listed twice — a printed edition and an e-book. The
 // bundle adds a flat amount to the printed copy rather than a percentage,
 // so class-set pricing still applies cleanly to the printed half.
-
-export const BUNDLE_EBOOK_ADD_CENTS = 30_000;
 
 export type EditionKind = "print" | "ebook" | "both";
 
@@ -121,6 +120,11 @@ export interface Edition {
   priceCents: number;
   /** Undisclosed when there's no saving to show. */
   listCents?: number;
+  /**
+   * The bundle uplift baked into this edition, carried along so re-pricing
+   * at a class-set tier doesn't need the whole config passed in again.
+   */
+  bundleAddCents?: number;
 }
 
 export function buildEditions({
@@ -128,11 +132,13 @@ export function buildEditions({
   ebookCents,
   pages,
   formats = ["EPUB", "MOBI", "PDF"],
+  bundleAddCents,
 }: {
   printCents?: number;
   ebookCents?: number;
   pages?: number | null;
   formats?: string[];
+  bundleAddCents: number;
 }): Edition[] {
   const editions: Edition[] = [];
 
@@ -162,8 +168,9 @@ export function buildEditions({
       label: "Both editions",
       detail: "Save on the pair",
       note: "E-book unlocks now, paperback ships today",
-      priceCents: printCents + BUNDLE_EBOOK_ADD_CENTS,
+      priceCents: printCents + bundleAddCents,
       listCents: printCents + ebookCents,
+      bundleAddCents,
     });
   }
 
@@ -173,7 +180,7 @@ export function buildEditions({
 /** Per-copy price for an edition at a given printed-copy tier price. */
 export function editionUnitCents(edition: Edition, printUnitCents: number): number {
   if (edition.kind === "ebook") return edition.priceCents;
-  if (edition.kind === "both") return printUnitCents + BUNDLE_EBOOK_ADD_CENTS;
+  if (edition.kind === "both") return printUnitCents + (edition.bundleAddCents ?? 0);
   return printUnitCents;
 }
 
@@ -181,28 +188,20 @@ export function editionUnitCents(edition: Edition, printUnitCents: number): numb
 // Prices are quoted GST-inclusive (Indian retail convention), so tax is
 // extracted from the line rather than added to it.
 
-export const GST_RATES = {
-  /** Printed books are nil-rated under HSN 4901. */
-  PHYSICAL_BOOK: 0,
-  EBOOK: 0.18,
-  SERVICE_PACKAGE: 0.18,
-} as const;
-
-export type TaxableType = keyof typeof GST_RATES;
-
 /** The GST already contained in a tax-inclusive amount. */
-export function includedGstCents(amountCents: number, type: TaxableType): number {
-  const rate = GST_RATES[type];
+export function includedGstCents(
+  amountCents: number,
+  type: TaxableType,
+  rates: PricingConfig["gstRates"]
+): number {
+  const rate = rates[type];
   if (!rate) return 0;
   return Math.round((amountCents * rate) / (1 + rate));
 }
 
 // ── Discount codes ──────────────────────────────────────────────────
 
-export const DISCOUNT_CODES: Record<string, { rate: number; blurb: string }> = {
-  SCHOOL5: { rate: 0.05, blurb: "5% off this order." },
-};
-
-export function lookupDiscount(code: string) {
-  return DISCOUNT_CODES[code.trim().toUpperCase()];
+export function lookupDiscount(config: PricingConfig, code: string) {
+  const wanted = code.trim().toUpperCase();
+  return config.discountCodes.find((candidate) => candidate.code === wanted);
 }

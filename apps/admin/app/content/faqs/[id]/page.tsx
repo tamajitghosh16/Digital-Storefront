@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@repo/database";
+import { PageHeader } from "@/components/ui";
 import { updateFaq } from "../actions";
 import { FaqForm } from "../faq-form";
 
@@ -17,7 +18,7 @@ export default async function EditFaqPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Edit FAQ</h1>
+      <PageHeader title="Edit question" backHref="/content/faqs" backLabel="Questions & answers" />
       <FaqForm action={updateFaq.bind(null, faq.id)} faq={faq} error={error} />
     </div>
   );

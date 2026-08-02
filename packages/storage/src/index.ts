@@ -18,6 +18,31 @@ export async function promoteFromStaging(stagingUrl: string, permanentPath: stri
   return result;
 }
 
+/**
+ * Image uploads from apps/admin (book covers, banner art, testimonial
+ * portraits, the site logo).
+ *
+ * Deliberately *not* routed through the staging → scan → promote pipeline
+ * above. That pipeline exists for files a customer or author supplies —
+ * manuscripts, source documents — where the uploader isn't trusted. These
+ * come from a signed-in EDITOR/OWNER, are type- and signature-checked before
+ * they get here, and are needed at a stable public URL the moment the form
+ * is saved. Sending them through a scan that is currently a stub returning
+ * "CLEAN" (packages/jobs/src/functions/malwareScan.ts) would add a
+ * round-trip and imply a guarantee that doesn't exist yet.
+ */
+export async function uploadImage(file: File | Blob, fileName: string) {
+  const safeName = fileName
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(-80);
+  return put(`images/${crypto.randomUUID()}-${safeName}`, file, {
+    access: "public",
+    addRandomSuffix: false,
+  });
+}
+
 export async function quarantine(stagingUrl: string) {
   // In production, move to a `quarantine/` prefix instead of deleting
   // outright, so infected uploads remain available for investigation.

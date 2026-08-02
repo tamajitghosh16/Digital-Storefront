@@ -56,26 +56,50 @@ GST.
 
 **`lib/pricing.ts` holds three mechanics the schema doesn't cover yet** —
 class-set quantity tiers, the print + e-book bundle, and per-line GST
-(printed books nil-rated, services 18% inclusive). They're derived from
-the printed price, which is why they live in one module: it's the single
-place to delete from once `Product` carries real pricing.
+(printed books nil-rated) — derived from the printed price, which is why
+they live in one module: it's the single place to delete from once
+`Product` carries real pricing.
+
+It holds the *arithmetic only*. The numbers (delivery threshold and fees,
+bundle uplift, GST rates, tiers, discount codes) are admin-managed rows,
+read with `getPricingConfig()` from `@repo/database`. Every function here
+takes that config as an argument rather than importing it, because
+`buy-box.tsx`, `cart-screen.tsx` and `promo-bar.tsx` need the numbers but
+two of them are Client Components — a Server Component loads the config
+once and passes it down as a prop, so Prisma never reaches the browser
+bundle. If you add a pricing rule, put the number in
+`packages/database/src/pricing.ts` (with a default equal to current
+behaviour) and the maths here.
 
 **`lib/sample-data/`** is split by concern (`books`, `services`, `cms`,
 `account`, `shared`) and re-exported from `index.ts`; import from
 `@/lib/sample-data`.
 
-**Header, footer, homepage sections, and site-wide `<head>` metadata are
-admin-controlled, not hardcoded.** `app/layout.tsx`'s `generateMetadata`
-and `components/layout/site-header.tsx`/`site-footer.tsx` read the
-singleton `SiteSettings` row (via `@repo/database`'s `getSiteSettings()`)
-and `NavLink` rows; `app/page.tsx` additionally reads `Banner`,
-`Testimonial`, and `Faq` rows. All of these are edited from `apps/admin`
-(`settings/site`, `settings/navigation`, `content/banners`,
-`content/faqs`, `content/testimonials`) — there's no API call to admin,
-just the same shared-Postgres read pattern already used for `Product`.
-Per-product SEO metadata (`Product.metaTitle`/`metaDescription`/`ogImageUrl`,
-editable from the admin catalogue form) is rendered via `generateMetadata`
-on each of `books/[slug]`, `ebooks/[slug]`, and `services/[slug]`.
+**No user-visible string on the homepage is hardcoded — all of it is
+admin-controlled.** `app/layout.tsx`'s `generateMetadata` and
+`components/layout/site-header.tsx`/`site-footer.tsx` read the singleton
+`SiteSettings` row (via `@repo/database`'s `getSiteSettings()`) and
+`NavLink` rows. `app/page.tsx` reads `Banner` (the first active row *is*
+the hero, including its eyebrow and both buttons), `Testimonial`, `Faq`,
+`getPricingConfig()` for the class-set table, and `getContent()` for
+everything else — every section heading, standfirst, promise, button label
+and piece of small print. All of it is edited from `apps/admin`
+(`settings/site`, `settings/navigation`, `settings/pricing`,
+`content/banners`, `content/homepage`, `content/faqs`,
+`content/testimonials`); there's no API call to admin, just the same
+shared-Postgres read pattern already used for `Product`. Per-product SEO
+metadata (`Product.metaTitle`/`metaDescription`/`ogImageUrl`, editable from
+the admin catalogue form) is rendered via `generateMetadata` on each of
+`books/[slug]`, `ebooks/[slug]`, and `services/[slug]`.
+
+**`getContent()` cannot return a blank string.** It merges stored
+`ContentBlock` overrides onto the defaults declared in
+`packages/database/src/content.ts`, and treats a blank override as "not
+set". So `content["homepage.faq.title"]` is always safe to render
+directly, and the key is a typed union — a typo won't compile. Components
+that show this copy (`TrustBand`, `Newsletter`, `PlanBand`, `Hero`) take
+it as props rather than reaching for it themselves, which keeps them
+usable from `catalog/[slug]` too.
 
 **`app/api/library/[assetId]/route.ts`** checks purchase entitlement and
 the per-asset download-count limit before serving a file, but currently

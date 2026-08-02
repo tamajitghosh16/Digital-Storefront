@@ -71,10 +71,23 @@ to deploy as its own Vercel project (Root Directory = `apps/web` or
 **`packages/database` is the single source of truth for the data model.**
 `prisma/schema.prisma` mirrors the BRD's entities one-to-one (User,
 Product, Order/OrderItem, SelfPublishingProject, ServiceRequest, Royalty,
-Review, Payment, FileAsset, Notification, AuditLog). Both apps import the
-same Prisma client singleton from `packages/database/src/client.ts`. After
-editing `schema.prisma`, run `npm run db:generate` before either app will
-typecheck against the new shape.
+Review, Payment, FileAsset, Notification, AuditLog), plus the CMS tables
+`apps/admin` writes and `apps/web` reads (SiteSettings, NavLink, Banner,
+Faq, Testimonial, ContentBlock, PricingSettings, ClassSetTier,
+DiscountCode). Both apps import the same Prisma client singleton from
+`packages/database/src/client.ts`. After editing `schema.prisma`, run
+`npm run db:generate` before either app will typecheck against the new
+shape.
+
+Two non-Prisma modules sit alongside it and are re-exported from
+`client.ts`: `src/content.ts`, the registry of every editable storefront
+string with its label, help text and default copy, and `src/pricing.ts`,
+the shape and defaults of the admin-managed pricing rules. Both are pure
+data — no Prisma import — so their *types* can be used from Client
+Components. Their readers (`getContent()`, `getPricingConfig()`) swallow
+database errors and fall back to the shipped defaults, deliberately: a
+storefront rendering last-known-good copy beats one that 500s because a
+settings row is missing.
 
 **Auth is Supabase Auth, wrapped by `packages/auth`.** `src/server.ts`
 (Server Components/Actions), `src/client.ts` (Client Components), and
@@ -110,6 +123,10 @@ staging → malware-scan → promote pattern. The scan itself
 (`packages/jobs/src/functions/malwareScan.ts`) is currently a stub that
 always returns `"CLEAN"` — it needs a real Cloudmersive or ClamAV
 integration before any upload pipeline built on top of it is safe to ship.
+Admin image uploads (book covers, banner art) take a separate,
+deliberately simpler path — `uploadImage()` straight to a public `images/`
+prefix — because they come from a signed-in EDITOR/OWNER and are
+type-checked by magic bytes at the route; see `apps/admin/CLAUDE.md`.
 
 **Shared UI/config:** `packages/ui` holds the *behavioural* primitives
 both apps share (Button, Sheet, DropdownMenu, Accordion + `cn()`);

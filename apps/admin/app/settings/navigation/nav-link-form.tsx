@@ -1,15 +1,7 @@
+import Link from "next/link";
 import type { NavLink } from "@repo/database";
-
-const inputClass = "mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-sm">
-      <span className="font-medium text-slate-700">{label}</span>
-      {children}
-    </label>
-  );
-}
+import { CheckboxField, ErrorBanner, Section, SelectField, TextField } from "@/components/ui";
+import { SaveButton } from "@/components/form-controls";
 
 export function NavLinkForm({
   action,
@@ -21,32 +13,46 @@ export function NavLinkForm({
   error?: string;
 }) {
   return (
-    <form action={action} className="mt-6 max-w-md space-y-4">
-      {error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+    <form action={action} className="max-w-2xl space-y-5">
+      <ErrorBanner message={error} />
 
-      <Field label="Label">
-        <input name="label" defaultValue={link?.label} className={inputClass} required />
-      </Field>
-      <Field label="Link target (e.g. /books or mailto:...)">
-        <input name="href" defaultValue={link?.href} className={inputClass} required />
-      </Field>
-      <Field label="Location">
-        <select name="location" defaultValue={link?.location ?? "HEADER"} className={inputClass} required>
-          <option value="HEADER">Header</option>
+      <Section title="Where this link goes" description="Menu links can point at a page on your site or anywhere else.">
+        <TextField
+          label="Wording"
+          help="What visitors see and click."
+          name="label"
+          required
+          defaultValue={link?.label}
+          placeholder="Books"
+        />
+        <TextField
+          label="Goes to"
+          help="A page on your site starts with a slash, like /books. You can also use a full web address or mailto:you@example.com."
+          name="href"
+          required
+          defaultValue={link?.href}
+          placeholder="/books"
+        />
+        <SelectField label="Where it appears" name="location" defaultValue={link?.location ?? "HEADER"} required>
+          <option value="HEADER">Top of the page</option>
           <option value="FOOTER">Footer</option>
-        </select>
-      </Field>
-      <Field label="Order (lower = earlier)">
-        <input name="order" type="number" defaultValue={link?.order ?? 0} className={inputClass} />
-      </Field>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="isActive" defaultChecked={link?.isActive ?? true} />
-        Active
-      </label>
+        </SelectField>
+        <TextField
+          label="Position"
+          help="Lower numbers appear first."
+          name="order"
+          type="number"
+          defaultValue={link?.order ?? 0}
+        />
+        <CheckboxField label="Show this link" name="isActive" defaultChecked={link?.isActive ?? true} />
+      </Section>
 
-      <button type="submit" className="rounded bg-brand-navy px-4 py-2 text-sm text-white">
-        {link ? "Save changes" : "Add link"}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <SaveButton>{link ? "Save changes" : "Add link"}</SaveButton>
+        <Link href="/settings/navigation" className="text-sm font-semibold text-ink-muted hover:text-ink hover:underline">
+          Cancel
+        </Link>
+      </div>
     </form>
   );
 }

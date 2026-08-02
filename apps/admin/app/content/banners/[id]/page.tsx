@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@repo/database";
+import { PageHeader } from "@/components/ui";
 import { updateBanner } from "../actions";
 import { BannerForm } from "../banner-form";
 
@@ -17,7 +18,7 @@ export default async function EditBannerPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Edit Banner</h1>
+      <PageHeader title="Edit banner" backHref="/content/banners" backLabel="Homepage hero" />
       <BannerForm action={updateBanner.bind(null, banner.id)} banner={banner} error={error} />
     </div>
   );

@@ -10,11 +10,14 @@ import { bannerFormSchema } from "./schema";
 
 function toBannerData(raw: z.infer<typeof bannerFormSchema>) {
   return {
+    eyebrow: raw.eyebrow ?? null,
     title: raw.title,
     subtitle: raw.subtitle ?? null,
     imageUrl: raw.imageUrl ?? null,
     ctaText: raw.ctaText ?? null,
     ctaHref: raw.ctaHref ?? null,
+    secondaryCtaText: raw.secondaryCtaText ?? null,
+    secondaryCtaHref: raw.secondaryCtaHref ?? null,
     order: raw.order,
     isActive: raw.isActive,
   };

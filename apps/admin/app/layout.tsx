@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { getCurrentUser } from "@repo/auth/server";
+import { getSiteSettings } from "@repo/database";
+import { SidebarNav } from "@/components/sidebar-nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,31 +10,91 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/** Where "View storefront" points. Falls back to the local dev port. */
+const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? "http://localhost:3000";
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Both reads are best-effort: this shell also wraps /sign-in and
+  // /unauthorized, which are reachable with no session and, in the case of a
+  // cold environment, no database either.
+  const [user, settings] = await Promise.all([
+    getCurrentUser().catch(() => null),
+    getSiteSettings().catch(() => null),
+  ]);
+
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
-        <div className="flex">
-          <aside className="min-h-screen w-56 shrink-0 space-y-1 border-r border-slate-200 bg-white p-4 text-sm">
-            <p className="mb-4 font-semibold text-brand-navy">Back Office</p>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/">Dashboard</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/catalogue">Catalogue</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/orders">Orders</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/submissions">Submissions Queue</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/royalties">Royalties</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/reviews">Reviews</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/analytics">Analytics</a>
-            <p className="mb-1 mt-4 px-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Storefront CMS</p>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/settings/site">Site Settings</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/settings/navigation">Navigation</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/content/banners">Homepage Banners</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/content/faqs">FAQs</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/content/testimonials">Testimonials</a>
-            <a className="block rounded px-2 py-1.5 hover:bg-slate-100" href="/settings/roles">Roles</a>
-          </aside>
-          <main className="flex-1 p-8">{children}</main>
+      <body className="min-h-screen bg-page text-ink antialiased">
+        <div className="mx-auto flex max-w-[110rem] flex-col lg:flex-row">
+          <Sidebar siteName={settings?.siteName} />
+
+          <div className="min-w-0 flex-1">
+            <Topbar userName={user?.name ?? user?.email ?? null} userRole={user?.role ?? null} />
+            <main className="px-5 py-8 sm:px-8">{children}</main>
+          </div>
         </div>
       </body>
     </html>
+  );
+}
+
+function Sidebar({ siteName }: { siteName?: string }) {
+  return (
+    <>
+      {/* Wide screens: a permanent column. */}
+      <aside className="hidden w-64 shrink-0 border-r border-line bg-ground lg:block">
+        <div className="sticky top-0 max-h-screen overflow-y-auto p-4">
+          <Wordmark siteName={siteName} />
+          <div className="mt-6">
+            <SidebarNav />
+          </div>
+        </div>
+      </aside>
+
+      {/* Narrow screens: the same navigation behind a disclosure, so the back
+          office stays usable from a phone without a second nav component. */}
+      <details className="group border-b border-line bg-ground lg:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3.5 [&::-webkit-details-marker]:hidden">
+          <Wordmark siteName={siteName} />
+          <span className="text-sm font-bold text-brand">
+            <span className="group-open:hidden">Menu ▾</span>
+            <span className="hidden group-open:inline">Close ▴</span>
+          </span>
+        </summary>
+        <div className="px-5 pb-5">
+          <SidebarNav />
+        </div>
+      </details>
+    </>
+  );
+}
+
+function Wordmark({ siteName }: { siteName?: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-sm font-bold tracking-[-0.01em] text-ink">Back Office</p>
+      <p className="truncate text-[12px] text-ink-subtle">{siteName ?? "New School Book Press"}</p>
+    </div>
+  );
+}
+
+function Topbar({ userName, userRole }: { userName: string | null; userRole: string | null }) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-2 border-b border-line bg-ground px-5 py-3 sm:px-8">
+      <a
+        href={STOREFRONT_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="text-sm font-semibold text-brand hover:underline"
+      >
+        View storefront ↗
+      </a>
+      {userName && (
+        <p className="text-sm text-ink-muted">
+          {userName}
+          {userRole && <span className="ml-2 rounded-full bg-tile px-2 py-0.5 text-[11px] font-bold">{userRole}</span>}
+        </p>
+      )}
+    </div>
   );
 }

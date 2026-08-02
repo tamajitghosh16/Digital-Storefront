@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { prisma } from "@repo/database";
+import { getPricingConfig, prisma } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
 import { findSampleProduct, SAMPLE_EBOOKS, type DisplayProduct } from "@/lib/sample-data";
 import { ProductPage, type ProductPageData } from "@/components/commerce/product-page";
@@ -26,7 +26,7 @@ export default async function EbookDetailPage({ params }: { params: Promise<{ sl
 
   const printSlug = slug.replace(/-ebook$/, "");
 
-  const [companionRow, related] = await Promise.all([
+  const [companionRow, related, pricing] = await Promise.all([
     withFallback(() => prisma.product.findUnique({ where: { slug: printSlug } }), null),
     withFallback(
       () =>
@@ -37,6 +37,7 @@ export default async function EbookDetailPage({ params }: { params: Promise<{ sl
         }),
       SAMPLE_EBOOKS.filter((ebook) => ebook.slug !== slug).slice(0, 8)
     ),
+    getPricingConfig(),
   ]);
 
   const companion = companionRow ?? findSampleProduct(printSlug);
@@ -47,6 +48,7 @@ export default async function EbookDetailPage({ params }: { params: Promise<{ sl
     <ProductPage
       companionPriceCents={companion?.priceCents}
       related={related as ProductTileData[]}
+      pricing={pricing}
       product={
         {
           ...product,

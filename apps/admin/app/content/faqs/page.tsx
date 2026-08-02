@@ -1,59 +1,61 @@
+import Link from "next/link";
 import { prisma } from "@repo/database";
-import { toggleFaqActive, deleteFaq } from "./actions";
+import { ButtonLink, EmptyState, PageHeader, Pill, Table } from "@/components/ui";
+import { ConfirmButton, LinkButton } from "@/components/form-controls";
+import { deleteFaq, toggleFaqActive } from "./actions";
 
 export default async function FaqsPage() {
   const faqs = await prisma.faq.findMany({ orderBy: { order: "asc" } });
 
   return (
-    <div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">FAQs</h1>
-        <a href="/content/faqs/new" className="rounded bg-brand-navy px-4 py-2 text-sm text-white">
-          + New FAQ
-        </a>
-      </div>
-      <table className="mt-6 w-full text-sm">
-        <thead className="text-left text-slate-500">
-          <tr>
-            <th className="py-2">Question</th>
-            <th>Order</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {faqs.map((f) => (
-            <tr key={f.id} className="border-t border-slate-100">
-              <td className="py-2">
-                <a href={`/content/faqs/${f.id}`} className="hover:underline">
-                  {f.question}
-                </a>
+    <div className="max-w-5xl">
+      <PageHeader
+        title="Questions & answers"
+        description="The questions shoppers can expand near the bottom of the homepage. The heading above them is under Homepage text."
+        action={<ButtonLink href="/content/faqs/new">Add a question</ButtonLink>}
+      />
+
+      {faqs.length === 0 ? (
+        <EmptyState
+          title="No questions yet"
+          description="Add the things customers ask most — delivery times, returns, how self-publishing works."
+          action={<ButtonLink href="/content/faqs/new">Add a question</ButtonLink>}
+        />
+      ) : (
+        <Table
+          head={
+            <>
+              <th>Question</th>
+              <th>Position</th>
+              <th>Status</th>
+              <th className="text-right">&nbsp;</th>
+            </>
+          }
+        >
+          {faqs.map((faq) => (
+            <tr key={faq.id}>
+              <td>
+                <Link href={`/content/faqs/${faq.id}`} className="font-semibold text-ink hover:text-brand hover:underline">
+                  {faq.question}
+                </Link>
+                <p className="mt-0.5 line-clamp-1 text-[13px] text-ink-muted">{faq.answer}</p>
               </td>
-              <td>{f.order}</td>
-              <td>{f.isActive ? "Active" : "Hidden"}</td>
-              <td className="space-x-3">
-                <form action={toggleFaqActive.bind(null, f.id)} className="inline">
-                  <button type="submit" className="text-xs text-brand-navy hover:underline">
-                    {f.isActive ? "Hide" : "Show"}
-                  </button>
+              <td className="tabular-nums text-ink-muted">{faq.order}</td>
+              <td>
+                <Pill tone={faq.isActive ? "on" : "off"}>{faq.isActive ? "Showing" : "Hidden"}</Pill>
+              </td>
+              <td className="space-x-4 text-right">
+                <form action={toggleFaqActive.bind(null, faq.id)} className="inline">
+                  <LinkButton>{faq.isActive ? "Hide" : "Show"}</LinkButton>
                 </form>
-                <form action={deleteFaq.bind(null, f.id)} className="inline">
-                  <button type="submit" className="text-xs text-red-600 hover:underline">
-                    Delete
-                  </button>
+                <form action={deleteFaq.bind(null, faq.id)} className="inline">
+                  <ConfirmButton message={`Delete “${faq.question}”? This can't be undone.`}>Delete</ConfirmButton>
                 </form>
               </td>
             </tr>
           ))}
-          {faqs.length === 0 && (
-            <tr>
-              <td colSpan={4} className="py-4 text-center text-slate-500">
-                None yet.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+        </Table>
+      )}
     </div>
   );
 }

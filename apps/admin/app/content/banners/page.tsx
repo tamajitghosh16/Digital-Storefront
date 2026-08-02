@@ -1,59 +1,78 @@
+import Link from "next/link";
 import { prisma } from "@repo/database";
-import { toggleBannerActive, deleteBanner } from "./actions";
+import { ButtonLink, EmptyState, PageHeader, Pill, Table } from "@/components/ui";
+import { ConfirmButton, LinkButton } from "@/components/form-controls";
+import { deleteBanner, toggleBannerActive } from "./actions";
 
 export default async function BannersPage() {
   const banners = await prisma.banner.findMany({ orderBy: { order: "asc" } });
+  // apps/web renders the first active banner as the hero; make that visible
+  // here so nobody has to guess which row is the one on the homepage.
+  const heroId = banners.find((banner) => banner.isActive)?.id;
 
   return (
-    <div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Homepage Banners</h1>
-        <a href="/content/banners/new" className="rounded bg-brand-navy px-4 py-2 text-sm text-white">
-          + New Banner
-        </a>
-      </div>
-      <table className="mt-6 w-full text-sm">
-        <thead className="text-left text-slate-500">
-          <tr>
-            <th className="py-2">Title</th>
-            <th>Order</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {banners.map((b) => (
-            <tr key={b.id} className="border-t border-slate-100">
-              <td className="py-2">
-                <a href={`/content/banners/${b.id}`} className="hover:underline">
-                  {b.title}
-                </a>
+    <div className="max-w-5xl">
+      <PageHeader
+        title="Homepage hero"
+        description="The big headline and buttons at the very top of your website. The first one that's switched on is the one people see."
+        action={<ButtonLink href="/content/banners/new">Add a banner</ButtonLink>}
+      />
+
+      {banners.length === 0 ? (
+        <EmptyState
+          title="No hero set up yet"
+          description="Add one to control the headline, paragraph and buttons at the top of the homepage. Until then the site shows its built-in wording."
+          action={<ButtonLink href="/content/banners/new">Add a banner</ButtonLink>}
+        />
+      ) : (
+        <Table
+          head={
+            <>
+              <th>Headline</th>
+              <th>Buttons</th>
+              <th>Position</th>
+              <th>Status</th>
+              <th className="text-right">&nbsp;</th>
+            </>
+          }
+        >
+          {banners.map((banner) => (
+            <tr key={banner.id}>
+              <td>
+                <Link
+                  href={`/content/banners/${banner.id}`}
+                  className="font-semibold text-ink hover:text-brand hover:underline"
+                >
+                  {banner.title}
+                </Link>
+                {banner.id === heroId && (
+                  <span className="ml-2 align-middle">
+                    <Pill tone="info">On the homepage now</Pill>
+                  </span>
+                )}
+                {banner.subtitle && <p className="mt-0.5 line-clamp-1 text-[13px] text-ink-muted">{banner.subtitle}</p>}
               </td>
-              <td>{b.order}</td>
-              <td>{b.isActive ? "Active" : "Hidden"}</td>
-              <td className="space-x-3">
-                <form action={toggleBannerActive.bind(null, b.id)} className="inline">
-                  <button type="submit" className="text-xs text-brand-navy hover:underline">
-                    {b.isActive ? "Hide" : "Show"}
-                  </button>
+              <td className="text-[13px] text-ink-muted">
+                {[banner.ctaText, banner.secondaryCtaText].filter(Boolean).join(" · ") || "—"}
+              </td>
+              <td className="tabular-nums text-ink-muted">{banner.order}</td>
+              <td>
+                <Pill tone={banner.isActive ? "on" : "off"}>{banner.isActive ? "On" : "Off"}</Pill>
+              </td>
+              <td className="space-x-4 text-right">
+                <form action={toggleBannerActive.bind(null, banner.id)} className="inline">
+                  <LinkButton>{banner.isActive ? "Turn off" : "Turn on"}</LinkButton>
                 </form>
-                <form action={deleteBanner.bind(null, b.id)} className="inline">
-                  <button type="submit" className="text-xs text-red-600 hover:underline">
+                <form action={deleteBanner.bind(null, banner.id)} className="inline">
+                  <ConfirmButton message={`Delete the banner “${banner.title}”? This can't be undone.`}>
                     Delete
-                  </button>
+                  </ConfirmButton>
                 </form>
               </td>
             </tr>
           ))}
-          {banners.length === 0 && (
-            <tr>
-              <td colSpan={4} className="py-4 text-center text-slate-500">
-                None yet.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+        </Table>
+      )}
     </div>
   );
 }

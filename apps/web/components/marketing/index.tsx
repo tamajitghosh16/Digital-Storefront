@@ -112,32 +112,26 @@ export function CategoryCircles({ categories }: { categories: CategoryCircle[] }
 
 // ── Trust band ──────────────────────────────────────────────────────
 
-const TRUST_ITEMS = [
-  {
-    glyph: "▤",
-    title: "Print & e-book, every title",
-    body: "Buy the physical edition, the e-book, or both — most titles ship either way.",
-  },
-  {
-    glyph: "↺",
-    title: "Easy returns",
-    body: "Free replacement or full refund on any printed order within seven days.",
-  },
-  {
-    glyph: "₹",
-    title: "Royalties, paid monthly",
-    body: "Self-published authors see payouts land in their dashboard like clockwork.",
-  },
-];
+export interface TrustItem {
+  title: string;
+  body: string;
+}
 
-export function TrustBand() {
+/**
+ * The glyphs stay in code. They're chosen to sit correctly at this size and
+ * weight, and picking one isn't a job to hand a non-technical editor — the
+ * wording beside them is what the admin controls.
+ */
+const TRUST_GLYPHS = ["▤", "↺", "₹"];
+
+export function TrustBand({ items }: { items: TrustItem[] }) {
   return (
     <div className="bg-tile">
       <Wrap className="grid gap-[26px] py-[34px] [grid-template-columns:repeat(auto-fit,minmax(240px,1fr))]">
-        {TRUST_ITEMS.map((item) => (
+        {items.map((item, index) => (
           <div key={item.title} className="flex items-start gap-3.5">
             <span aria-hidden className="text-[22px] leading-[1.1]">
-              {item.glyph}
+              {TRUST_GLYPHS[index % TRUST_GLYPHS.length]}
             </span>
             <div>
               <h4>{item.title}</h4>
@@ -246,15 +240,22 @@ export function PlanBand({
 
 // ── Newsletter ──────────────────────────────────────────────────────
 
-export function Newsletter() {
+export function Newsletter({
+  title,
+  body,
+  placeholder,
+  buttonLabel,
+}: {
+  title: string;
+  body: string;
+  placeholder: string;
+  buttonLabel: string;
+}) {
   return (
     <section className="bg-brand py-11 text-on-brand">
       <Wrap>
-        <h2 className="text-[28px]">New titles, once a month.</h2>
-        <p className="mt-2.5 max-w-[52ch] text-base leading-[1.55]">
-          What we printed, what authors published with us, and the occasional first chapter. No more than one email a
-          month.
-        </p>
+        <h2 className="text-[28px]">{title}</h2>
+        <p className="mt-2.5 max-w-[52ch] text-base leading-[1.55]">{body}</p>
         {/* No mailing-list backend in this scaffold yet — wiring it up means
             an inngest.send() from a Server Action (packages/jobs). */}
         <form className="mt-5 flex max-w-[520px] flex-wrap gap-2.5">
@@ -265,14 +266,14 @@ export function Newsletter() {
             id="newsletter-email"
             type="email"
             required
-            placeholder="you@example.com"
+            placeholder={placeholder}
             className="h-[50px] min-w-[210px] flex-1 rounded-full border-2 border-on-brand bg-ground px-5 text-ink focus:outline-none"
           />
           <button
             type="submit"
             className="rounded-btn border-2 border-on-brand bg-on-brand px-4 py-3 text-base font-bold text-brand transition hover:brightness-95"
           >
-            Subscribe
+            {buttonLabel}
           </button>
         </form>
       </Wrap>

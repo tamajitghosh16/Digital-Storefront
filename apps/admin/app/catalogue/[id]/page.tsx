@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@repo/database";
+import { PageHeader, Pill } from "@/components/ui";
 import { updateProduct } from "../actions";
 import { ProductForm } from "../product-form";
 
@@ -17,7 +18,17 @@ export default async function EditProductPage({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Edit Product</h1>
+      <PageHeader
+        title={product.title}
+        description={product.author}
+        backHref="/catalogue"
+        backLabel="Books & products"
+        action={
+          <Pill tone={product.isPublished ? "on" : "off"}>
+            {product.isPublished ? "Showing in the shop" : "Hidden from the shop"}
+          </Pill>
+        }
+      />
       <ProductForm action={updateProduct.bind(null, product.id)} product={product} error={error} />
     </div>
   );

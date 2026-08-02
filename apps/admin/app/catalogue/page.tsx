@@ -1,59 +1,76 @@
+import Link from "next/link";
+import type { ProductType } from "@repo/database";
 import { prisma } from "@repo/database";
+import { ButtonLink, EmptyState, PageHeader, Pill, Table, Thumb } from "@/components/ui";
+import { LinkButton } from "@/components/form-controls";
 import { toggleProductPublished } from "./actions";
 
 // FR-11.1: CMS for creating/editing catalogue items (books, service packages, pricing, inventory).
+
+const TYPE_LABEL: Record<ProductType, string> = {
+  PHYSICAL_BOOK: "Printed book",
+  EBOOK: "E-book",
+  SERVICE_PACKAGE: "Service package",
+};
+
+const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
+
 export default async function CataloguePage() {
-  const products = await prisma.product.findMany({ orderBy: { createdAt: "desc" }, take: 50 });
+  const products = await prisma.product.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
 
   return (
-    <div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Catalogue</h1>
-        <a href="/catalogue/new" className="rounded bg-brand-navy px-4 py-2 text-sm text-white">
-          + New Product
-        </a>
-      </div>
-      <table className="mt-6 w-full text-sm">
-        <thead className="text-left text-slate-500">
-          <tr>
-            <th className="py-2">Title</th>
-            <th>Type</th>
-            <th>Price</th>
-            <th>Stock</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((p) => (
-            <tr key={p.id} className="border-t border-slate-100">
-              <td className="py-2">
-                <a href={`/catalogue/${p.id}`} className="hover:underline">
-                  {p.title}
-                </a>
+    <div className="max-w-5xl">
+      <PageHeader
+        title="Books & products"
+        description="Everything you sell: printed books, e-books, and self-publishing packages."
+        action={<ButtonLink href="/catalogue/new">Add a book</ButtonLink>}
+      />
+
+      {products.length === 0 ? (
+        <EmptyState
+          title="Nothing in the shop yet"
+          description="Add your first printed book, e-book, or service package. You can upload the front cover as part of the same form."
+          action={<ButtonLink href="/catalogue/new">Add a book</ButtonLink>}
+        />
+      ) : (
+        <Table
+          head={
+            <>
+              <th colSpan={2}>Title</th>
+              <th>Type</th>
+              <th>Price</th>
+              <th>Stock</th>
+              <th>In the shop</th>
+              <th className="text-right">&nbsp;</th>
+            </>
+          }
+        >
+          {products.map((product) => (
+            <tr key={product.id}>
+              <td className="w-14 pr-0">
+                <Thumb src={product.coverImageUrl} alt="" />
               </td>
-              <td>{p.type}</td>
-              <td>₹{(p.priceCents / 100).toFixed(2)}</td>
-              <td>{p.stockQty ?? "—"}</td>
-              <td>{p.isPublished ? "Published" : "Draft"}</td>
               <td>
-                <form action={toggleProductPublished.bind(null, p.id)}>
-                  <button type="submit" className="text-xs text-brand-navy hover:underline">
-                    {p.isPublished ? "Unpublish" : "Publish"}
-                  </button>
+                <Link href={`/catalogue/${product.id}`} className="font-semibold text-ink hover:text-brand hover:underline">
+                  {product.title}
+                </Link>
+                <p className="text-[13px] text-ink-muted">{product.author}</p>
+              </td>
+              <td className="text-ink-muted">{TYPE_LABEL[product.type]}</td>
+              <td className="tabular-nums">{money.format(product.priceCents / 100)}</td>
+              <td className="tabular-nums text-ink-muted">{product.stockQty ?? "—"}</td>
+              <td>
+                <Pill tone={product.isPublished ? "on" : "off"}>{product.isPublished ? "Showing" : "Hidden"}</Pill>
+              </td>
+              <td className="text-right">
+                <form action={toggleProductPublished.bind(null, product.id)}>
+                  <LinkButton>{product.isPublished ? "Hide" : "Show"}</LinkButton>
                 </form>
               </td>
             </tr>
           ))}
-          {products.length === 0 && (
-            <tr>
-              <td colSpan={6} className="py-6 text-center text-slate-500">
-                No products yet.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+        </Table>
+      )}
     </div>
   );
 }

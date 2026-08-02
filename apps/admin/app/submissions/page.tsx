@@ -1,7 +1,9 @@
 import { prisma } from "@repo/database";
+import { EmptyState, PageHeader, Pill } from "@/components/ui";
 
 // FR-11.3: queue for incoming self-publishing submissions and service
 // requests with assignable status (Technical Design Document, Section 3.4).
+// Read-only for now — assigning and moving status is still to be built.
 export default async function SubmissionsQueuePage() {
   const [projects, serviceRequests] = await Promise.all([
     prisma.selfPublishingProject.findMany({ orderBy: { createdAt: "desc" }, take: 25, include: { author: true } }),
@@ -9,31 +11,51 @@ export default async function SubmissionsQueuePage() {
   ]);
 
   return (
-    <div className="space-y-10">
-      <section>
-        <h1 className="text-2xl font-bold">Self-Publishing Submissions</h1>
-        <ul className="mt-4 space-y-2">
-          {projects.map((p) => (
-            <li key={p.id} className="flex items-center justify-between rounded border border-slate-200 bg-white p-3">
-              <span>{p.bookTitle} — {p.author.name ?? p.author.email}</span>
-              <span className="rounded bg-slate-100 px-2 py-1 text-xs">{p.status}</span>
+    <div className="max-w-4xl">
+      <PageHeader
+        title="Submissions"
+        description="Manuscripts authors have sent in, and e-book creation jobs customers have ordered."
+      />
+
+      <h2 className="mb-3 text-base font-bold text-ink">Self-publishing submissions</h2>
+      {projects.length === 0 ? (
+        <EmptyState title="Nothing submitted yet" description="Manuscripts sent through the website land here." />
+      ) : (
+        <ul className="space-y-2">
+          {projects.map((project) => (
+            <li
+              key={project.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-btn border border-line bg-ground p-4"
+            >
+              <span>
+                <span className="block font-semibold text-ink">{project.bookTitle}</span>
+                <span className="text-[13px] text-ink-muted">{project.author.name ?? project.author.email}</span>
+              </span>
+              <Pill tone="info">{project.status}</Pill>
             </li>
           ))}
-          {projects.length === 0 && <p className="text-slate-500">No submissions yet.</p>}
         </ul>
-      </section>
-      <section>
-        <h2 className="text-xl font-bold">Service Requests</h2>
-        <ul className="mt-4 space-y-2">
-          {serviceRequests.map((r) => (
-            <li key={r.id} className="flex items-center justify-between rounded border border-slate-200 bg-white p-3">
-              <span>{r.serviceType} — {r.customer.name ?? r.customer.email}</span>
-              <span className="rounded bg-slate-100 px-2 py-1 text-xs">{r.status}</span>
+      )}
+
+      <h2 className="mb-3 mt-8 text-base font-bold text-ink">Service requests</h2>
+      {serviceRequests.length === 0 ? (
+        <EmptyState title="No service requests yet" description="E-book creation jobs appear here once ordered." />
+      ) : (
+        <ul className="space-y-2">
+          {serviceRequests.map((request) => (
+            <li
+              key={request.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-btn border border-line bg-ground p-4"
+            >
+              <span>
+                <span className="block font-semibold text-ink">{request.serviceType}</span>
+                <span className="text-[13px] text-ink-muted">{request.customer.name ?? request.customer.email}</span>
+              </span>
+              <Pill tone="info">{request.status}</Pill>
             </li>
           ))}
-          {serviceRequests.length === 0 && <p className="text-slate-500">No service requests yet.</p>}
         </ul>
-      </section>
+      )}
     </div>
   );
 }

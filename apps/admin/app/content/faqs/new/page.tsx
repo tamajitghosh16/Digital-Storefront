@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui";
 import { createFaq } from "../actions";
 import { FaqForm } from "../faq-form";
 
@@ -6,7 +7,7 @@ export default async function NewFaqPage({ searchParams }: { searchParams: Promi
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">New FAQ</h1>
+      <PageHeader title="Add a question" backHref="/content/faqs" backLabel="Questions & answers" />
       <FaqForm action={createFaq} error={error} />
     </div>
   );

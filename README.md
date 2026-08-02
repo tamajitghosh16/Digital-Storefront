@@ -113,8 +113,11 @@ npm run dev                           # runs both apps via Turborepo
 - `packages/jobs` — a working Inngest client with 3 functions wired to `apps/web/app/api/inngest/route.ts`.
 - `packages/email` — real Resend + React Email templates.
 - All list/detail pages that read from Postgres (homepage, catalogue, orders, submissions queue, royalties, analytics) — these run real Prisma queries today.
-- **Admin catalogue create/edit/publish forms** (`apps/admin/app/catalogue`) — full CRUD with Zod validation, `assertRole`, and `AuditLog` entries.
-- **Admin-as-CMS for the storefront** (`apps/admin/app/settings/site`, `settings/navigation`, `content/banners`, `content/faqs`, `content/testimonials`) — site branding/SEO defaults, header/footer nav, homepage hero banners, FAQs, and testimonials are all admin-managed rows (`SiteSettings`, `NavLink`, `Banner`, `Faq`, `Testimonial` models) that `apps/web`'s root layout, header, footer, and homepage read directly — no runtime call between the two apps, same shared-Postgres pattern as `Product`. Per-product SEO fields (`metaTitle`/`metaDescription`/`ogImageUrl`) are also admin-editable and rendered via `generateMetadata` on the product detail pages.
+- **Admin catalogue create/edit/publish forms** (`apps/admin/app/catalogue`) — full CRUD with Zod validation, `assertRole`, and `AuditLog` entries. The form adapts to what you're selling (printed book / e-book / service package) and only asks for the fields that apply, generates the web address from the title, and takes the front cover from a **file picker with a live preview** rather than asking for a URL.
+- **Cover and banner image upload** (`apps/admin/app/api/uploads` → `packages/storage`'s `uploadImage`) — role-checked, 4 MB cap, magic-byte type verification, SVG refused. Needs `BLOB_READ_WRITE_TOKEN`; without it the image fields say so and fall back to pasting a link.
+- **Admin-as-CMS for the storefront** (`apps/admin/app/settings/site`, `settings/navigation`, `settings/pricing`, `content/banners`, `content/homepage`, `content/faqs`, `content/testimonials`) — site branding/SEO defaults, header/footer nav, the homepage hero, **every other homepage heading and description**, FAQs, testimonials, and **the pricing rules** are all admin-managed rows (`SiteSettings`, `NavLink`, `Banner`, `ContentBlock`, `Faq`, `Testimonial`, `PricingSettings`, `ClassSetTier`, `DiscountCode`) that `apps/web`'s root layout, header, footer, homepage, product pages and cart read directly — no runtime call between the two apps, same shared-Postgres pattern as `Product`. Per-product SEO fields (`metaTitle`/`metaDescription`/`ogImageUrl`) are also admin-editable and rendered via `generateMetadata` on the product detail pages.
+  - *Homepage text* works off a registry in `packages/database/src/content.ts` that carries each string's label, help text and **default copy**; the database stores only overrides, so clearing a box in the admin restores the original wording and the storefront can never render blank.
+  - *Pricing & delivery* covers the free-delivery threshold, express/same-day fees and their arrival wording, the print + e-book bundle uplift, GST rates, class-set quantity discounts, and checkout discount codes. The defaults reproduce exactly what the storefront used to hardcode.
 
 **Stubbed — needs implementation:**
 - Sign-in UI (Supabase Auth's email/OAuth components aren't wired into `app/sign-in`).
@@ -130,7 +133,7 @@ Matches the roadmap in the Technical Design Document, Section 9:
 
 1. Finish auth end-to-end (sign-in/sign-up UI, session on both apps, confirm `sync_user.sql` trigger fires).
 2. Add-to-cart + checkout Server Action + Razorpay Checkout on the client; confirm the webhook flips an order to PAID.
-3. ~~Admin catalogue CRUD~~ — done; admin also now manages every piece of storefront content (site settings, nav, banners, FAQs, testimonials) as a lightweight CMS.
+3. ~~Admin catalogue CRUD~~ — done; admin is now the CMS for the whole storefront (site settings, nav, hero, every homepage heading and description, FAQs, testimonials, and pricing), with cover-image upload built into the catalogue form.
 4. Self-publishing wizard (steps 1–6), file upload + malware scan pipeline.
 5. Submissions queue actions (assign, move status, publish → auto-create Product), royalty calculation job.
 6. Reviews, notifications end-to-end, accessibility/security pass before launch.

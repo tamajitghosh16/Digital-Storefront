@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui";
 import { createNavLink } from "../actions";
 import { NavLinkForm } from "../nav-link-form";
 
@@ -6,7 +7,7 @@ export default async function NewNavLinkPage({ searchParams }: { searchParams: P
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">New Nav Link</h1>
+      <PageHeader title="Add a menu link" backHref="/settings/navigation" backLabel="Menu links" />
       <NavLinkForm action={createNavLink} error={error} />
     </div>
   );

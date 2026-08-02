@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui";
 import { createProduct } from "../actions";
 import { ProductForm } from "../product-form";
 
@@ -6,7 +7,12 @@ export default async function NewProductPage({ searchParams }: { searchParams: P
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">New Product</h1>
+      <PageHeader
+        title="Add a book"
+        description="Fill in what you know — you can come back and change any of it later."
+        backHref="/catalogue"
+        backLabel="Books & products"
+      />
       <ProductForm action={createProduct} error={error} />
     </div>
   );

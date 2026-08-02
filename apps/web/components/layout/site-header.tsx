@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Heart } from "lucide-react";
-import { getSiteSettings } from "@repo/database";
+import { getPricingConfig, getSiteSettings } from "@repo/database";
 import { getCurrentUser } from "@repo/auth/server";
 import { withFallback } from "@/lib/safe-fetch";
 import { SAMPLE_SITE_SETTINGS } from "@/lib/sample-data";
@@ -24,16 +24,17 @@ import { UtilityBar } from "./utility-bar";
  * database is reachable.
  */
 export async function SiteHeader() {
-  const [settings, user] = await Promise.all([
+  const [settings, user, pricing] = await Promise.all([
     withFallback(() => getSiteSettings(), SAMPLE_SITE_SETTINGS),
     withFallback(() => getCurrentUser(), null),
+    getPricingConfig(),
   ]);
 
   const departments = buildDepartments();
 
   return (
     <header>
-      <PromoBar />
+      <PromoBar pricing={pricing} />
       <UtilityBar contactPhone={settings.contactPhone} signedIn={!!user} />
 
       <Wrap className="flex items-center gap-4 py-4 lg:gap-7">

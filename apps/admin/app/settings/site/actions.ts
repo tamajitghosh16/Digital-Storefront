@@ -56,4 +56,5 @@ export async function updateSiteSettings(formData: FormData) {
   // pick up this change on the very next page load with no invalidation
   // needed on that side.
   revalidatePath("/settings/site");
+  redirect("/settings/site?saved=1");
 }

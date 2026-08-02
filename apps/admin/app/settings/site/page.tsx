@@ -1,72 +1,102 @@
 import { prisma, SITE_SETTINGS_ID } from "@repo/database";
+import { ErrorBanner, FieldRow, PageHeader, SavedBanner, Section, TextAreaField, TextField } from "@/components/ui";
+import { ImageField } from "@/components/image-field";
+import { SaveButton } from "@/components/form-controls";
 import { updateSiteSettings } from "./actions";
 
-const inputClass = "mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm";
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-sm">
-      <span className="font-medium text-slate-700">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-export default async function SiteSettingsPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
+// The screen behind apps/web's root layout: name and logo in the header,
+// contact details and social links in the footer, and the default title and
+// description search engines show for the site as a whole.
+export default async function SiteSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; saved?: string }>;
+}) {
+  const { error, saved } = await searchParams;
   const settings = await prisma.siteSettings.findUnique({ where: { id: SITE_SETTINGS_ID } });
   const social = (settings?.socialLinks as { twitter?: string; facebook?: string; instagram?: string } | null) ?? {};
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold">Site Settings</h1>
-      <p className="mt-1 text-sm text-slate-500">
-        Controls apps/web&apos;s global branding, default SEO metadata, and contact/social info.
-      </p>
+    <div className="max-w-3xl">
+      <PageHeader
+        title="Site details"
+        description="Your shop's name, logo, contact details and social links — used across the whole website."
+      />
 
-      <form action={updateSiteSettings} className="mt-6 max-w-2xl space-y-4">
-        {error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      <form action={updateSiteSettings} className="space-y-5">
+        <ErrorBanner message={error} />
+        {saved && <SavedBanner message="Site details saved." />}
 
-        <Field label="Site name">
-          <input name="siteName" defaultValue={settings?.siteName ?? "Shashibhushan's New School Book Press"} className={inputClass} required />
-        </Field>
-        <Field label="Tagline">
-          <input name="tagline" defaultValue={settings?.tagline ?? ""} className={inputClass} />
-        </Field>
-        <Field label="Meta title (SEO, homepage default)">
-          <input name="metaTitle" defaultValue={settings?.metaTitle ?? ""} className={inputClass} />
-        </Field>
-        <Field label="Meta description (SEO, homepage default)">
-          <textarea name="metaDescription" defaultValue={settings?.metaDescription ?? ""} className={inputClass} rows={2} />
-        </Field>
-        <Field label="OG image URL (social share preview)">
-          <input name="ogImageUrl" defaultValue={settings?.ogImageUrl ?? ""} className={inputClass} />
-        </Field>
-        <Field label="Logo URL">
-          <input name="logoUrl" defaultValue={settings?.logoUrl ?? ""} className={inputClass} />
-        </Field>
-        <Field label="Contact email">
-          <input name="contactEmail" type="email" defaultValue={settings?.contactEmail ?? ""} className={inputClass} />
-        </Field>
-        <Field label="Contact phone">
-          <input name="contactPhone" defaultValue={settings?.contactPhone ?? ""} className={inputClass} />
-        </Field>
-        <Field label="Address">
-          <input name="addressLine" defaultValue={settings?.addressLine ?? ""} className={inputClass} />
-        </Field>
-        <Field label="Twitter/X URL">
-          <input name="twitterUrl" defaultValue={social.twitter ?? ""} className={inputClass} />
-        </Field>
-        <Field label="Facebook URL">
-          <input name="facebookUrl" defaultValue={social.facebook ?? ""} className={inputClass} />
-        </Field>
-        <Field label="Instagram URL">
-          <input name="instagramUrl" defaultValue={social.instagram ?? ""} className={inputClass} />
-        </Field>
+        <Section title="Name and logo" description="Shown in the header of every page.">
+          <TextField
+            label="Shop name"
+            name="siteName"
+            required
+            defaultValue={settings?.siteName ?? "Shashibhushan's New School Book Press"}
+          />
+          <TextField
+            label="Tagline"
+            help="Optional. A short line under the name."
+            name="tagline"
+            defaultValue={settings?.tagline ?? ""}
+          />
+          <ImageField
+            name="logoUrl"
+            label="Logo"
+            help="Leave empty to use the logo built into the site. If yours is an SVG file, use “Use a link instead”."
+            defaultValue={settings?.logoUrl}
+            shape="wide"
+          />
+        </Section>
 
-        <button type="submit" className="rounded bg-brand-navy px-4 py-2 text-sm text-white">
-          Save settings
-        </button>
+        <Section
+          title="Contact details"
+          description="Shown in the footer so customers know how to reach you."
+        >
+          <FieldRow>
+            <TextField label="Email" name="contactEmail" type="email" defaultValue={settings?.contactEmail ?? ""} />
+            <TextField label="Phone" name="contactPhone" defaultValue={settings?.contactPhone ?? ""} />
+          </FieldRow>
+          <TextField label="Address" name="addressLine" defaultValue={settings?.addressLine ?? ""} />
+        </Section>
+
+        <Section title="Social links" description="Leave any of these empty to hide that icon in the footer.">
+          <FieldRow>
+            <TextField label="Twitter / X" name="twitterUrl" type="url" defaultValue={social.twitter ?? ""} placeholder="https://x.com/…" />
+            <TextField label="Facebook" name="facebookUrl" type="url" defaultValue={social.facebook ?? ""} placeholder="https://facebook.com/…" />
+            <TextField label="Instagram" name="instagramUrl" type="url" defaultValue={social.instagram ?? ""} placeholder="https://instagram.com/…" />
+          </FieldRow>
+        </Section>
+
+        <Section
+          title="How the site appears in Google and when shared"
+          description="Only the site as a whole — individual books have their own settings on the book's own page."
+        >
+          <TextField
+            label="Title in search results"
+            help="Leave empty to use the shop name."
+            name="metaTitle"
+            defaultValue={settings?.metaTitle ?? ""}
+          />
+          <TextAreaField
+            label="Description in search results"
+            help="Around 150 characters."
+            name="metaDescription"
+            rows={2}
+            defaultValue={settings?.metaDescription ?? ""}
+          />
+          <ImageField
+            name="ogImageUrl"
+            label="Picture when the site is shared"
+            help="Optional. Wide images (about 1200×630) work best."
+            defaultValue={settings?.ogImageUrl}
+            shape="wide"
+          />
+        </Section>
+
+        <div className="sticky bottom-4 flex items-center gap-3 rounded-tile border border-line bg-ground/95 p-4 backdrop-blur">
+          <SaveButton>Save site details</SaveButton>
+        </div>
       </form>
     </div>
   );

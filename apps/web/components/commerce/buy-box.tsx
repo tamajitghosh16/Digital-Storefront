@@ -5,14 +5,14 @@ import { Callout, CheckList, Rule, Stars, buttonClass } from "@/components/primi
 import { formatINRWhole } from "@/lib/format";
 import { useCartStore } from "@/lib/cart-store";
 import {
-  CLASS_SET_TIERS,
-  DELIVERY,
-  FREE_DELIVERY_COPY,
   deliveryOptions,
   editionUnitCents,
+  freeDeliveryCopy,
+  tierForQuantity,
   tierUnitCents,
   type DeliverySpeed,
   type Edition,
+  type PricingConfig,
 } from "@/lib/pricing";
 
 /**
@@ -34,6 +34,7 @@ export function BuyBox({
   editions,
   printCents,
   supportsClassSets,
+  pricing,
 }: {
   productId: string;
   title: string;
@@ -45,6 +46,8 @@ export function BuyBox({
   /** Single-copy printed price — the base every tier is derived from. */
   printCents?: number;
   supportsClassSets: boolean;
+  /** Admin-managed delivery, bundle and class-set rules, loaded by the page. */
+  pricing: PricingConfig;
 }) {
   const addItem = useCartStore((state) => state.addItem);
 
@@ -53,14 +56,14 @@ export function BuyBox({
   const [speed, setSpeed] = useState<DeliverySpeed>("standard");
   const [added, setAdded] = useState(false);
 
-  const speeds = useMemo(() => deliveryOptions(), []);
+  const speeds = useMemo(() => deliveryOptions(pricing), [pricing]);
   const edition = editions.find((candidate) => candidate.kind === editionKind) ?? editions[0];
   const digitalOnly = edition?.kind === "ebook";
 
   // Tiers are meaningless without a printed copy to discount.
   const tiersEnabled = supportsClassSets && printCents !== undefined && !digitalOnly;
   const effectiveQuantity = tiersEnabled ? quantity : 1;
-  const tier = CLASS_SET_TIERS.find((candidate) => candidate.quantity === effectiveQuantity) ?? CLASS_SET_TIERS[0]!;
+  const tier = tierForQuantity(pricing.classSetTiers, effectiveQuantity);
 
   const printUnit = printCents !== undefined ? tierUnitCents(printCents, tier.discount) : 0;
   const unitCents = edition ? editionUnitCents(edition, printUnit) : 0;
@@ -185,7 +188,7 @@ export function BuyBox({
             </summary>
 
             <div className="mt-3.5 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(134px,1fr))]">
-              {CLASS_SET_TIERS.map((candidate) => {
+              {pricing.classSetTiers.map((candidate) => {
                 const disabled = digitalOnly && candidate.quantity > 1;
                 const selected = !disabled && candidate.quantity === effectiveQuantity;
                 const each = tierUnitCents(printCents, candidate.discount);
@@ -229,7 +232,7 @@ export function BuyBox({
 
       <CheckList
         items={[
-          FREE_DELIVERY_COPY,
+          freeDeliveryCopy(pricing),
           "Easy returns — free replacement or full refund",
           "Five downloads per e-book format",
           "25% of this sale funds the Sashibhusan Book Press Memorial Trust",
@@ -238,8 +241,8 @@ export function BuyBox({
 
       {speed !== "standard" && (
         <p className="mt-4 text-xs text-ink-subtle">
-          Delivery is charged at checkout; orders over {formatINRWhole(DELIVERY.freeOverCents)} ship free on standard
-          speed.
+          Delivery is charged at checkout; orders over {formatINRWhole(pricing.delivery.freeOverCents)} ship free on
+          standard speed.
         </p>
       )}
     </div>

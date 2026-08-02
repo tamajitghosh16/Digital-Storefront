@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui";
 import { createTestimonial } from "../actions";
 import { TestimonialForm } from "../testimonial-form";
 
@@ -6,7 +7,7 @@ export default async function NewTestimonialPage({ searchParams }: { searchParam
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">New Testimonial</h1>
+      <PageHeader title="Add a testimonial" backHref="/content/testimonials" backLabel="Testimonials" />
       <TestimonialForm action={createTestimonial} error={error} />
     </div>
   );

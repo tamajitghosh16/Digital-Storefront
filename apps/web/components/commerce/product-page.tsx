@@ -12,7 +12,7 @@ import {
   Wrap,
   buttonClass,
 } from "@/components/primitives";
-import { buildEditions } from "@/lib/pricing";
+import { buildEditions, type PricingConfig } from "@/lib/pricing";
 import { BuyBox } from "./buy-box";
 import { JacketGallery } from "./jacket-gallery";
 import { ProductScroller, ProductTile, type ProductTileData } from "./product-tile";
@@ -50,11 +50,14 @@ export function ProductPage({
   product,
   companionPriceCents,
   related,
+  pricing,
 }: {
   product: ProductPageData;
   /** The other edition's price, when this title is published both ways. */
   companionPriceCents?: number;
   related: ProductTileData[];
+  /** Admin-managed pricing rules, loaded by the route that renders this. */
+  pricing: PricingConfig;
 }) {
   const isEbook = product.type === "EBOOK";
   const section = isEbook ? { label: "E-Books", href: "/ebooks" } : { label: "Books", href: "/books" };
@@ -67,6 +70,7 @@ export function ProductPage({
     ebookCents,
     pages: product.pages,
     formats: product.formats?.length ? product.formats : ["EPUB", "MOBI", "PDF"],
+    bundleAddCents: pricing.bundleEbookAddCents,
   });
 
   const distribution = reviewDistribution(product.rating ?? 4.5);
@@ -213,6 +217,7 @@ export function ProductPage({
             editions={editions}
             printCents={printCents}
             supportsClassSets={printCents !== undefined}
+            pricing={pricing}
           />
 
           <div className="mt-[18px] rounded-tile bg-tile p-6 inset-ring inset-ring-card-edge">

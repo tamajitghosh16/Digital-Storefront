@@ -7,12 +7,15 @@ import { NOW } from "./shared";
 export const SAMPLE_BANNERS: Banner[] = [
   {
     id: "banner-hero",
+    eyebrow: "New this season",
     title: "Your story, published your way.",
     subtitle:
       "Shop the catalogue, order custom e-book creation, or launch your own book through our guided self-publishing program.",
     imageUrl: null,
     ctaText: "Start self-publishing",
     ctaHref: "/self-publishing",
+    secondaryCtaText: "Shop books",
+    secondaryCtaHref: "/books",
     order: 0,
     isActive: true,
     createdAt: NOW,

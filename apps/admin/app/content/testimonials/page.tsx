@@ -1,61 +1,70 @@
+import Link from "next/link";
 import { prisma } from "@repo/database";
-import { toggleTestimonialActive, deleteTestimonial } from "./actions";
+import { ButtonLink, EmptyState, PageHeader, Pill, Table } from "@/components/ui";
+import { ConfirmButton, LinkButton } from "@/components/form-controls";
+import { deleteTestimonial, toggleTestimonialActive } from "./actions";
 
 export default async function TestimonialsPage() {
   const testimonials = await prisma.testimonial.findMany({ orderBy: { order: "asc" } });
 
   return (
-    <div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Testimonials</h1>
-        <a href="/content/testimonials/new" className="rounded bg-brand-navy px-4 py-2 text-sm text-white">
-          + New Testimonial
-        </a>
-      </div>
-      <table className="mt-6 w-full text-sm">
-        <thead className="text-left text-slate-500">
-          <tr>
-            <th className="py-2">Author</th>
-            <th>Rating</th>
-            <th>Order</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {testimonials.map((t) => (
-            <tr key={t.id} className="border-t border-slate-100">
-              <td className="py-2">
-                <a href={`/content/testimonials/${t.id}`} className="hover:underline">
-                  {t.authorName}
-                </a>
+    <div className="max-w-5xl">
+      <PageHeader
+        title="Testimonials"
+        description="Quotes from readers and authors, shown as cards on the homepage."
+        action={<ButtonLink href="/content/testimonials/new">Add a testimonial</ButtonLink>}
+      />
+
+      {testimonials.length === 0 ? (
+        <EmptyState
+          title="No testimonials yet"
+          description="Add a few quotes from happy readers or authors. The section stays hidden on the homepage until there's at least one."
+          action={<ButtonLink href="/content/testimonials/new">Add a testimonial</ButtonLink>}
+        />
+      ) : (
+        <Table
+          head={
+            <>
+              <th>Quote</th>
+              <th>Stars</th>
+              <th>Position</th>
+              <th>Status</th>
+              <th className="text-right">&nbsp;</th>
+            </>
+          }
+        >
+          {testimonials.map((testimonial) => (
+            <tr key={testimonial.id}>
+              <td>
+                <Link
+                  href={`/content/testimonials/${testimonial.id}`}
+                  className="font-semibold text-ink hover:text-brand hover:underline"
+                >
+                  {testimonial.authorName}
+                </Link>
+                <p className="mt-0.5 line-clamp-1 text-[13px] text-ink-muted">{testimonial.quote}</p>
               </td>
-              <td>{t.rating ?? "—"}</td>
-              <td>{t.order}</td>
-              <td>{t.isActive ? "Active" : "Hidden"}</td>
-              <td className="space-x-3">
-                <form action={toggleTestimonialActive.bind(null, t.id)} className="inline">
-                  <button type="submit" className="text-xs text-brand-navy hover:underline">
-                    {t.isActive ? "Hide" : "Show"}
-                  </button>
+              <td className="whitespace-nowrap text-warn">{"★".repeat(testimonial.rating ?? 5)}</td>
+              <td className="tabular-nums text-ink-muted">{testimonial.order}</td>
+              <td>
+                <Pill tone={testimonial.isActive ? "on" : "off"}>
+                  {testimonial.isActive ? "Showing" : "Hidden"}
+                </Pill>
+              </td>
+              <td className="space-x-4 text-right">
+                <form action={toggleTestimonialActive.bind(null, testimonial.id)} className="inline">
+                  <LinkButton>{testimonial.isActive ? "Hide" : "Show"}</LinkButton>
                 </form>
-                <form action={deleteTestimonial.bind(null, t.id)} className="inline">
-                  <button type="submit" className="text-xs text-red-600 hover:underline">
+                <form action={deleteTestimonial.bind(null, testimonial.id)} className="inline">
+                  <ConfirmButton message={`Delete the testimonial from ${testimonial.authorName}?`}>
                     Delete
-                  </button>
+                  </ConfirmButton>
                 </form>
               </td>
             </tr>
           ))}
-          {testimonials.length === 0 && (
-            <tr>
-              <td colSpan={5} className="py-4 text-center text-slate-500">
-                None yet.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+        </Table>
+      )}
     </div>
   );
 }

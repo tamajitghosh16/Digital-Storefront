@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSiteSettings } from "@repo/database";
+import { getContent, getSiteSettings } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
 import { SAMPLE_SITE_SETTINGS } from "@/lib/sample-data";
 import { CATALOG_ITEMS, findCatalogItem } from "@/lib/catalog";
@@ -41,7 +41,12 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ sl
   const item = findCatalogItem(slug);
   if (!item) notFound();
 
-  const settings = await withFallback(() => getSiteSettings(), SAMPLE_SITE_SETTINGS);
+  // The promises band shares its wording with the homepage — the Publisher
+  // edits it once, under Homepage text, and both pages follow.
+  const [settings, content] = await Promise.all([
+    withFallback(() => getSiteSettings(), SAMPLE_SITE_SETTINGS),
+    getContent(),
+  ]);
   const flow = FLOW_COPY[item.flow];
   const siblings = CATALOG_ITEMS.filter(
     (candidate) => candidate.category === item.category && candidate.slug !== item.slug
@@ -121,7 +126,13 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ sl
         </div>
       </Wrap>
 
-      <TrustBand />
+      <TrustBand
+        items={[
+          { title: content["homepage.trust.item1.title"], body: content["homepage.trust.item1.body"] },
+          { title: content["homepage.trust.item2.title"], body: content["homepage.trust.item2.body"] },
+          { title: content["homepage.trust.item3.title"], body: content["homepage.trust.item3.body"] },
+        ]}
+      />
     </>
   );
 }

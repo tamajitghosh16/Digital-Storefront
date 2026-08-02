@@ -452,11 +452,16 @@ model NavLink {
 /// Homepage hero/promo banners.
 model Banner {
   id        String   @id @default(cuid())
+  /// Small label above the headline ("New this season").
+  eyebrow   String?
   title     String
   subtitle  String?
   imageUrl  String?
   ctaText   String?
   ctaHref   String?
+  /// Optional second button beside the main one ("Shop books").
+  secondaryCtaText String?
+  secondaryCtaHref String?
   order     Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -491,4 +496,73 @@ model Testimonial {
   updatedAt  DateTime @updatedAt
 
   @@map("testimonials")
+}
+
+/// Every other piece of storefront copy — section headings, their
+/// descriptions, button labels — as an admin-editable override keyed by a
+/// stable string. The catalogue of keys (with the label, help text and
+/// default copy each one carries) lives in `src/content.ts`, not here: only
+/// keys the Publisher has actually changed get a row, so the storefront
+/// falls back to the shipped default and can never render blank.
+model ContentBlock {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("content_blocks")
+}
+
+/// Singleton row (fixed id, see PRICING_SETTINGS_ID) holding the storefront
+/// pricing rules that aren't per-product: delivery thresholds and fees, the
+/// print + e-book bundle uplift, and GST rates. Defaults here mirror what
+/// apps/web's lib/pricing.ts used to hardcode.
+model PricingSettings {
+  id                    String   @id @default(cuid())
+  /// Order subtotal at or above which standard delivery is free.
+  freeDeliveryOverCents Int      @default(150000)
+  expressFeeCents       Int      @default(14900)
+  sameDayFeeCents       Int      @default(24900)
+  /// Human-written arrival estimates shown beside each delivery speed.
+  standardEta           String   @default("in 3-5 working days")
+  expressEta            String   @default("next working day")
+  sameDayEta            String   @default("by 9pm today")
+  /// Flat amount added to a printed copy when the reader takes both editions.
+  bundleEbookAddCents   Int      @default(30000)
+  /// GST in basis points (1800 = 18%). Printed books are nil-rated (HSN 4901).
+  ebookGstBps           Int      @default(1800)
+  serviceGstBps         Int      @default(1800)
+  /// The example title price the homepage class-set table is priced from.
+  classSetBaseCents     Int      @default(49900)
+  updatedAt             DateTime @updatedAt
+
+  @@map("pricing_settings")
+}
+
+/// Quantity breaks for class sets — schools buying one title in bulk.
+/// Empty table means no tiers are offered.
+model ClassSetTier {
+  id          String   @id @default(cuid())
+  quantity    Int      @unique
+  /// Fraction off the single-copy price, in basis points (1000 = 10% off).
+  discountBps Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("class_set_tiers")
+}
+
+/// Checkout discount codes. Matched case-insensitively by storing `code`
+/// already upper-cased at write time.
+model DiscountCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  /// Fraction off the order, in basis points (500 = 5% off).
+  rateBps   Int
+  blurb     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("discount_codes")
 }
