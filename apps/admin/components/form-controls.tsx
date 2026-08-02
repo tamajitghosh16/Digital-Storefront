@@ -56,7 +56,9 @@ export function ConfirmButton({
         if (!window.confirm(message)) event.preventDefault();
       }}
       className={cn(
-        "text-[13px] font-semibold text-sale transition-opacity hover:underline disabled:opacity-60",
+        // Always underlined, not just on hover — with no red left to lean
+        // on, the underline is what marks this one as irreversible.
+        "text-[13px] font-semibold text-ink underline decoration-ink/40 underline-offset-2 transition-opacity hover:decoration-ink disabled:opacity-60",
         className
       )}
     >

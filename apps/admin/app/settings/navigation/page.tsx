@@ -18,10 +18,10 @@ export default async function NavigationPage() {
         action={<ButtonLink href="/settings/navigation/new">Add a link</ButtonLink>}
       />
 
-      <h2 className="mb-3 text-base font-bold text-ink">Top of the page</h2>
+      <h2 className="mb-3 font-display text-base font-bold text-ink">Top of the page</h2>
       <LinkTable links={header} where="the top menu" />
 
-      <h2 className="mb-3 mt-8 text-base font-bold text-ink">Footer</h2>
+      <h2 className="mb-3 mt-8 font-display text-base font-bold text-ink">Footer</h2>
       <LinkTable links={footer} where="the footer" />
     </div>
   );

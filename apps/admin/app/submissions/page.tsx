@@ -17,7 +17,7 @@ export default async function SubmissionsQueuePage() {
         description="Manuscripts authors have sent in, and e-book creation jobs customers have ordered."
       />
 
-      <h2 className="mb-3 text-base font-bold text-ink">Self-publishing submissions</h2>
+      <h2 className="mb-3 font-display text-base font-bold text-ink">Self-publishing submissions</h2>
       {projects.length === 0 ? (
         <EmptyState title="Nothing submitted yet" description="Manuscripts sent through the website land here." />
       ) : (
@@ -37,7 +37,7 @@ export default async function SubmissionsQueuePage() {
         </ul>
       )}
 
-      <h2 className="mb-3 mt-8 text-base font-bold text-ink">Service requests</h2>
+      <h2 className="mb-3 mt-8 font-display text-base font-bold text-ink">Service requests</h2>
       {serviceRequests.length === 0 ? (
         <EmptyState title="No service requests yet" description="E-book creation jobs appear here once ordered." />
       ) : (

@@ -46,7 +46,7 @@ export function PageHeader({
       )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-[-0.02em] text-ink">{title}</h1>
+          <h1 className="font-display text-[28px] font-bold tracking-[-0.02em] text-ink">{title}</h1>
           {description && <p className="mt-1.5 max-w-[65ch] text-sm leading-relaxed text-ink-muted">{description}</p>}
         </div>
         {action && <div className="shrink-0">{action}</div>}
@@ -69,7 +69,7 @@ export function Section({
 }) {
   return (
     <section className={cn("rounded-tile border border-line bg-ground p-6", className)}>
-      <h2 className="text-base font-bold tracking-[-0.01em] text-ink">{title}</h2>
+      <h2 className="font-display text-lg font-bold tracking-[-0.01em] text-ink">{title}</h2>
       {description && <p className="mt-1 max-w-[70ch] text-sm leading-relaxed text-ink-muted">{description}</p>}
       <div className="mt-5 space-y-5">{children}</div>
     </section>
@@ -233,10 +233,14 @@ export function CheckboxField({
 
 // ── Feedback ────────────────────────────────────────────────────────
 
+/** Filled ink, not outlined — the more urgent of the two banners gets more ink. */
 export function ErrorBanner({ message }: { message?: string }) {
   if (!message) return null;
   return (
-    <div role="alert" className="rounded-btn border border-sale/40 bg-sale/10 p-3.5 text-sm font-medium text-sale">
+    <div role="alert" className="flex items-start gap-3 rounded-btn bg-ink px-4 py-3.5 text-sm font-semibold text-white">
+      <span aria-hidden className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full bg-white text-[10px] font-bold text-ink">
+        !
+      </span>
       {message}
     </div>
   );
@@ -246,8 +250,11 @@ export function ErrorBanner({ message }: { message?: string }) {
 export function SavedBanner({ message }: { message?: string }) {
   if (!message) return null;
   return (
-    <div role="status" className="rounded-btn border border-ok/40 bg-ok/10 p-3.5 text-sm font-medium text-ok">
-      ✓ {message}
+    <div role="status" className="flex items-start gap-3 rounded-btn border border-line-strong bg-ground px-4 py-3.5 text-sm font-semibold text-ink">
+      <span aria-hidden className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full bg-ink text-[10px] font-bold text-white">
+        ✓
+      </span>
+      {message}
     </div>
   );
 }
@@ -263,7 +270,7 @@ export function EmptyState({
 }) {
   return (
     <div className="rounded-tile border border-dashed border-line-strong bg-ground px-6 py-14 text-center">
-      <p className="text-base font-bold text-ink">{title}</p>
+      <p className="font-display text-base font-bold text-ink">{title}</p>
       <p className="mx-auto mt-1.5 max-w-[46ch] text-sm leading-relaxed text-ink-muted">{description}</p>
       {action && <div className="mt-5 flex justify-center">{action}</div>}
     </div>
@@ -280,7 +287,9 @@ export function buttonClass(variant: "primary" | "secondary" | "danger" = "prima
     buttonBase,
     variant === "primary" && "bg-brand text-on-brand hover:bg-brand-press",
     variant === "secondary" && "border border-line-strong bg-ground text-ink hover:bg-tile",
-    variant === "danger" && "border border-sale/40 bg-sale/10 text-sale hover:bg-sale/20",
+    // Same ink as primary, inverted on hover, rather than a colour swap —
+    // "about to commit more ink" reads as caution without needing red.
+    variant === "danger" && "border-2 border-ink bg-ground text-ink hover:bg-ink hover:text-white",
     className
   );
 }
@@ -322,14 +331,19 @@ export function Table({ head, children }: { head: React.ReactNode; children: Rea
   );
 }
 
+/**
+ * Status reads as a stamp, not a colour: filled ink for "live", a hairline
+ * outline for "off", a dashed outline for "in progress". Three tones, three
+ * shapes — legible without a single hue in the system.
+ */
 export function Pill({ tone, children }: { tone: "on" | "off" | "info"; children: React.ReactNode }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold",
-        tone === "on" && "bg-ok/12 text-ok",
-        tone === "off" && "bg-tile-2 text-ink-muted",
-        tone === "info" && "bg-brand-soft text-brand"
+        "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide",
+        tone === "on" && "bg-ink text-white",
+        tone === "off" && "border border-line-strong text-ink-muted",
+        tone === "info" && "border border-dashed border-line-strong text-ink"
       )}
     >
       {children}
@@ -341,11 +355,11 @@ export function Pill({ tone, children }: { tone: "on" | "off" | "info"; children
 export function Thumb({ src, alt }: { src?: string | null; alt: string }) {
   if (!src) {
     return (
-      <span className="grid h-12 w-9 shrink-0 place-items-center rounded border border-line bg-tile text-[10px] font-bold text-ink-subtle">
+      <span className="grid h-12 w-9 shrink-0 place-items-center rounded-[10px] border border-line bg-tile text-[10px] font-bold text-ink-subtle">
         —
       </span>
     );
   }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={src} alt={alt} className="h-12 w-9 shrink-0 rounded border border-line object-cover" />;
+  return <img src={src} alt={alt} className="h-12 w-9 shrink-0 rounded-[10px] border border-line object-cover" />;
 }

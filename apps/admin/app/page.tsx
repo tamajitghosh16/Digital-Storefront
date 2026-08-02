@@ -34,7 +34,7 @@ export default async function AdminDashboard() {
       </div>
 
       <section className="mt-8 rounded-tile border border-line bg-ground p-6">
-        <h2 className="text-base font-bold tracking-[-0.01em] text-ink">Everyday jobs</h2>
+        <h2 className="font-display text-lg font-bold tracking-[-0.01em] text-ink">Everyday jobs</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Shortcut
             href="/catalogue/new"
@@ -79,17 +79,26 @@ function StatCard({
   href: string;
   tone?: "loud" | "quiet";
 }) {
+  // "Loud" stats (the ones waiting on the Publisher today) get the full
+  // ink-stamp treatment; "quiet" ones (a standing count, not a to-do) stay
+  // on paper — hierarchy by fill, not by a colour that no longer exists.
   return (
     <Link
       href={href}
-      className="block rounded-tile border border-line bg-ground p-5 transition-colors hover:border-brand"
+      className={
+        tone === "loud"
+          ? "block rounded-tile bg-ink p-5 shadow-tile transition-transform hover:-translate-y-0.5"
+          : "block rounded-tile border border-line bg-ground p-5 transition-colors hover:border-line-strong"
+      }
     >
-      <p className="text-sm font-semibold text-ink-muted">{label}</p>
+      <p className={tone === "loud" ? "text-sm font-semibold text-white/60" : "text-sm font-semibold text-ink-muted"}>
+        {label}
+      </p>
       <p
         className={
           tone === "loud"
-            ? "mt-2 text-4xl font-bold tabular-nums text-brand"
-            : "mt-2 text-3xl font-bold tabular-nums text-ink"
+            ? "mt-2 font-display text-4xl font-bold tabular-nums text-white"
+            : "mt-2 font-display text-3xl font-bold tabular-nums text-ink"
         }
       >
         {value}

@@ -1,2 +1,79 @@
 @import "tailwindcss";
 @import "@repo/config/tailwind-preset.css";
+
+/* ── Back office — ink & paper ──────────────────────────────────────────
+   The shared preset above is Vistaprint-blue and built for the storefront;
+   this file re-points its tokens for apps/admin only (a plain CSS custom-
+   property override after the import wins the cascade, same trick the
+   preset already uses for `.dark` — it never touches packages/config, so
+   apps/web is unaffected).
+
+   The brief: minimalist, rounded, black and white only. Rather than fake
+   "black and white" with a named grey ramp, every tint here is either a
+   neutral (equal-channel) grey or black at some opacity — literally ink at
+   different strengths on paper. Status colour (paid/pending, live/hidden,
+   error/success) is carried by shape and weight instead of hue: filled vs.
+   outlined vs. dashed, not green vs. red. That's the whole idea — a back
+   office that reads like a proof sheet, not a dashboard. */
+:root {
+  /* Ink-black stands in for "brand" — every primary action is a stamp. */
+  --color-brand: #0a0a0a;
+  --color-brand-press: #000000;
+  --color-on-brand: #ffffff;
+  --color-brand-soft: rgba(0, 0, 0, 0.06);
+
+  /* Paper, and one step up for a raised sheet. */
+  --color-page: #fafafa;
+  --color-ground: #ffffff;
+  --color-tile: #f2f2f2;
+  --color-tile-2: #e8e8e8;
+  --color-tile-3: #f5f5f5;
+
+  --color-ink: #0a0a0a;
+  --color-ink-muted: rgba(0, 0, 0, 0.58);
+  --color-ink-subtle: rgba(0, 0, 0, 0.38);
+
+  --color-line: rgba(0, 0, 0, 0.1);
+  --color-line-strong: rgba(0, 0, 0, 0.26);
+  --color-card-edge: rgba(0, 0, 0, 0.06);
+
+  /* Status tokens collapse to ink on purpose — see note above. */
+  --color-ok: #0a0a0a;
+  --color-warn: #0a0a0a;
+  --color-sale: #0a0a0a;
+
+  --color-band: #0a0a0a;
+  --color-band-ink: #ffffff;
+  --color-band-muted: rgba(255, 255, 255, 0.7);
+  --color-promo: #0a0a0a;
+  --color-promo-ink: #ffffff;
+
+  --color-background: #fafafa;
+  --color-foreground: #0a0a0a;
+  --color-muted: #f2f2f2;
+  --color-muted-foreground: rgba(0, 0, 0, 0.58);
+  --color-border: rgba(0, 0, 0, 0.1);
+  --color-card: #ffffff;
+  --color-card-foreground: #0a0a0a;
+  --color-ring: #0a0a0a;
+  --color-brand-navy: #0a0a0a;
+  --color-brand-accent: #0a0a0a;
+
+  /* Rounder than the storefront on purpose — the one geometry change the
+     brief asked for by name. */
+  --radius-tile: 28px;
+  --radius-btn: 14px;
+
+  --shadow-tile: 0 1px 2px rgba(0, 0, 0, 0.04), 0 16px 32px -12px rgba(0, 0, 0, 0.08);
+  --shadow-pop: 0 20px 48px -12px rgba(0, 0, 0, 0.22);
+  --shadow-book: 0 10px 24px rgba(0, 0, 0, 0.16);
+
+  /* Space Grotesk for anything that announces a screen or a number;
+     Manrope carries the actual work (labels, body, buttons) — its rounded
+     terminals echo the radius system instead of fighting it; Plex Mono
+     gives table figures and codes a ledger feel. next/font variables are
+     set on <html> in app/layout.tsx. */
+  --font-sans: var(--font-manrope), "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-space-grotesk), "Space Grotesk", var(--font-sans);
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}

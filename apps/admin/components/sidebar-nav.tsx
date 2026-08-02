@@ -23,12 +23,17 @@ import {
 import { cn } from "@repo/ui/utils";
 
 /**
- * Back-office navigation.
+ * Back-office navigation, rendered inside the black dock in app/layout.tsx.
  *
  * Grouped and labelled by the job being done rather than by the data model:
  * the Publisher looks for "Homepage text", not for "ContentBlock". The
  * groups deliberately mirror how the work actually splits up — selling,
  * editing the website, running the publishing side, and administration.
+ *
+ * Colours here are hand-picked white-on-black, not the shared `ink`/`tile`
+ * tokens — the dock is a fixed dark surface regardless of the rest of the
+ * (light-only) app, so it needs its own contrast pair rather than one that
+ * assumes a white ground.
  */
 
 interface NavItem {
@@ -87,7 +92,7 @@ export function SidebarNav() {
 
       {NAV_GROUPS.map((group) => (
         <div key={group.heading}>
-          <p className="mb-1.5 px-3 text-[11px] font-bold uppercase tracking-[0.08em] text-ink-subtle">
+          <p className="mb-1.5 px-3.5 text-[11px] font-bold uppercase tracking-[0.1em] text-white/40">
             {group.heading}
           </p>
           <div className="space-y-0.5">
@@ -101,19 +106,14 @@ export function SidebarNav() {
   );
 }
 
-function NavLink({
-  href,
-  label,
-  icon: Icon,
-  current,
-}: NavItem & { current: boolean }) {
+function NavLink({ href, label, icon: Icon, current }: NavItem & { current: boolean }) {
   return (
     <Link
       href={href}
       aria-current={current ? "page" : undefined}
       className={cn(
-        "flex items-center gap-2.5 rounded-btn px-3 py-2 text-sm font-semibold transition-colors",
-        current ? "bg-brand text-on-brand" : "text-ink-muted hover:bg-tile hover:text-ink"
+        "flex items-center gap-2.5 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors",
+        current ? "bg-white text-ink" : "text-white/70 hover:bg-white/10 hover:text-white"
       )}
     >
       <Icon aria-hidden className="h-4 w-4 shrink-0" />
