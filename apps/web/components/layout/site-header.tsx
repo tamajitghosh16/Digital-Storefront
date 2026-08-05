@@ -15,13 +15,12 @@ import { IconButtonLink } from "./icon-button";
 import { MobileNav } from "./mobile-nav";
 import { PromoBar } from "./promo-bar";
 import { ThemeToggle } from "./theme-toggle";
-import { UtilityBar } from "./utility-bar";
 
 /**
- * Storefront chrome: offer marquee → utility row → masthead → department
- * bar. Site name, phone and contact details are admin-controlled (the
- * singleton SiteSettings row), falling back to sample settings when no
- * database is reachable.
+ * Storefront chrome: offer marquee → masthead → department bar. Site
+ * name, phone and contact details are admin-controlled (the singleton
+ * SiteSettings row), falling back to sample settings when no database
+ * is reachable.
  */
 export async function SiteHeader() {
   const [settings, user, pricing] = await Promise.all([
@@ -35,7 +34,6 @@ export async function SiteHeader() {
   return (
     <header>
       <PromoBar pricing={pricing} />
-      <UtilityBar contactPhone={settings.contactPhone} signedIn={!!user} />
 
       <Wrap className="flex items-center gap-4 py-4 lg:gap-7">
         <MobileNav departments={departments} signedIn={!!user} />
@@ -59,10 +57,10 @@ export async function SiteHeader() {
           <HeaderSearch className="hidden max-w-[620px] flex-1 min-[900px]:block" />
         </Suspense>
 
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-0.5">
           <ThemeToggle />
           <IconButtonLink href="/account/library" label="Library">
-            <Heart className="h-[18px] w-[18px]" strokeWidth={1.9} />
+            <Heart className="h-[22px] w-[22px]" strokeWidth={1.9} />
           </IconButtonLink>
           <CartIndicator />
           <AccountMenu user={user ? { name: user.name, email: user.email, role: user.role } : null} />

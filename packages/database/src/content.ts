@@ -34,19 +34,6 @@ export interface ContentGroup {
 
 export const CONTENT_GROUPS = [
   {
-    id: "categories",
-    title: "Category circles",
-    description: "The row of round category links just under the hero.",
-    entries: [
-      {
-        key: "homepage.categories.title",
-        label: "Heading",
-        help: "Sits above the circles.",
-        defaultValue: "Explore all categories",
-      },
-    ],
-  },
-  {
     id: "popular",
     title: "Popular titles",
     description: "The horizontal shelf of best-selling books.",
@@ -54,7 +41,7 @@ export const CONTENT_GROUPS = [
       {
         key: "homepage.popular.title",
         label: "Heading",
-        defaultValue: "Our most popular titles",
+        defaultValue: "Our most popular books",
       },
       {
         key: "homepage.popular.standfirst",
@@ -67,7 +54,7 @@ export const CONTENT_GROUPS = [
   {
     id: "trust",
     title: "Promises band",
-    description: "The three short promises on the tinted strip below the popular titles.",
+    description: "The three short promises shown on catalog item pages (no longer shown on the homepage).",
     entries: [
       {
         key: "homepage.trust.item1.title",
@@ -105,80 +92,97 @@ export const CONTENT_GROUPS = [
     ],
   },
   {
-    id: "classSet",
-    title: "Class sets band",
-    description:
-      "The bulk-order panel for schools. The prices in its table come from Pricing → Class set tiers, not from here.",
+    id: "educationalLearning",
+    title: "Educational and Learning band",
+    description: "Short highlight for the educational-materials product lines.",
     entries: [
       {
-        key: "homepage.classSet.eyebrow",
-        label: "Small label above the heading",
-        defaultValue: "Class sets",
-      },
-      {
-        key: "homepage.classSet.title",
+        key: "homepage.educationalLearning.title",
         label: "Heading",
-        defaultValue: "Buy more, save more.",
+        defaultValue: "Educational and Learning",
       },
       {
-        key: "homepage.classSet.body",
+        key: "homepage.educationalLearning.body",
         label: "Description",
         defaultValue:
-          "Schools and reading groups order the same title in quantity. Pick a tier — the per-copy price drops automatically. No quote, no waiting on a rep.",
-        multiline: true,
-      },
-      {
-        key: "homepage.classSet.ctaLabel",
-        label: "Button text",
-        defaultValue: "Shop class sets",
-      },
-      {
-        key: "homepage.classSet.ctaHref",
-        label: "Button link",
-        help: "A path on your own site, e.g. /books",
-        defaultValue: "/books",
-      },
-      {
-        key: "homepage.classSet.priceCaption",
-        label: "Caption above the price table",
-        defaultValue: "Books for Primary Students · per copy",
-      },
-      {
-        key: "homepage.classSet.footnote",
-        label: "Small print under the price table",
-        defaultValue: "MRP (inclusive of all taxes). Delivery billed at checkout.",
+          "Charts, worksheets, activity puzzles and teaching materials published under our Ink & Imagination imprint — classroom-ready resources for primary students and educators alike.",
         multiline: true,
       },
     ],
   },
   {
-    id: "services",
-    title: "Author services band",
-    description:
-      "The dark band showing your self-publishing packages. The package names and prices come from the catalogue (product type “Service package”).",
+    id: "professionalProducts",
+    title: "Professional products band",
+    description: "Short highlight for the Advocate's Diary (Naya Bandhu).",
     entries: [
       {
-        key: "homepage.services.eyebrow",
-        label: "Small label above the heading",
-        defaultValue: "Author services",
-      },
-      {
-        key: "homepage.services.title",
+        key: "homepage.professionalProducts.title",
         label: "Heading",
-        defaultValue: "Publish it yourself — we'll guide you.",
+        defaultValue: "Professional products",
       },
       {
-        key: "homepage.services.standfirst",
+        key: "homepage.professionalProducts.body",
         label: "Description",
         defaultValue:
-          "Every package takes your manuscript to a finished e-book. Add a printed edition, ISBN registration, and a storefront listing whenever you're ready.",
+          "The Advocate's Diary (Naya Bandhu) is legal stationery built for the job — a daily planner sized for case lists, hearing dates and client notes.",
         multiline: true,
       },
+    ],
+  },
+  {
+    id: "digitalTechSolutions",
+    title: "Digital & Tech Solutions band",
+    description: "Short highlight for the Naya Bandhu app and Digital Tracking System.",
+    entries: [
       {
-        key: "homepage.services.featuredTag",
-        label: "Badge on the highlighted package",
-        help: "Shown on the middle package. Clear this to hide the badge.",
-        defaultValue: "Most popular",
+        key: "homepage.digitalTechSolutions.title",
+        label: "Heading",
+        defaultValue: "Digital & Tech Solutions",
+      },
+      {
+        key: "homepage.digitalTechSolutions.body",
+        label: "Description",
+        defaultValue:
+          "Naya Bandhu puts legal productivity tools in an advocate's pocket, and our Digital Tracking System gives institutions a direct software entitlement for enterprise-grade tracking.",
+        multiline: true,
+      },
+    ],
+  },
+  {
+    id: "publishing",
+    title: "Publishing band",
+    description: "Short highlight for self-publishing and bulk publishing.",
+    entries: [
+      {
+        key: "homepage.publishing.title",
+        label: "Heading",
+        defaultValue: "Publishing",
+      },
+      {
+        key: "homepage.publishing.body",
+        label: "Description",
+        defaultValue:
+          "Publish a single title through our guided self-publishing program, or place a bulk print run for schools, reading groups and institutions ordering in quantity.",
+        multiline: true,
+      },
+    ],
+  },
+  {
+    id: "lifestyle",
+    title: "Lifestyle band",
+    description: "Short highlight for the indoor plants line.",
+    entries: [
+      {
+        key: "homepage.lifestyle.title",
+        label: "Heading",
+        defaultValue: "Lifestyle",
+      },
+      {
+        key: "homepage.lifestyle.body",
+        label: "Description",
+        defaultValue:
+          "Chatterjee's Green Veranda brings indoor plants to your doorstep, fostering environmental conservation and a connection with nature at home.",
+        multiline: true,
       },
     ],
   },
@@ -202,7 +206,7 @@ export const CONTENT_GROUPS = [
       {
         key: "homepage.newsletter.title",
         label: "Heading",
-        defaultValue: "New titles, once a month.",
+        defaultValue: "Subscribe to get latest updates",
       },
       {
         key: "homepage.newsletter.body",

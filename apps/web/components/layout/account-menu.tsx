@@ -30,7 +30,7 @@ export function AccountMenu({ user }: { user: AccountMenuUser | null }) {
   if (!user) {
     return (
       <IconButtonLink href="/sign-in" label="Sign in">
-        <CircleUserRound className="h-[18px] w-[18px]" strokeWidth={1.9} />
+        <CircleUserRound className="h-[22px] w-[22px]" strokeWidth={1.9} />
       </IconButtonLink>
     );
   }
@@ -50,7 +50,7 @@ export function AccountMenu({ user }: { user: AccountMenuUser | null }) {
       <DropdownMenuTrigger asChild>
         <button type="button" aria-label="Account menu" className={ICON_BUTTON_CLASS}>
           <span className="text-lg leading-none">
-            <CircleUserRound className="h-[18px] w-[18px]" strokeWidth={1.9} />
+            <CircleUserRound className="h-[22px] w-[22px]" strokeWidth={1.9} />
           </span>
           <span className={ICON_LABEL_CLASS}>Account</span>
         </button>

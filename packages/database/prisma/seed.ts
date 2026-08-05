@@ -101,7 +101,7 @@ async function main() {
     update: {},
     create: {
       id: "banner-welcome",
-      eyebrow: "New this season",
+      eyebrow: "Knowledge that builds better citizens and better professionals",
       title: "Your story, published your way.",
       subtitle:
         "Shop the catalogue, commission an e-book conversion, or launch your own title — manuscript to storefront listing in as little as three weeks.",

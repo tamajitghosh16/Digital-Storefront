@@ -7,7 +7,7 @@ import { NOW } from "./shared";
 export const SAMPLE_BANNERS: Banner[] = [
   {
     id: "banner-hero",
-    eyebrow: "New this season",
+    eyebrow: "Knowledge that builds better citizens and better professionals",
     title: "Your story, published your way.",
     subtitle:
       "Shop the catalogue, order custom e-book creation, or launch your own book through our guided self-publishing program.",

@@ -7,7 +7,7 @@ import { cn } from "@repo/ui/utils";
  * so they stay on one baseline.
  */
 export const ICON_BUTTON_CLASS =
-  "inline-flex flex-col items-center gap-[3px] rounded-btn px-2.5 py-2 text-[11px] text-ink transition-colors hover:bg-tile";
+  "inline-flex flex-col items-center gap-1 rounded-btn px-2 py-1 text-xs text-ink transition-colors hover:bg-tile";
 
 export const ICON_LABEL_CLASS = "hidden min-[1100px]:block";
 
@@ -39,7 +39,7 @@ export function IconButtonLink({
 /** Count bubble on the cart glyph. */
 export function IconBadge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="absolute -right-2.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand px-1.5 text-[11px] font-bold tabular-nums text-on-brand">
+    <span className="absolute -right-3 -top-2 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-brand px-1.5 text-[11px] font-bold tabular-nums text-on-brand">
       {children}
     </span>
   );

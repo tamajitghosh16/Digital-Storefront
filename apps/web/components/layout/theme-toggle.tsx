@@ -17,7 +17,7 @@ export function ThemeToggle() {
   const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
   if (!mounted) {
-    return <div className="h-[46px] w-[38px]" aria-hidden />;
+    return <div className="h-[54px] w-[44px]" aria-hidden />;
   }
 
   const isDark = resolvedTheme === "dark";
@@ -30,7 +30,7 @@ export function ThemeToggle() {
       className={ICON_BUTTON_CLASS}
     >
       <span className="text-lg leading-none">
-        {isDark ? <Sun className="h-[18px] w-[18px]" strokeWidth={1.9} /> : <Moon className="h-[18px] w-[18px]" strokeWidth={1.9} />}
+        {isDark ? <Sun className="h-[22px] w-[22px]" strokeWidth={1.9} /> : <Moon className="h-[22px] w-[22px]" strokeWidth={1.9} />}
       </span>
       <span className={ICON_LABEL_CLASS}>Theme</span>
     </button>

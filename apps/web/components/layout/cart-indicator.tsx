@@ -11,7 +11,7 @@ export function CartIndicator() {
   return (
     <Link href="/cart" aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`} className={ICON_BUTTON_CLASS}>
       <span className="relative text-lg leading-none">
-        <ShoppingBag className="h-[18px] w-[18px]" strokeWidth={1.9} />
+        <ShoppingBag className="h-[22px] w-[22px]" strokeWidth={1.9} />
         {count > 0 && <IconBadge>{count > 99 ? "99+" : count}</IconBadge>}
       </span>
       <span className={ICON_LABEL_CLASS}>Cart</span>

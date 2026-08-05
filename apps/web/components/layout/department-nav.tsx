@@ -18,7 +18,7 @@ export function DepartmentNav({ departments }: { departments: Department[] }) {
           absolutely-positioned panel on the vertical axis too. */}
       <Wrap
         as="nav"
-        className="flex gap-1 overflow-x-auto [scrollbar-width:none] min-[900px]:flex-wrap min-[900px]:overflow-visible [&::-webkit-scrollbar]:hidden"
+        className="flex gap-1 overflow-x-auto [scrollbar-width:none] min-[900px]:flex-wrap min-[900px]:justify-center min-[900px]:overflow-visible [&::-webkit-scrollbar]:hidden"
       >
         {departments.map((department) => (
           <div key={department.label} className="group/dept static shrink-0">

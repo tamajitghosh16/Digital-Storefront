@@ -30,7 +30,7 @@ export function Hero({
   eyebrow?: string;
   title: string;
   standfirst: string;
-  primary: { label: string; href: string };
+  primary?: { label: string; href: string };
   secondary?: { label: string; href: string };
   jackets: HeroJacket[];
 }) {
@@ -49,16 +49,20 @@ export function Hero({
           {eyebrow && <Callout>{eyebrow}</Callout>}
           <h1 className="mb-3.5 mt-4">{title}</h1>
           <p className="max-w-[40ch] text-[17px] leading-[1.55] text-ink-muted">{standfirst}</p>
-          <div className="mt-[26px] flex flex-wrap gap-3">
-            <Link href={primary.href} className={buttonClass("primary", "lg")}>
-              {primary.label}
-            </Link>
-            {secondary && (
-              <Link href={secondary.href} className={buttonClass("secondary", "lg")}>
-                {secondary.label}
-              </Link>
-            )}
-          </div>
+          {(primary || secondary) && (
+            <div className="mt-[26px] flex flex-wrap gap-3">
+              {primary && (
+                <Link href={primary.href} className={buttonClass("primary", "lg")}>
+                  {primary.label}
+                </Link>
+              )}
+              {secondary && (
+                <Link href={secondary.href} className={buttonClass("secondary", "lg")}>
+                  {secondary.label}
+                </Link>
+              )}
+            </div>
+          )}
         </div>
 
         <div aria-hidden className="relative hidden min-h-[400px] min-[900px]:block">
