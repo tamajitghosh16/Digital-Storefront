@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@repo/ui/utils";
 import { Callout, Wrap, buttonClass } from "@/components/primitives";
@@ -45,9 +46,9 @@ export function Hero({
   return (
     <Wrap as="section" className="pt-6">
       <div className="grid items-center overflow-hidden rounded-tile bg-tile bg-[linear-gradient(135deg,var(--color-tile-3)_0%,var(--color-tile)_58%,var(--color-brand-soft)_100%)] min-[900px]:grid-cols-2">
-        <div className="px-7 py-10 min-[900px]:px-12 min-[900px]:py-14">
-          {eyebrow && <Callout>{eyebrow}</Callout>}
-          <h1 className="mb-3.5 mt-4">{title}</h1>
+        <div className="px-7 py-10 min-[900px]:px-12 min-[900px]:py-16">
+          {eyebrow && <Callout className="max-w-[38ch]">{eyebrow}</Callout>}
+          <h1 className="mb-3.5 mt-5">{title}</h1>
           <p className="max-w-[40ch] text-[17px] leading-[1.55] text-ink-muted">{standfirst}</p>
           {(primary || secondary) && (
             <div className="mt-[26px] flex flex-wrap gap-3">
@@ -111,6 +112,349 @@ export function CategoryCircles({ categories }: { categories: CategoryCircle[] }
         </Link>
       ))}
     </div>
+  );
+}
+
+// ── Department bands ───────────────────────────────────────────────
+
+/**
+ * Five full-width homepage bands, one per business line, stacked one
+ * after another rather than sharing a single repeated card template —
+ * each shaped by what's actually different about that line (a mosaic of
+ * classroom resources, one flagship product, a genuine either/or, two
+ * pieces of software). Image areas are striped placeholders labelled
+ * with what belongs there until real photography replaces them.
+ */
+
+export interface ProductLineItem {
+  label: string;
+  href: string;
+}
+
+/** The heading size these five bands share — bigger than the sitewide h2. */
+const BAND_HEADING = "text-[32px] leading-[1.15] tracking-[-0.02em]";
+
+/** Digital & Tech Solutions' teal and Lifestyle's green — the two accent
+ *  pairs the mockup keeps from the storefront's own per-line palette. */
+const TEAL = { border: "#0f8a95", from: "#e3f2f2", to: "#cfe6e6" };
+const GREEN = { text: "#2f8b52", from: "#e6f2ea", to: "#d5e8db" };
+const GOLD = "#b08600";
+
+/** A striped stand-in for a product photo, labelled with what belongs there. */
+function ImagePlaceholder({
+  label,
+  from,
+  to,
+  dark,
+  align = "start",
+  className,
+}: {
+  label: string;
+  from?: string;
+  to?: string;
+  dark?: boolean;
+  align?: "start" | "end";
+  className?: string;
+}) {
+  return (
+    <div
+      aria-hidden
+      className={cn("flex items-start p-4", align === "end" ? "justify-end text-right" : "justify-start", className)}
+      style={{
+        backgroundImage: dark
+          ? "repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 14px, rgba(255,255,255,0.1) 14px 28px)"
+          : `repeating-linear-gradient(45deg, ${from ?? "var(--color-tile)"} 0 14px, ${to ?? "var(--color-tile-2)"} 14px 28px)`,
+      }}
+    >
+      <span className={cn("caps", dark ? "text-white/50" : "text-ink-subtle")}>{label}</span>
+    </div>
+  );
+}
+
+/** Fills a band's image slot with a real photo/illustration when a src is
+ *  given, falling back to the striped placeholder otherwise. */
+function BandImage({
+  src,
+  alt,
+  label,
+  from,
+  to,
+  dark,
+  align,
+  className,
+  sizes = "(min-width: 860px) 50vw, 100vw",
+}: {
+  src?: string;
+  alt: string;
+  label: string;
+  from?: string;
+  to?: string;
+  dark?: boolean;
+  align?: "start" | "end";
+  className?: string;
+  sizes?: string;
+}) {
+  if (src) {
+    return (
+      <div className={cn("relative", className)}>
+        <Image src={src} alt={alt} fill sizes={sizes} className="object-cover" />
+      </div>
+    );
+  }
+  return <ImagePlaceholder label={label} from={from} to={to} dark={dark} align={align} className={className} />;
+}
+
+/** "Educational and Learning" — heading and CTA left, a staggered tile mosaic right. */
+export function EducationalLearningBand({
+  title,
+  body,
+  items,
+  images = [],
+  href = "/books",
+}: {
+  title: string;
+  body: string;
+  items: ProductLineItem[];
+  images?: string[];
+  href?: string;
+}) {
+  const [tall, ...rest] = items;
+  const shotLabels = ["Chart photo", "Worksheet spread", "Teaching kit"];
+
+  return (
+    <section className="bg-page py-12 min-[860px]:py-16">
+      <Wrap className="grid gap-8 min-[860px]:grid-cols-[minmax(0,320px)_1fr] min-[860px]:items-stretch min-[860px]:gap-10">
+        <div className="flex flex-col justify-center">
+          <h2 className={BAND_HEADING}>{title}</h2>
+          <p className="mt-3 max-w-[38ch] text-[15px] leading-[1.6] text-ink-muted">{body}</p>
+          <Link
+            href={href}
+            className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-brand px-5 py-3 text-sm font-bold text-on-brand transition hover:bg-brand-press"
+          >
+            View all <span aria-hidden>→</span>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 min-[860px]:h-[440px]">
+          {tall && (
+            <Link
+              href={tall.href}
+              className="group relative row-span-2 flex h-[220px] flex-col overflow-hidden rounded-tile bg-tile inset-ring inset-ring-card-edge min-[860px]:h-full"
+            >
+              <BandImage
+                src={images[0]}
+                alt={tall.label}
+                label={shotLabels[0] ?? "Product photo"}
+                className="flex-1 items-start"
+                sizes="(min-width: 860px) 320px, 50vw"
+              />
+              <span className="flex items-center justify-between gap-2 bg-ground px-4 py-3.5 text-sm font-bold">
+                {tall.label}
+                <span aria-hidden className="text-ink-subtle">
+                  →
+                </span>
+              </span>
+            </Link>
+          )}
+          {rest.map((item, i) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group relative flex h-[102px] flex-col overflow-hidden rounded-tile bg-tile inset-ring inset-ring-card-edge min-[860px]:h-full"
+            >
+              <BandImage
+                src={images[i + 1]}
+                alt={item.label}
+                label={shotLabels[i + 1] ?? "Product photo"}
+                className="flex-1 items-start"
+                sizes="(min-width: 860px) 320px, 50vw"
+              />
+              <span className="flex items-center justify-between gap-2 bg-ground px-4 py-3 text-sm font-bold">
+                {item.label}
+                <span aria-hidden className="text-ink-subtle">
+                  →
+                </span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      </Wrap>
+    </section>
+  );
+}
+
+/** "Professional products" — navy spotlight card, copy left, product photo right.
+ *  Contained to the page's 1280px measure like every other band, rather than
+ *  breaking out to the viewport edge. */
+export function ProfessionalProductsBand({
+  title,
+  body,
+  item,
+  image,
+}: {
+  title: string;
+  body: string;
+  item: ProductLineItem;
+  image?: string;
+}) {
+  return (
+    <Wrap as="section" className="py-12 min-[860px]:py-16">
+      <div className="grid overflow-hidden rounded-tile bg-band text-band-ink min-[820px]:grid-cols-2 min-[820px]:items-stretch">
+        <div className="px-7 py-10 min-[820px]:px-12 min-[820px]:py-14">
+          <h2 className={cn(BAND_HEADING, "text-band-ink")}>{title}</h2>
+          <p className="mt-2 text-[15px] font-bold text-band-feature">{item.label}</p>
+          <p className="mt-3 max-w-[46ch] text-[15px] leading-[1.6] text-band-muted">{body}</p>
+          <Link
+            href={item.href}
+            className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-band transition hover:bg-white/90"
+          >
+            {item.label} <span aria-hidden>→</span>
+          </Link>
+        </div>
+        <div className="relative h-[240px] min-[820px]:h-auto">
+          <BandImage
+            src={image}
+            alt={item.label}
+            label="Diary photo"
+            dark
+            className="absolute inset-0 h-full"
+            sizes="(min-width: 820px) 50vw, 100vw"
+          />
+        </div>
+      </div>
+    </Wrap>
+  );
+}
+
+/** "Digital & Tech Solutions" — light band, two wide numbered panels with a screenshot beside the copy. */
+export function DigitalTechBand({ title, body, items }: { title: string; body: string; items: ProductLineItem[] }) {
+  const shotLabels = ["App screen", "Dashboard view"];
+
+  return (
+    <section className="bg-tile">
+      <Wrap className="py-12 min-[860px]:py-16">
+        <div className="flex flex-col gap-3 min-[760px]:flex-row min-[760px]:items-end min-[760px]:justify-between min-[760px]:gap-8">
+          <h2 className={BAND_HEADING}>{title}</h2>
+          <p className="max-w-[46ch] text-[15px] leading-[1.6] text-ink-muted min-[760px]:text-right">{body}</p>
+        </div>
+
+        <div className="mt-8 grid gap-5 min-[640px]:grid-cols-2">
+          {items.map((item, i) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group overflow-hidden rounded-tile border-t-4 bg-ground shadow-tile transition-transform hover:-translate-y-1"
+              style={{ borderTopColor: TEAL.border }}
+            >
+              <div className="relative h-[170px]">
+                <ImagePlaceholder
+                  label={shotLabels[i] ?? "App screen"}
+                  from={TEAL.from}
+                  to={TEAL.to}
+                  className="absolute inset-0 items-start"
+                />
+              </div>
+              <div className="p-6">
+                <span className="caps text-ink-subtle">{String(i + 1).padStart(2, "0")}</span>
+                <h3 className="mt-2">{item.label}</h3>
+                <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-brand">
+                  Learn more
+                  <span aria-hidden className="transition-transform group-hover:translate-x-0.5">
+                    →
+                  </span>
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </Wrap>
+    </section>
+  );
+}
+
+/** "Publishing" — no imagery; large gold-numbered rows that indent on hover. */
+export function PublishingBand({ title, body, items }: { title: string; body: string; items: ProductLineItem[] }) {
+  return (
+    <section className="bg-page py-12 min-[860px]:py-16">
+      <Wrap>
+        <div className="flex flex-col gap-3 min-[760px]:flex-row min-[760px]:items-end min-[760px]:justify-between min-[760px]:gap-8">
+          <h2 className={BAND_HEADING}>{title}</h2>
+          <p className="max-w-[46ch] text-[15px] leading-[1.6] text-ink-muted min-[760px]:text-right">{body}</p>
+        </div>
+
+        <div className="mt-8 border-t border-line">
+          {items.map((item, i) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group flex items-center justify-between gap-6 border-b border-line py-7 transition-transform hover:translate-x-3"
+            >
+              <span className="flex items-baseline gap-5">
+                <span className="text-[26px] font-bold tabular-nums" style={{ color: GOLD }}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <span className="text-[26px] font-bold tracking-[-0.02em] min-[640px]:text-[36px]">{item.label}</span>
+              </span>
+              <span
+                aria-hidden
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-line-strong text-lg text-ink-subtle transition group-hover:translate-x-1 group-hover:border-brand group-hover:text-brand"
+              >
+                →
+              </span>
+            </Link>
+          ))}
+        </div>
+      </Wrap>
+    </section>
+  );
+}
+
+/** "Lifestyle" — image band with a white copy panel overlaid, contained to the
+ *  page's 1280px measure like every other band. */
+export function LifestyleBand({
+  title,
+  body,
+  item,
+  image,
+}: {
+  title: string;
+  body: string;
+  item: ProductLineItem;
+  image?: string;
+}) {
+  return (
+    <Wrap as="section" className="py-12 min-[860px]:py-16">
+      <div className="relative isolate h-[420px] overflow-hidden rounded-tile min-[760px]:h-[460px]">
+        <BandImage
+          src={image}
+          alt={item.label}
+          label="Wide plant photo"
+          from={GREEN.from}
+          to={GREEN.to}
+          align="end"
+          className="absolute inset-0 items-start"
+          sizes="(min-width: 1280px) 1280px, 100vw"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/5 to-transparent min-[760px]:bg-gradient-to-r min-[760px]:from-black/45 min-[760px]:via-black/5 min-[760px]:to-transparent"
+        />
+        <div className="absolute inset-x-4 bottom-4 max-w-[420px] rounded-tile bg-ground p-6 shadow-pop min-[760px]:inset-x-auto min-[760px]:bottom-6 min-[760px]:left-6 min-[760px]:p-8">
+          <h2 className={BAND_HEADING}>{title}</h2>
+          <p className="mt-2 text-[15px] font-bold" style={{ color: GREEN.text }}>
+            {item.label}
+          </p>
+          <p className="mt-3 max-w-[40ch] text-[15px] leading-[1.6] text-ink-muted">{body}</p>
+          <Link
+            href={item.href}
+            className="mt-5 inline-flex w-fit items-center gap-2 rounded-full px-5 py-3 text-sm font-bold text-white transition hover:brightness-90"
+            style={{ backgroundColor: GREEN.text }}
+          >
+            {item.label} <span aria-hidden>→</span>
+          </Link>
+        </div>
+      </div>
+    </Wrap>
   );
 }
 

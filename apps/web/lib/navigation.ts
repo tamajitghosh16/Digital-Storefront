@@ -1,3 +1,5 @@
+import { prisma } from "@repo/database";
+import { withFallback } from "./safe-fetch";
 import { groupCatalogItemsByCategory } from "./catalog";
 
 /**
@@ -51,7 +53,7 @@ export const BOOK_GENRES = [
 // catalog items that belong to it. Replaces the earlier nine-item bar
 // (All Products / Books / E-Books / Publishing Services / Self-Publishing
 // / the four PRD verticals) with the operator's own five-way grouping.
-export function buildDepartments(): Department[] {
+export async function buildDepartments(): Promise<Department[]> {
   const educationalMaterials: Department = {
     label: "Educational Materials",
     href: "/books",
@@ -131,7 +133,39 @@ export function buildDepartments(): Department[] {
     })),
   };
 
-  return [educationalMaterials, professionalMaterials, digitalAndTech, publishing, lifestyle, allProducts];
+  // Admin-created categories (apps/admin's "Products Menu") — each becomes
+  // its own department with a single dropdown column of the products
+  // created under it. Inserted ahead of "All Products", which stays last.
+  const menuCategories = await withFallback(
+    () =>
+      prisma.menuCategory.findMany({
+        where: { isActive: true },
+        orderBy: { order: "asc" },
+        include: { products: { where: { isActive: true }, orderBy: { order: "asc" } } },
+      }),
+    []
+  );
+
+  const adminDepartments: Department[] = menuCategories.map((category) => ({
+    label: category.name,
+    href: `/${category.slug}`,
+    columns: [
+      {
+        title: category.name,
+        items: category.products.map((product) => ({ label: product.name, href: `/${product.slug}` })),
+      },
+    ],
+  }));
+
+  return [
+    educationalMaterials,
+    professionalMaterials,
+    digitalAndTech,
+    publishing,
+    lifestyle,
+    ...adminDepartments,
+    allProducts,
+  ];
 }
 
 /** Footer sitemap — grouped the way the approved design lays it out. */

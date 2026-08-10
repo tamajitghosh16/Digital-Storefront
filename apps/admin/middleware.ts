@@ -8,5 +8,5 @@ import { ADMIN_ROLES } from "@repo/auth/roles";
 export const middleware = createAuthMiddleware({ allowedRoles: ADMIN_ROLES, signInPath: "/sign-in" });
 
 export const config = {
-  matcher: ["/((?!sign-in|unauthorized|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!sign-in|forgot-password|reset-password|unauthorized|_next/static|_next/image|favicon.ico).*)"],
 };

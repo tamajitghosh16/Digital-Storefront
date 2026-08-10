@@ -1,10 +1,19 @@
-import Link from "next/link";
 import { getContent, prisma } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
 import { SAMPLE_BANNERS, SAMPLE_BOOKS, SAMPLE_EBOOKS, SAMPLE_FAQS, SAMPLE_TESTIMONIALS } from "@/lib/sample-data";
 import { SectionHead, Stars, Wrap } from "@/components/primitives";
 import { ProductScroller, ProductTile, type ProductTileData } from "@/components/commerce/product-tile";
-import { FaqList, Hero, Newsletter } from "@/components/marketing";
+import {
+  DigitalTechBand,
+  EducationalLearningBand,
+  FaqList,
+  Hero,
+  LifestyleBand,
+  Newsletter,
+  ProfessionalProductsBand,
+  PublishingBand,
+  type ProductLineItem,
+} from "@/components/marketing";
 
 // FR-1.1: homepage featuring bestsellers, new releases, and promoted
 // product lines.
@@ -16,58 +25,42 @@ import { FaqList, Hero, Newsletter } from "@/components/marketing";
 // Publisher's overrides onto the copy this build shipped with.
 
 /**
- * Each product-line band's icon, colour and row of linked cards — labels
- * and hrefs match the department bar in lib/navigation.ts. Glyph/colour
- * pairs follow the same gradient-circle language the removed category
- * circles used, so these bands read as part of the same design system.
+ * Each department band's linked items — labels and hrefs match the
+ * department bar in lib/navigation.ts. Educational and Learning
+ * deliberately excludes the general Books line (it already has its own
+ * flagship shelf above), which is why it carries three items where the
+ * department bar's dropdown carries four.
  */
-const PRODUCT_LINE_BANDS = [
-  {
-    contentKey: "educationalLearning",
-    glyph: "🎓",
-    from: "#3b53b8",
-    to: "#22307a",
-    items: [
-      { label: "Educational Charts", href: "/educational-charts" },
-      { label: "Worksheets and Activity Puzzles", href: "/worksheets-activity-puzzles" },
-      { label: "Teaching and Learning Materials", href: "/teaching-learning-materials" },
-    ],
-  },
-  {
-    contentKey: "professionalProducts",
-    glyph: "⚖",
-    from: "#bd3140",
-    to: "#7c1f2a",
-    items: [{ label: "Advocate's Diary (Naya Bandhu)", href: "/advocate-diary" }],
-  },
-  {
-    contentKey: "digitalTechSolutions",
-    glyph: "◫",
-    from: "#0f8a95",
-    to: "#0a5960",
-    items: [
-      { label: "Naya Bandhu (Application)", href: "/naya-bandhu" },
-      { label: "Digital Tracking System", href: "/digital-tracking-system" },
-    ],
-  },
-  {
-    contentKey: "publishing",
-    glyph: "✎",
-    from: "#b08600",
-    to: "#6f5400",
-    items: [
-      { label: "Self Publishing", href: "/self-publishing" },
-      { label: "Bulk Publishing", href: "/bulk-publishing" },
-    ],
-  },
-  {
-    contentKey: "lifestyle",
-    glyph: "❧",
-    from: "#2f8b52",
-    to: "#1c5733",
-    items: [{ label: "Indoor Plants (Chatterjee's Green Veranda)", href: "/indoor-plants" }],
-  },
-] as const;
+const EDUCATIONAL_LEARNING_ITEMS: ProductLineItem[] = [
+  { label: "Educational Charts", href: "/educational-charts" },
+  { label: "Worksheets and Activity Puzzles", href: "/worksheets-activity-puzzles" },
+  { label: "Teaching and Learning Materials", href: "/teaching-learning-materials" },
+];
+
+/** Placeholder photography for the three Educational and Learning tiles,
+ * in the same order as EDUCATIONAL_LEARNING_ITEMS above — swap for real
+ * product photography whenever it's shot. */
+const EDUCATIONAL_LEARNING_IMAGES = [
+  "/images/kindergarten-chart.png",
+  "/images/activity-puzzle.png",
+  "/images/teaching-kit.png",
+];
+
+const PROFESSIONAL_PRODUCT_ITEM: ProductLineItem = { label: "Advocate's Diary (Naya Bandhu)", href: "/advocate-diary" };
+const PROFESSIONAL_PRODUCT_IMAGE = "/images/advocates-diary.png";
+
+const DIGITAL_TECH_ITEMS: ProductLineItem[] = [
+  { label: "Naya Bandhu (Application)", href: "/naya-bandhu" },
+  { label: "Digital Tracking System", href: "/digital-tracking-system" },
+];
+
+const PUBLISHING_ITEMS: ProductLineItem[] = [
+  { label: "Self Publishing", href: "/self-publishing" },
+  { label: "Bulk Publishing", href: "/bulk-publishing" },
+];
+
+const LIFESTYLE_ITEM: ProductLineItem = { label: "Indoor Plants (Chatterjee's Green Veranda)", href: "/indoor-plants" };
+const LIFESTYLE_IMAGE = "/images/indoor-plants.png";
 
 export default async function HomePage() {
   const [books, ebooks, banners, testimonials, faqs, content] = await Promise.all([
@@ -143,19 +136,38 @@ export default async function HomePage() {
         </ProductScroller>
       </Wrap>
 
-      <Wrap as="section" className="flex flex-col gap-4 py-8">
-        {PRODUCT_LINE_BANDS.map((band) => (
-          <ProductLineBand
-            key={band.contentKey}
-            glyph={band.glyph}
-            from={band.from}
-            to={band.to}
-            title={content[`homepage.${band.contentKey}.title` as const]}
-            body={content[`homepage.${band.contentKey}.body` as const]}
-            items={band.items}
-          />
-        ))}
-      </Wrap>
+      <EducationalLearningBand
+        title={content["homepage.educationalLearning.title"]}
+        body={content["homepage.educationalLearning.body"]}
+        items={EDUCATIONAL_LEARNING_ITEMS}
+        images={EDUCATIONAL_LEARNING_IMAGES}
+      />
+
+      <ProfessionalProductsBand
+        title={content["homepage.professionalProducts.title"]}
+        body={content["homepage.professionalProducts.body"]}
+        item={PROFESSIONAL_PRODUCT_ITEM}
+        image={PROFESSIONAL_PRODUCT_IMAGE}
+      />
+
+      <DigitalTechBand
+        title={content["homepage.digitalTechSolutions.title"]}
+        body={content["homepage.digitalTechSolutions.body"]}
+        items={DIGITAL_TECH_ITEMS}
+      />
+
+      <PublishingBand
+        title={content["homepage.publishing.title"]}
+        body={content["homepage.publishing.body"]}
+        items={PUBLISHING_ITEMS}
+      />
+
+      <LifestyleBand
+        title={content["homepage.lifestyle.title"]}
+        body={content["homepage.lifestyle.body"]}
+        item={LIFESTYLE_ITEM}
+        image={LIFESTYLE_IMAGE}
+      />
 
       {testimonials.length > 0 && (
         <Wrap as="section" className="py-12">
@@ -186,59 +198,5 @@ export default async function HomePage() {
         </Wrap>
       )}
     </>
-  );
-}
-
-/**
- * A gradient icon circle, heading and description, and a grid of linked
- * cards to that line's product pages — the same tile-in-a-tinted-band
- * language the class-set and trust bands use elsewhere on this page.
- */
-function ProductLineBand({
-  glyph,
-  from,
-  to,
-  title,
-  body,
-  items,
-}: {
-  glyph: string;
-  from: string;
-  to: string;
-  title: string;
-  body: string;
-  items: readonly { label: string; href: string }[];
-}) {
-  return (
-    <div className="rounded-tile bg-tile p-6 inset-ring inset-ring-card-edge min-[700px]:p-7">
-      <div className="flex flex-wrap items-start gap-4">
-        <span
-          aria-hidden
-          className="grid h-14 w-14 shrink-0 place-items-center rounded-full text-[26px] leading-none text-white shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]"
-          style={{ backgroundImage: `linear-gradient(155deg, ${from}, ${to})` }}
-        >
-          {glyph}
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2>{title}</h2>
-          <p className="mt-1.5 max-w-[62ch] text-[15px] leading-[1.55] text-ink-muted">{body}</p>
-        </div>
-      </div>
-
-      <div className="mt-5 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-        {items.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="group flex items-center justify-between gap-2 rounded-btn bg-ground px-4 py-3.5 text-sm font-bold transition-colors hover:bg-tile-2 inset-ring inset-ring-card-edge"
-          >
-            {item.label}
-            <span aria-hidden className="text-ink-subtle transition-transform group-hover:translate-x-0.5">
-              →
-            </span>
-          </Link>
-        ))}
-      </div>
-    </div>
   );
 }

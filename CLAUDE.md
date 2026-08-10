@@ -104,6 +104,11 @@ Postgres trigger in `packages/database/prisma/sql/sync_user.sql` — this has
 to be run manually in the Supabase SQL editor, since Prisma doesn't manage
 the `auth` schema. That same file defines the starter Row-Level Security
 policies (a database-level backstop behind the app-level role checks).
+Everyone lands in `public.users` as `READER` by default — nobody signs up
+directly into a staff role. `apps/admin` is the only place `SUPPORT`/
+`EDITOR`/`OWNER` gets assigned, and only the Owner can do it; see "Staff
+access is Owner-granted" in `apps/admin/CLAUDE.md` for the invite/promote/
+revoke design (not yet built — `settings/roles` is still read-only).
 
 **Payments run through `packages/payments` (Razorpay).** Order status is
 only ever flipped to `PAID` by the signature-verified webhook at

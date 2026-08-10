@@ -23,13 +23,12 @@ import { ThemeToggle } from "./theme-toggle";
  * is reachable.
  */
 export async function SiteHeader() {
-  const [settings, user, pricing] = await Promise.all([
+  const [settings, user, pricing, departments] = await Promise.all([
     withFallback(() => getSiteSettings(), SAMPLE_SITE_SETTINGS),
     withFallback(() => getCurrentUser(), null),
     getPricingConfig(),
+    buildDepartments(),
   ]);
-
-  const departments = buildDepartments();
 
   return (
     <header>

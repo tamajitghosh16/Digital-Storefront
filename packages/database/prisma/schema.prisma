@@ -433,6 +433,43 @@ model SiteSettings {
   @@map("site_settings")
 }
 
+/// A department-bar entry the Publisher creates from apps/admin's "Products
+/// Menu". Distinct from the hardcoded `Department`s in apps/web's
+/// navigation.ts — those two lists are merged at render time. Distinct from
+/// `Product` too: this is a nav/page entity (a category gets a blank landing
+/// page and a dropdown), not a commerce line item with price/stock.
+model MenuCategory {
+  id        String        @id @default(cuid())
+  name      String
+  slug      String        @unique
+  order     Int           @default(0)
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  products  MenuProduct[]
+
+  @@map("menu_categories")
+}
+
+/// A single dropdown entry under a `MenuCategory`, rendered as its own blank
+/// storefront page at /<slug> until the admin CMS grows real page content
+/// for it.
+model MenuProduct {
+  id         String       @id @default(cuid())
+  name       String
+  slug       String       @unique
+  categoryId String
+  category   MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  order      Int          @default(0)
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([categoryId])
+  @@map("menu_products")
+}
+
 /// Header and footer navigation, fully admin-managed (replaces the
 /// hardcoded <nav> links that used to live in apps/web/app/layout.tsx).
 model NavLink {

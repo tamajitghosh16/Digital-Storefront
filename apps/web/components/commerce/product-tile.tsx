@@ -107,14 +107,7 @@ export function ProductTile({
   );
 }
 
-/** Horizontal shelf of tiles, snapping as it scrolls. */
-export function ProductScroller({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex snap-x gap-4 overflow-x-auto pb-3.5 [&>*]:w-[196px] [&>*]:shrink-0 [&>*]:snap-start">
-      {children}
-    </div>
-  );
-}
+export { ProductScroller } from "./product-scroller";
 
 /** Responsive grid of tiles. */
 export function ProductGrid({ children }: { children: React.ReactNode }) {

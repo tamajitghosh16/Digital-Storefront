@@ -7,17 +7,20 @@ import {
   BookOpen,
   Coins,
   FileStack,
+  FolderPlus,
   HelpCircle,
   Image as ImageIcon,
   IndianRupee,
   LayoutDashboard,
   Link2,
   type LucideIcon,
+  PackagePlus,
   Quote,
   Settings,
   ShoppingBag,
   Star,
   Type,
+  UserCircle,
   Users,
 } from "lucide-react";
 import { cn } from "@repo/ui/utils";
@@ -49,6 +52,13 @@ const NAV_GROUPS: { heading: string; items: NavItem[] }[] = [
       { href: "/catalogue", label: "Books & products", icon: BookOpen },
       { href: "/orders", label: "Orders", icon: ShoppingBag },
       { href: "/reviews", label: "Reviews", icon: Star },
+    ],
+  },
+  {
+    heading: "Products Menu",
+    items: [
+      { href: "/menu/categories", label: "Add category", icon: FolderPlus },
+      { href: "/menu/products", label: "Add product", icon: PackagePlus },
     ],
   },
   {
@@ -102,6 +112,10 @@ export function SidebarNav() {
           </div>
         </div>
       ))}
+
+      <div className="border-t border-white/10 pt-4">
+        <NavLink href="/account" label="My account" icon={UserCircle} current={isCurrent("/account")} />
+      </div>
     </nav>
   );
 }
