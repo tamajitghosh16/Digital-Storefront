@@ -1,4 +1,4 @@
-import { DEFAULT_PRICING_CONFIG, PRICING_SETTINGS_ID, prisma } from "@repo/database";
+import { DEFAULT_PRICING_CONFIG, PRICING_SETTINGS_ID, bpsToRate, prisma, rateToBps } from "@repo/database";
 import {
   ErrorBanner,
   FieldRow,
@@ -51,8 +51,8 @@ export default async function PricingPage({
     expressEta: settings?.expressEta ?? defaults.delivery.expressEta,
     sameDayEta: settings?.sameDayEta ?? defaults.delivery.sameDayEta,
     bundleEbookAddCents: settings?.bundleEbookAddCents ?? defaults.bundleEbookAddCents,
-    ebookGstBps: settings?.ebookGstBps ?? Math.round(defaults.gstRates.EBOOK * 10_000),
-    serviceGstBps: settings?.serviceGstBps ?? Math.round(defaults.gstRates.SERVICE_PACKAGE * 10_000),
+    ebookGstBps: settings?.ebookGstBps ?? rateToBps(defaults.gstRates.EBOOK),
+    serviceGstBps: settings?.serviceGstBps ?? rateToBps(defaults.gstRates.SERVICE_PACKAGE),
     classSetBaseCents: settings?.classSetBaseCents ?? defaults.classSetBaseCents,
   };
 
@@ -180,7 +180,7 @@ export default async function PricingPage({
                 <td>{toPercent(tier.discountBps)}% off</td>
                 <td className="tabular-nums text-ink-muted">
                   {money.format(
-                    (Math.round((current.classSetBaseCents * (1 - tier.discountBps / 10_000)) / 100) * 100) / 100
+                    (Math.round((current.classSetBaseCents * (1 - bpsToRate(tier.discountBps))) / 100) * 100) / 100
                   )}
                 </td>
                 <td className="text-right">

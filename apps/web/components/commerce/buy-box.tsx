@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { cn } from "@repo/ui/utils";
-import { Callout, CheckList, Rule, Stars, buttonClass } from "@/components/primitives";
+import { CheckList, Rule, Stars, buttonClass } from "@/components/primitives";
 import { formatINRWhole } from "@/lib/format";
 import { useCartStore } from "@/lib/cart-store";
 import {
@@ -85,13 +85,13 @@ export function BuyBox({
 
   return (
     <div className="rounded-tile bg-ground p-[26px] inset-ring inset-ring-line">
-      <h1 className="text-[30px]">{title}</h1>
-      <p className="mt-2 text-sm text-ink-muted">
+      <p className="text-[22px] font-bold leading-[1.15] tracking-[-0.02em]">{title}</p>
+      <p className="mt-1.5 text-sm text-ink-muted">
         {author}
         {genre && ` · ${genre}`}
       </p>
       {typeof rating === "number" && (
-        <p className="mt-3 flex items-center gap-1.5 text-xs text-ink-muted">
+        <p className="mt-2.5 flex items-center gap-1.5 text-xs text-ink-muted">
           <Stars rating={rating} />
           <span className="tabular-nums">
             {rating.toFixed(1)}
@@ -247,9 +247,4 @@ export function BuyBox({
       )}
     </div>
   );
-}
-
-/** Small bestseller/new pill used above the buy box's gallery. */
-export function ShotFlag({ children }: { children: React.ReactNode }) {
-  return <Callout className="absolute left-3 top-3">{children}</Callout>;
 }

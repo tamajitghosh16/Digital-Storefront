@@ -32,9 +32,9 @@ import {
  * department bar's dropdown carries four.
  */
 const EDUCATIONAL_LEARNING_ITEMS: ProductLineItem[] = [
-  { label: "Educational Charts", href: "/educational-charts" },
-  { label: "Worksheets and Activity Puzzles", href: "/worksheets-activity-puzzles" },
-  { label: "Teaching and Learning Materials", href: "/teaching-learning-materials" },
+  { label: "Educational Charts", href: "/educational-material/educational-charts" },
+  { label: "Worksheets and Activity Puzzles", href: "/educational-material/worksheets-activity-puzzles" },
+  { label: "Teaching and Learning Materials", href: "/educational-material/teaching-learning-materials" },
 ];
 
 /** Placeholder photography for the three Educational and Learning tiles,
@@ -107,7 +107,7 @@ export default async function HomePage() {
         primary={banner?.ctaText ? { label: banner.ctaText, href: banner.ctaHref ?? "/self-publishing" } : undefined}
         secondary={
           banner?.secondaryCtaText
-            ? { label: banner.secondaryCtaText, href: banner.secondaryCtaHref ?? "/books" }
+            ? { label: banner.secondaryCtaText, href: banner.secondaryCtaHref ?? "/educational-material/books" }
             : undefined
         }
         jackets={allBooks.slice(0, 4).map((book) => ({
@@ -122,7 +122,7 @@ export default async function HomePage() {
         <SectionHead
           title={content["homepage.popular.title"]}
           standfirst={content["homepage.popular.standfirst"]}
-          href="/books"
+          href="/educational-material/books"
         />
         <ProductScroller>
           {popular.map((product, index) => (

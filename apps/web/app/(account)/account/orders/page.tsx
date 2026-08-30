@@ -53,7 +53,7 @@ export default async function OrderHistoryPage() {
           <p className="mx-auto mt-2 max-w-[46ch] text-sm text-ink-muted">
             Printed editions, e-books and service packages you buy will show up here.
           </p>
-          <Link href="/books" className={buttonClass("secondary", "md", "mt-5")}>
+          <Link href="/educational-material/books" className={buttonClass("secondary", "md", "mt-5")}>
             Start browsing
           </Link>
         </div>

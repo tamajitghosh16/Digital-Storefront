@@ -85,38 +85,6 @@ export function Hero({
   );
 }
 
-// ── Category circles ────────────────────────────────────────────────
-
-export interface CategoryCircle {
-  label: string;
-  href: string;
-  glyph: string;
-  from: string;
-  to: string;
-}
-
-export function CategoryCircles({ categories }: { categories: CategoryCircle[] }) {
-  return (
-    <div className="flex gap-5 overflow-x-auto pb-2.5">
-      {categories.map((category) => (
-        <Link key={category.label} href={category.href} className="group w-[116px] shrink-0 text-center">
-          <span
-            className="mb-2.5 grid h-[116px] w-[116px] place-items-center rounded-full shadow-[inset_0_0_0_1px_rgba(0,0,0,0.06)]"
-            style={{ backgroundImage: `linear-gradient(155deg, ${category.from}, ${category.to})` }}
-          >
-            <span aria-hidden className="text-[40px] leading-none text-white">
-              {category.glyph}
-            </span>
-          </span>
-          <span className="block text-[13px] font-bold leading-[1.25] group-hover:underline">{category.label}</span>
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-// ── Department bands ───────────────────────────────────────────────
-
 /**
  * Five full-width homepage bands, one per business line, stacked one
  * after another rather than sharing a single repeated card template —
@@ -210,7 +178,7 @@ export function EducationalLearningBand({
   body,
   items,
   images = [],
-  href = "/books",
+  href = "/educational-material/books",
 }: {
   title: string;
   body: string;

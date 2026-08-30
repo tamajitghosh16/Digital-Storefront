@@ -56,15 +56,15 @@ export const BOOK_GENRES = [
 export async function buildDepartments(): Promise<Department[]> {
   const educationalMaterials: Department = {
     label: "Educational Materials",
-    href: "/books",
+    href: "/educational-material/books",
     columns: [
       {
         title: "Educational Materials",
         items: [
-          { label: "Books", href: "/books" },
-          { label: "Educational Charts", href: "/educational-charts" },
-          { label: "Worksheets and Activity Puzzles", href: "/worksheets-activity-puzzles" },
-          { label: "Teaching and Learning Materials", href: "/teaching-learning-materials" },
+          { label: "Books", href: "/educational-material/books" },
+          { label: "Educational Charts", href: "/educational-material/educational-charts" },
+          { label: "Worksheets and Activity Puzzles", href: "/educational-material/worksheets-activity-puzzles" },
+          { label: "Teaching and Learning Materials", href: "/educational-material/teaching-learning-materials" },
         ],
       },
     ],
@@ -95,12 +95,12 @@ export async function buildDepartments(): Promise<Department[]> {
     ],
   };
 
-  const publishing: Department = {
-    label: "Publishing",
+  const services: Department = {
+    label: "Services",
     href: "/self-publishing",
     columns: [
       {
-        title: "Publishing",
+        title: "Services",
         items: [
           { label: "Self Publishing", href: "/self-publishing" },
           { label: "Bulk Publishing", href: "/bulk-publishing" },
@@ -122,7 +122,7 @@ export async function buildDepartments(): Promise<Department[]> {
 
   const allProducts: Department = {
     label: "All Products",
-    href: "/books",
+    href: "/educational-material/books",
     columns: groupCatalogItemsByCategory().map((group) => ({
       title: group.category,
       items: group.items.map((item) => ({
@@ -161,7 +161,7 @@ export async function buildDepartments(): Promise<Department[]> {
     educationalMaterials,
     professionalMaterials,
     digitalAndTech,
-    publishing,
+    services,
     lifestyle,
     ...adminDepartments,
     allProducts,
@@ -173,11 +173,10 @@ export const FOOTER_COLUMNS: NavColumn[] = [
   {
     title: "Shop",
     items: [
-      { label: "Books", href: "/books" },
-      { label: "E-Books", href: "/ebooks" },
-      { label: "New releases", href: "/books?sort=new" },
-      { label: "Top rated", href: "/books?sort=rating" },
-      { label: "Class sets", href: "/books" },
+      { label: "Books", href: "/educational-material/books" },
+      { label: "New releases", href: "/educational-material/books?sort=new" },
+      { label: "Top rated", href: "/educational-material/books?sort=rating" },
+      { label: "Class sets", href: "/educational-material/books?classset=1" },
     ],
   },
   {

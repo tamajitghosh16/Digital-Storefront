@@ -19,7 +19,11 @@ export function HeaderSearch({ className }: { className?: string }) {
       onSubmit={(event) => {
         event.preventDefault();
         const query = value.trim();
-        router.push(query ? `/books?q=${encodeURIComponent(query)}` : "/books");
+        router.push(
+          query
+            ? `/educational-material/books?q=${encodeURIComponent(query)}`
+            : "/educational-material/books"
+        );
       }}
       className={cn("relative", className)}
     >

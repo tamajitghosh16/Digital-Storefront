@@ -22,7 +22,13 @@ export const prisma =
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
-export * from "@prisma/client";
+// Re-export Prisma's generated surface. Types go through `export type *` so
+// they're fully erased at compile time; `@prisma/client` is a CommonJS module,
+// and a bare `export *` from it forces the bundler (Turbopack) to emit runtime
+// code that enumerates its exports and warns about it. Only `Prisma` is needed
+// as a real runtime value (for `Prisma.JsonNull` and the error classes).
+export type * from "@prisma/client";
+export { Prisma } from "@prisma/client";
 
 /**
  * SiteSettings is a singleton row — always read/written at this fixed id
@@ -61,6 +67,11 @@ export async function getSiteSettings() {
 
 export * from "./content";
 export * from "./pricing";
+export * from "./taxonomy";
+// The demo book catalogue the seed writes and apps/web falls back to — one
+// list of titles, so the storefront and the admin never disagree about
+// what's in the shop.
+export * from "./book-catalog";
 
 import { mergeContent, type ContentMap } from "./content";
 import {

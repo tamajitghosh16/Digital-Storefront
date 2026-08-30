@@ -2,14 +2,135 @@
  * Minimal dev-data seed. Run with `pnpm db:seed` (wire up a "seed" script /
  * prisma.seed config once this repo has its first migration applied).
  */
-import { prisma, PRICING_SETTINGS_ID, SITE_SETTINGS_ID } from "../src/client";
+// Loads packages/database/.env — unlike the Prisma CLI (prisma.config.ts
+// does this itself), tsx running this file directly won't pick up
+// DATABASE_URL otherwise, and ../src/client builds its PrismaPg adapter
+// from that env var at import time.
+import "dotenv/config";
+import { prisma, BOOK_SEEDS, PRICING_SETTINGS_ID, SITE_SETTINGS_ID } from "../src/client";
+
+/**
+ * The demo catalogue, written the way the admin's product form writes a
+ * book: **one row per title**, with `bookFormats: [PHYSICAL, EBOOK]` and the
+ * two prices on that single row — not a printed row plus a separate
+ * "(E-Book)" row. That's what makes the admin's Books list and the
+ * storefront (which groups its two sample editions back into one listing)
+ * show the same 100 titles instead of two different catalogues.
+ *
+ * `update` carries the same fields as `create` on purpose: re-running the
+ * seed after a schema or price change corrects existing rows rather than
+ * silently leaving them stale. It only ever touches these 100 slugs, so
+ * anything added by hand from the admin is left alone.
+ */
+async function seedBookCatalogue() {
+  for (const book of BOOK_SEEDS) {
+    const data = {
+      type: "PHYSICAL_BOOK" as const,
+      productLine: "BOOK" as const,
+      bookFormats: ["PHYSICAL", "EBOOK"] as const,
+      title: book.title,
+      author: book.author,
+      description: `${book.description}\n\n${book.pages} pages.`,
+      priceCents: book.physicalPriceCents,
+      ebookPriceCents: book.ebookPriceCents,
+      stockQty: book.stockQty,
+      isbn: book.isbn,
+      weightGrams: 320,
+      genre: book.genre,
+      ratingAvg: book.rating,
+      reviewCount: book.reviewCount,
+      // Curated merchandising label — "Best Selling" / "Coming Soon" / "Out
+      // of Stock" — set on a handful of demo titles, null for the rest. The
+      // "Coming Soon" ones are what seedProcurement() raises purchase orders
+      // for below.
+      inventoryStatus: book.inventoryStatus ?? null,
+      formats: ["EPUB", "MOBI", "PDF"],
+      isPublished: true,
+    };
+    await prisma.product.upsert({
+      where: { slug: book.slug },
+      update: data,
+      create: { ...data, slug: book.slug, publishedAt: new Date() },
+    });
+  }
+  return BOOK_SEEDS.length;
+}
+
+/**
+ * Ten sample suppliers for the admin's "All Vendors" page, plus one open
+ * purchase order per "Coming Soon" title for the "Purchase Orders" page —
+ * a print run raised against a vendor and marked SENT (ordered, not yet
+ * received), which is what "Coming Soon" means operationally.
+ *
+ * Idempotent like the rest of the seed: vendors upsert on a fixed id,
+ * purchase orders on a fixed `po-<slug>` id with `update: {}` so a re-run
+ * leaves any received quantities alone.
+ */
+const VENDOR_SEEDS = [
+  { id: "vendor-01", name: "Sagar Printers & Binders", contactName: "Ramesh Sagar", phone: "+91 98300 11221", email: "orders@sagarprinters.in", gstin: "19AabsC1234F1Z5", city: "Kolkata", state: "West Bengal" },
+  { id: "vendor-02", name: "Ananda Paper Mills", contactName: "Sujata Bose", phone: "+91 98311 44556", email: "sales@anandapaper.com", gstin: "19AAdCA5678G1Z2", city: "Howrah", state: "West Bengal" },
+  { id: "vendor-03", name: "Deshbandhu Offset Press", contactName: "Kartik Dey", phone: "+91 90514 77889", email: "hello@deshbandhuoffset.in", gstin: "19AAeCD9012H1Z9", city: "Kolkata", state: "West Bengal" },
+  { id: "vendor-04", name: "Rainbow Colour Litho", contactName: "Farhan Ali", phone: "+91 98745 20034", email: "print@rainbowlitho.in", gstin: "19AAfCR3456J1Z7", city: "Siliguri", state: "West Bengal" },
+  { id: "vendor-05", name: "Gitanjali Printing House", contactName: "Anita Chatterjee", phone: "+91 93300 65432", email: "accounts@gitanjaliprint.in", gstin: "19AAgCG7890K1Z4", city: "Durgapur", state: "West Bengal" },
+  { id: "vendor-06", name: "Bharati Book Manufacturers", contactName: "Deepak Nair", phone: "+91 99030 12876", email: "supply@bharatibooks.co.in", gstin: "27AAhCB2345L1Z1", city: "Mumbai", state: "Maharashtra" },
+  { id: "vendor-07", name: "Sunrise Graphics", contactName: "Meera Iyer", phone: "+91 90080 33421", email: "info@sunrisegraphics.in", gstin: "29AAiCS6789M1Z8", city: "Bengaluru", state: "Karnataka" },
+  { id: "vendor-08", name: "National Paper Traders", contactName: "Harpreet Singh", phone: "+91 98110 55490", email: "desk@nationalpaper.in", gstin: "07AAjCN0123N1Z6", city: "New Delhi", state: "Delhi" },
+  { id: "vendor-09", name: "Kaveri Print Solutions", contactName: "Lakshmi Rao", phone: "+91 94440 88123", email: "orders@kaveriprint.in", gstin: "33AAkCK4567P1Z3", city: "Chennai", state: "Tamil Nadu" },
+  { id: "vendor-10", name: "Everest Packaging & Print", contactName: "Nilesh Patil", phone: "+91 90099 71234", email: "sales@everestpack.in", gstin: "24AAlCE8901Q1Z0", city: "Ahmedabad", state: "Gujarat" },
+];
+
+async function seedProcurement() {
+  for (const { id, ...vendor } of VENDOR_SEEDS) {
+    await prisma.vendor.upsert({
+      where: { id },
+      update: vendor,
+      create: { id, ...vendor },
+    });
+  }
+
+  const comingSoonSlugs = BOOK_SEEDS.filter((b) => b.inventoryStatus === "COMING_SOON").map((b) => b.slug);
+  const comingSoonProducts = await prisma.product.findMany({ where: { slug: { in: comingSoonSlugs } } });
+
+  let poCount = 0;
+  for (const [i, product] of comingSoonProducts.entries()) {
+    const vendor = VENDOR_SEEDS[i % VENDOR_SEEDS.length]!;
+    const quantityOrdered = 250;
+    // Trade cost ~45% of the list price, rounded to the rupee.
+    const unitCostCents = Math.round((product.priceCents * 0.45) / 100) * 100;
+    const expectedAt = new Date();
+    expectedAt.setDate(expectedAt.getDate() + 21);
+
+    await prisma.purchaseOrder.upsert({
+      where: { id: `po-${product.slug}` },
+      update: {},
+      create: {
+        id: `po-${product.slug}`,
+        vendorId: vendor.id,
+        status: "SENT",
+        expectedAt,
+        notes: `Initial print run for "${product.title}" — launch title, still marked Coming Soon on the storefront.`,
+        totalCents: quantityOrdered * unitCostCents,
+        items: {
+          create: [{ productId: product.id, quantityOrdered, unitCostCents }],
+        },
+      },
+    });
+    poCount += 1;
+  }
+
+  return { vendors: VENDOR_SEEDS.length, purchaseOrders: poCount };
+}
 
 async function main() {
+  const bookCount = await seedBookCatalogue();
+  const procurement = await seedProcurement();
+
   const physicalBook = await prisma.product.upsert({
     where: { slug: "geographic-atlas-of-bengal" },
     update: {},
     create: {
       type: "PHYSICAL_BOOK",
+      productLine: "BOOK",
       title: "Geographic Atlas of Bengal",
       author: "Shashibhushan Book Press",
       slug: "geographic-atlas-of-bengal",
@@ -25,6 +146,7 @@ async function main() {
     update: {},
     create: {
       type: "EBOOK",
+      productLine: "BOOK",
       title: "Geographic Atlas of Bengal (E-Book)",
       author: "Shashibhushan Book Press",
       slug: "geographic-atlas-of-bengal-ebook",
@@ -174,7 +296,13 @@ async function main() {
     create: { code: "SCHOOL5", rateBps: 500, blurb: "5% off this order." },
   });
 
-  console.log({ physicalBook: physicalBook.id, ebook: ebook.id, servicePackage: servicePackage.id });
+  console.log({
+    books: bookCount,
+    physicalBook: physicalBook.id,
+    ebook: ebook.id,
+    servicePackage: servicePackage.id,
+    ...procurement,
+  });
 }
 
 main()

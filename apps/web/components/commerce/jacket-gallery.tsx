@@ -61,7 +61,7 @@ export function JacketGallery({
 
   return (
     <div style={{ ["--jacket-from" as string]: from, ["--jacket-to" as string]: to }}>
-      <ProductShot square>
+      <ProductShot aspect="aspect-[5/6]">
         {flag && <Callout className="absolute left-3 top-3">{flag}</Callout>}
         <BookJacket
           title={title}
@@ -71,8 +71,8 @@ export function JacketGallery({
           to={active.face === "spine" ? to : to}
           face={active.face}
           priority
-          className={active.face === "spine" ? "h-[70%] w-auto" : "w-[46%]"}
-          sizes="(min-width: 980px) 320px, 70vw"
+          className={active.face === "spine" ? "h-[78%] w-auto" : "w-[62%]"}
+          sizes="(min-width: 980px) 340px, 70vw"
         />
       </ProductShot>
 

@@ -31,6 +31,38 @@ enum ProductType {
   SERVICE_PACKAGE
 }
 
+enum BookFormat {
+  PHYSICAL
+  EBOOK
+}
+
+/// The 8 product lines the Press sells across its 5 fixed storefront
+/// departments (Educational Materials, Professional Materials, Digital &
+/// Tech Solutions, Lifestyle — Publishing's 2 services aren't Product rows,
+/// see ServiceRequest/SelfPublishingProject instead). Canonical labels,
+/// departments and slugs live in `src/taxonomy.ts`, not here — this enum is
+/// deliberately just the stable identifiers a Product row is tagged with.
+enum ProductLine {
+  BOOK
+  EDUCATIONAL_CHART
+  WORKSHEET_ACTIVITY_PUZZLE
+  TEACHING_LEARNING_MATERIAL
+  ADVOCATE_DIARY
+  NAYA_BANDHU_APP
+  DIGITAL_TRACKING_SYSTEM
+  INDOOR_PLANT
+}
+
+/// Merchandising label shown against an inventory row in apps/admin's Books
+/// list (and available to the storefront). Curated, not derived from
+/// stockQty — an operator marks a title "Best Selling" or "Coming Soon"
+/// regardless of the count on hand. Null means "no special status".
+enum InventoryStatus {
+  BEST_SELLING
+  COMING_SOON
+  OUT_OF_STOCK
+}
+
 enum OrderStatus {
   PENDING
   PAID
@@ -107,6 +139,14 @@ enum NavLocation {
   FOOTER
 }
 
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
 // ────────────────────────────────────────────────────────────
 // Core models
 // ────────────────────────────────────────────────────────────
@@ -155,18 +195,45 @@ model Address {
 model Product {
   id          String      @id @default(cuid())
   type        ProductType
+  // Which of the 8 fixed product lines this listing belongs to. Null for
+  // SERVICE_PACKAGE rows outside that taxonomy (e.g. e-book conversion
+  // packages sold from /services) and for anything not yet migrated.
+  productLine ProductLine?
   title       String
   author      String
   slug        String      @unique
   description String?
   priceCents  Int
+  // Set only when bookFormats includes both PHYSICAL and EBOOK — the two
+  // formats of the same title are priced separately (e-books undercut
+  // print). priceCents alone is still the whole story for a single-format
+  // book, so this stays null for everything else.
+  ebookPriceCents Int?
   currency    String      @default("INR")
   coverImageUrl String?
+
+  // Books only — which format(s) this book is sold in. A book can be
+  // physical-only, e-book-only, or both at once; [] for service packages.
+  bookFormats BookFormat[] @default([])
 
   // Books only
   stockQty    Int?
   isbn        String?
   weightGrams Int?
+  // Curated merchandising status ("Best Selling" / "Coming Soon" / "Out of
+  // Stock") an operator sets on a title. Independent of stockQty — see the
+  // InventoryStatus enum. Null for an ordinary in-stock listing.
+  inventoryStatus InventoryStatus?
+  // The storefront's genre facet (apps/web's BOOK_GENRES) and aggregate
+  // rating. Both default to zero rather than null, deliberately: nothing
+  // writes them yet (no review-aggregation job exists), and a plain 0
+  // avoids null-handling in the listing's sort/keyset-pagination columns.
+  // The storefront only ever displays a rating when reviewCount > 0 — see
+  // `rowToListing()` in apps/web/lib/books-data.ts — so an unreviewed book
+  // still reads as "no rating yet", not "rated zero".
+  genre       String?
+  ratingAvg   Float    @default(0)
+  reviewCount Int      @default(0)
 
   // E-books only
   formats     String[]    @default([]) // EPUB, MOBI, PDF
@@ -192,9 +259,15 @@ model Product {
   fileAssets  FileAsset[]
   orderItems  OrderItem[]
   reviews     Review[]
+  purchaseOrderItems PurchaseOrderItem[]
 
   @@index([type])
   @@index([slug])
+  @@index([productLine])
+  @@index([genre])
+  @@index([ratingAvg])
+  @@index([reviewCount])
+  @@index([inventoryStatus])
   @@map("products")
 }
 
@@ -404,6 +477,76 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([actorId])
   @@map("audit_logs")
+}
+
+// ────────────────────────────────────────────────────────────
+// Procurement: vendors the Press buys stock from, and the purchase
+// orders raised against them. apps/admin-only — no apps/web reads.
+// Receiving a PO writes straight to Product.stockQty (no
+// StockMovement ledger exists yet — see docs/inventory-management-design.md).
+// ────────────────────────────────────────────────────────────
+
+/// A supplier the Press orders physical stock (reprints) from.
+model Vendor {
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  gstin       String?
+  addressLine String?
+  city        String?
+  state       String?
+  postalCode  String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+
+  @@map("vendors")
+}
+
+/// A stock-replenishment order raised against a Vendor. `poNumber` is a
+/// separate auto-incrementing display id ("PO-0001") since every other
+/// model's id is a cuid, not something a human should read out loud.
+model PurchaseOrder {
+  id         String              @id @default(cuid())
+  poNumber   Int                 @unique @default(autoincrement())
+  vendorId   String
+  vendor     Vendor              @relation(fields: [vendorId], references: [id])
+  status     PurchaseOrderStatus @default(DRAFT)
+  orderedAt  DateTime            @default(now())
+  expectedAt DateTime?
+  notes      String?
+  /// Denormalized sum of items' quantityOrdered * unitCostCents, recomputed on every write.
+  totalCents Int                 @default(0)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  items PurchaseOrderItem[]
+
+  @@index([vendorId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+/// A line item on a PurchaseOrder. Restricted to PHYSICAL_BOOK products —
+/// the only product type with a real stockQty to receive against today.
+model PurchaseOrderItem {
+  id               String        @id @default(cuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId        String
+  product          Product       @relation(fields: [productId], references: [id])
+  quantityOrdered  Int
+  quantityReceived Int           @default(0)
+  unitCostCents    Int
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+  @@map("purchase_order_items")
 }
 
 // ────────────────────────────────────────────────────────────

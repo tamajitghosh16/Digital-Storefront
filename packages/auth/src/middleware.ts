@@ -44,8 +44,9 @@ export function createAuthMiddleware(options?: { allowedRoles?: Role[]; signInPa
 
     // Role check happens against the `users` table (public schema), synced
     // from auth.users — see packages/database/prisma/sql/sync_user.sql.
-    // Fetched here via a lightweight REST call to avoid pulling Prisma's
-    // Node-only client into the Edge middleware runtime.
+    // Fetched here via a lightweight REST call rather than Prisma, since
+    // this factory is shared code and Prisma's client isn't meant to run
+    // outside a Node.js server process.
     if (options?.allowedRoles?.length) {
       const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single();
       if (!profile || !options.allowedRoles.includes(profile.role as Role)) {

@@ -3,7 +3,7 @@ import { getCurrentUser } from "@repo/auth/server";
 import { Callout, PageHeader, Wrap } from "@/components/primitives";
 import { AccountNav } from "@/components/account/account-nav";
 
-// FR-5.2/FR-5.3: the account area requires sign-in. middleware.ts already
+// FR-5.2/FR-5.3: the account area requires sign-in. proxy.ts already
 // redirects unauthenticated requests; this is the defence-in-depth check.
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();

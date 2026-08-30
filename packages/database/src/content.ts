@@ -150,13 +150,13 @@ export const CONTENT_GROUPS = [
   },
   {
     id: "publishing",
-    title: "Publishing band",
+    title: "Services band",
     description: "Short highlight for self-publishing and bulk publishing.",
     entries: [
       {
         key: "homepage.publishing.title",
         label: "Heading",
-        defaultValue: "Publishing",
+        defaultValue: "Services",
       },
       {
         key: "homepage.publishing.body",

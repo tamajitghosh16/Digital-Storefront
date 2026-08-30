@@ -15,7 +15,7 @@ export const SAMPLE_BANNERS: Banner[] = [
     ctaText: "Start self-publishing",
     ctaHref: "/self-publishing",
     secondaryCtaText: "Shop books",
-    secondaryCtaHref: "/books",
+    secondaryCtaHref: "/educational-material/books",
     order: 0,
     isActive: true,
     createdAt: NOW,
@@ -90,16 +90,9 @@ export const SAMPLE_FAQS: Faq[] = [
   },
 ];
 
-export const SAMPLE_HEADER_NAV: NavLink[] = [
-  { id: "nav-1", label: "Books", href: "/books", location: "HEADER", order: 0, isActive: true, createdAt: NOW, updatedAt: NOW },
-  { id: "nav-2", label: "E-Books", href: "/ebooks", location: "HEADER", order: 1, isActive: true, createdAt: NOW, updatedAt: NOW },
-  { id: "nav-3", label: "Publishing Services", href: "/services", location: "HEADER", order: 2, isActive: true, createdAt: NOW, updatedAt: NOW },
-  { id: "nav-4", label: "Self-Publishing", href: "/self-publishing", location: "HEADER", order: 3, isActive: true, createdAt: NOW, updatedAt: NOW },
-];
-
 export const SAMPLE_FOOTER_NAV: NavLink[] = [
-  { id: "nav-f1", label: "Books", href: "/books", location: "FOOTER", order: 0, isActive: true, createdAt: NOW, updatedAt: NOW },
-  { id: "nav-f2", label: "E-Books", href: "/ebooks", location: "FOOTER", order: 1, isActive: true, createdAt: NOW, updatedAt: NOW },
+  { id: "nav-f1", label: "Books", href: "/educational-material/books", location: "FOOTER", order: 0, isActive: true, createdAt: NOW, updatedAt: NOW },
+  { id: "nav-f2", label: "E-Books", href: "/educational-material/books?format=ebook", location: "FOOTER", order: 1, isActive: true, createdAt: NOW, updatedAt: NOW },
   { id: "nav-f3", label: "Publishing Services", href: "/services", location: "FOOTER", order: 2, isActive: true, createdAt: NOW, updatedAt: NOW },
   { id: "nav-f4", label: "Self-Publishing", href: "/self-publishing", location: "FOOTER", order: 3, isActive: true, createdAt: NOW, updatedAt: NOW },
 ];

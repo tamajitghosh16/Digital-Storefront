@@ -4,8 +4,7 @@ import { Wrap, buttonClass } from "./index";
 
 /** The two dead ends — 404 and 403. Each offers a way onward. */
 const ONWARD = [
-  { label: "Books", href: "/books" },
-  { label: "E-Books", href: "/ebooks" },
+  { label: "Books", href: "/educational-material/books" },
   { label: "Publishing services", href: "/services" },
   { label: "Self-publishing", href: "/self-publishing" },
 ];

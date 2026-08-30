@@ -24,7 +24,7 @@ export default function DigitalLibraryPage() {
           <p className="mx-auto mt-2 max-w-[46ch] text-sm text-ink-muted">
             Purchased e-books and delivered service files appear here the moment payment clears.
           </p>
-          <Link href="/ebooks" className={buttonClass("secondary", "md", "mt-5")}>
+          <Link href="/educational-material/books" className={buttonClass("secondary", "md", "mt-5")}>
             Shop e-books
           </Link>
         </div>

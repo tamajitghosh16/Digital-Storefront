@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@repo/auth/server";
 import { CATALOGUE_WRITE_ROLES, CONTENT_WRITE_ROLES } from "@repo/auth/roles";
-import { uploadImage } from "@repo/storage";
+import { uploadImage, isImageUploadConfigured } from "@repo/storage";
 
 /**
  * Image upload endpoint behind the admin's ImageField.
@@ -59,8 +59,8 @@ export async function POST(request: Request) {
     return fail("You don't have permission to upload images.", 403);
   }
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return fail("Image storage isn't configured yet. Paste an image URL instead, or ask your developer to set BLOB_READ_WRITE_TOKEN.", 503);
+  if (!isImageUploadConfigured()) {
+    return fail("Image storage isn't configured yet. Paste an image URL instead, or ask your developer to set the Supabase environment variables.", 503);
   }
 
   let file: File | null = null;

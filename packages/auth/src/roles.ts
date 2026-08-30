@@ -25,18 +25,6 @@ export const CONTENT_WRITE_ROLES: Role[] = [ROLES.EDITOR, ROLES.OWNER];
 /** Only the Owner (Publisher) may configure royalty rates and manage staff roles. */
 export const OWNER_ONLY_ROLES: Role[] = [ROLES.OWNER];
 
-export function isAdmin(role: Role | null | undefined): boolean {
-  return !!role && ADMIN_ROLES.includes(role);
-}
-
-export function canWriteCatalogue(role: Role | null | undefined): boolean {
-  return !!role && CATALOGUE_WRITE_ROLES.includes(role);
-}
-
-export function isOwner(role: Role | null | undefined): boolean {
-  return !!role && OWNER_ONLY_ROLES.includes(role);
-}
-
 /**
  * Server Actions should call this at the top of every mutation — route-level
  * middleware guards are a UX nicety, not a security boundary. Throws if the

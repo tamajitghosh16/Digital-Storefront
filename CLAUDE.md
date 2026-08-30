@@ -89,14 +89,67 @@ database errors and fall back to the shipped defaults, deliberately: a
 storefront rendering last-known-good copy beats one that 500s because a
 settings row is missing.
 
+**Product & service taxonomy — business structure, not schema structure.**
+The Press sells across 5 departments (8 product lines total) plus a
+Publishing department of 2 services:
+
+- **Educational Materials** — Books (physical/e-book), Educational Charts,
+  Worksheets and Activity Puzzles, Teaching and Learning Materials
+- **Professional Materials** — Advocate's Diary (Naya Bandhu)
+- **Digital & Tech Solutions** — Naya Bandhu (Application), Digital
+  Tracking System
+- **Lifestyle** — Indoor Plants (Chatterjee's Green Veranda)
+- **Publishing** (services, not products) — Self Publishing, Bulk
+  Publishing
+
+The 8 product lines are now schema-backed: `Product.productLine` is a
+nullable `ProductLine` enum (`packages/database/prisma/schema.prisma`),
+one value per line above (`BOOK`, `EDUCATIONAL_CHART`, ...), separate from
+`Product.type` (`PHYSICAL_BOOK`/`EBOOK`/`SERVICE_PACKAGE`), which still only
+encodes fulfillment mechanics. It's null for `SERVICE_PACKAGE` rows outside
+this taxonomy (e.g. the e-book conversion packages sold from `/services`)
+and, today, for every product line except Books — see below. The canonical
+labels/departments/slugs for all 8 lines (plus the 2 Publishing services,
+which are deliberately *not* `ProductLine` values since they're never
+`Product` rows — see `ServiceRequest`/`SelfPublishingProject`) live in
+`packages/database/src/taxonomy.ts`, re-exported from `client.ts` the same
+way `content.ts`/`pricing.ts` are.
+
+**This taxonomy module isn't consumed yet, so it's a second source of
+truth, not a replacement for the first.** `FIXED_DEPARTMENTS` in
+`apps/admin/components/sidebar-nav.tsx` and `buildDepartments()` in
+`apps/web/lib/navigation.ts` still hardcode their own literal copy of the
+same labels/hrefs (kept in sync by hand, since the two apps never import
+from each other — see below) rather than importing `PRODUCT_LINE_CATALOG`
+from `@repo/database`; wiring them up is follow-up work, not done here.
+The only schema-backed category system besides `ProductLine` is
+`MenuCategory`/`MenuProduct`, and that's for *additional* categories an
+operator creates from `apps/admin`'s Menu section, layered on top of these
+5 fixed departments rather than modeling them. In practice four of the
+eight product lines now have a real admin CMS backed by `Product`:
+**Books** (`apps/admin/app/educational-material/books`, the fullest one —
+formats, genre, e-book fields, service packages) and the three simpler
+Educational Materials lines — **Educational Charts**, **Worksheets and
+Activity Puzzles**, **Teaching and Learning Materials** — which share one
+trimmed-down list/form/actions set in
+`apps/admin/app/educational-material/_shared/`, each route folder passing
+its own `ProductLineConfig`. Every one of these writes `Product.productLine`
+(Books always `"BOOK"`; the other three their own enum value), and the
+Books list/detail — in both apps — filter to `productLine: "BOOK"` so the
+`PHYSICAL_BOOK`-typed charts/worksheets/materials don't leak in. The
+remaining four product-line pages and both service pages are still
+`EmptyState` stubs (see `apps/admin/CLAUDE.md`'s "Route map"); giving one
+real inventory now only needs a route folder like the three simple lines'
+— read/write `Product` filtered by its `ProductLine` value.
+
 **Auth is Supabase Auth, wrapped by `packages/auth`.** `src/server.ts`
 (Server Components/Actions), `src/client.ts` (Client Components), and
-`src/middleware.ts` (a middleware *factory* — each app's `middleware.ts`
+`src/middleware.ts` (a middleware *factory* — each app's `proxy.ts`
 calls `createAuthMiddleware()` with its own options; `apps/admin` passes
 `allowedRoles: ADMIN_ROLES` to lock the whole app down, `apps/web` doesn't).
-Role authorization is checked twice by design: loosely in middleware (a UX
+Role authorization is checked twice by design: loosely in proxy (a UX
 redirect, not a security boundary) and again inside every Server Action via
-`assertRole()` from `packages/auth/src/roles.ts`. Never rely on middleware
+`assertRole()` from `packages/auth/src/roles.ts`. Never rely on proxy
 alone to protect a mutation.
 
 `public.users` is kept in sync with Supabase's own `auth.users` table by a
@@ -141,3 +194,13 @@ config, and the single set of Tailwind v4 design tokens in
 `tailwind-preset.css`, which both apps' `globals.css` import — Swan
 geometry with a palette sampled from `apps/web/public/logo*.svg`. See
 `apps/web/CLAUDE.md` for what the tokens mean.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues (`tamajitghosh16/Digital-Storefront`), via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.

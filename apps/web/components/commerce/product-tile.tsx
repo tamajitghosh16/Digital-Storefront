@@ -30,8 +30,8 @@ export interface ProductTileData {
 }
 
 const TYPE_PATH = {
-  PHYSICAL_BOOK: "books",
-  EBOOK: "ebooks",
+  PHYSICAL_BOOK: "educational-material/books",
+  EBOOK: "educational-material/books",
   SERVICE_PACKAGE: "services",
 } as const;
 
@@ -108,8 +108,3 @@ export function ProductTile({
 }
 
 export { ProductScroller } from "./product-scroller";
-
-/** Responsive grid of tiles. */
-export function ProductGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-x-4 gap-y-5 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">{children}</div>;
-}

@@ -68,7 +68,7 @@ export function Section({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-tile border border-line bg-ground p-6", className)}>
+    <section className={cn("rounded-tile border border-line-strong bg-ground p-6", className)}>
       <h2 className="font-display text-lg font-bold tracking-[-0.01em] text-ink">{title}</h2>
       {description && <p className="mt-1 max-w-[70ch] text-sm leading-relaxed text-ink-muted">{description}</p>}
       <div className="mt-5 space-y-5">{children}</div>
@@ -316,12 +316,10 @@ export function ButtonLink({
 
 export function Table({ head, children }: { head: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-tile border border-line bg-ground">
+    <div className="overflow-x-auto rounded-tile border border-line-strong bg-ground">
       <table className="w-full min-w-[42rem] text-sm">
-        <thead className="border-b border-line bg-tile-3 text-left">
-          <tr className="[&>th]:px-4 [&>th]:py-3 [&>th]:text-xs [&>th]:font-bold [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-ink-muted">
-            {head}
-          </tr>
+        <thead className="border-b border-line-strong text-left">
+          <tr className="[&>th]:px-4 [&>th]:py-3 [&>th]:text-xs [&>th]:font-medium [&>th]:text-ink-muted">{head}</tr>
         </thead>
         <tbody className="[&>tr:not(:last-child)]:border-b [&>tr:not(:last-child)]:border-line [&>tr>td]:px-4 [&>tr>td]:py-3 [&>tr]:align-middle">
           {children}
@@ -351,8 +349,40 @@ export function Pill({ tone, children }: { tone: "on" | "off" | "info"; children
   );
 }
 
-/** Small inline thumbnail for list rows — plain <img>, since Blob URLs are remote. */
-export function Thumb({ src, alt }: { src?: string | null; alt: string }) {
+/**
+ * Small inline thumbnail for list rows — plain <img>, since Blob URLs are remote.
+ *
+ * With no uploaded image, a book falls back to a drawn gradient jacket
+ * (title inked on a 2:3 block with a hinge down the left edge), the same
+ * treatment apps/web gives a cover-less book. Pass `from`/`to` to get it;
+ * without them it's the neutral dash box.
+ */
+export function Thumb({
+  src,
+  alt,
+  title,
+  from,
+  to,
+}: {
+  src?: string | null;
+  alt: string;
+  title?: string;
+  from?: string;
+  to?: string;
+}) {
+  if (!src && from && to) {
+    return (
+      <span
+        className="relative flex h-12 w-9 shrink-0 flex-col justify-end overflow-hidden rounded-[10px] border border-line p-[3px] text-white"
+        style={{ backgroundImage: `linear-gradient(155deg, ${from}, ${to})` }}
+      >
+        <span aria-hidden className="pointer-events-none absolute inset-y-0 left-[3px] right-0 border-l border-white/25" />
+        {title && (
+          <span className="relative line-clamp-3 text-[6px] font-bold leading-[1.15] tracking-[-0.01em]">{title}</span>
+        )}
+      </span>
+    );
+  }
   if (!src) {
     return (
       <span className="grid h-12 w-9 shrink-0 place-items-center rounded-[10px] border border-line bg-tile text-[10px] font-bold text-ink-subtle">

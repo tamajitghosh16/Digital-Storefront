@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  Breadcrumb,
   Callout,
   CheckList,
   PageHeader,
@@ -13,7 +14,7 @@ import {
   Wrap,
   buttonClass,
 } from "@/components/primitives";
-import { PlanBand } from "@/components/marketing";
+import { FaqList, PlanBand } from "@/components/marketing";
 
 export const metadata: Metadata = { title: "Self-Publishing" };
 
@@ -69,9 +70,42 @@ const WIZARD = [
   { tag: "Step 4", title: "Review & pay", points: ["Fixed quote, no deposit games", "Production starts on payment"] },
 ];
 
+const FAQS = [
+  {
+    id: "rights",
+    question: "Do I keep the rights to my book?",
+    answer:
+      "Entirely. You hold the copyright, the ISBN is registered in your name, and you can take the print-ready files elsewhere at any time. Listing here is non-exclusive.",
+  },
+  {
+    id: "timeline",
+    question: "How firm are the timelines?",
+    answer:
+      "The weeks shown against each package are from the point your manuscript is final and payment has cleared. Revision rounds you request pause the clock; nothing else does.",
+  },
+  {
+    id: "editing",
+    question: "Is editing included?",
+    answer:
+      "Production, typesetting, cover and ISBN are included. Structural and copy editing are separate — add them as an add-on in the wizard, or bring your own editor.",
+  },
+  {
+    id: "payouts",
+    question: "When do royalties actually arrive?",
+    answer:
+      "Storefront sales are totalled monthly and paid by bank transfer on the 7th once your balance passes ₹1,000. Retail-distribution sales settle quarterly. Every statement downloads as CSV from your dashboard.",
+  },
+];
+
 export default function SelfPublishingLandingPage() {
   return (
     <>
+      <Wrap>
+        <Breadcrumb
+          trail={[{ label: "Home", href: "/" }, { label: "Services" }, { label: "Self-Publishing" }]}
+        />
+      </Wrap>
+
       <PageHeader>
         <Callout>Self-publishing programme</Callout>
         <h1 className="mt-4">From manuscript to storefront listing.</h1>
@@ -156,6 +190,11 @@ export default function SelfPublishingLandingPage() {
         standfirst="You can leave and come back — the project saves at every step."
         plans={WIZARD}
       />
+
+      <Wrap as="section" className="py-12">
+        <SectionHead title="Before you start" />
+        <FaqList items={FAQS} />
+      </Wrap>
     </>
   );
 }

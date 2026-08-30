@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Manrope, Space_Grotesk } from "next/font/google";
 import { getCurrentUser } from "@repo/auth/server";
-import { getSiteSettings } from "@repo/database";
+import { getSiteSettings, prisma } from "@repo/database";
 import { AppShell } from "@/components/app-shell";
+import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 // Space Grotesk announces a screen or a number; Manrope does the actual
@@ -34,21 +35,35 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Both reads are best-effort: this shell also wraps /sign-in,
+  // All three reads are best-effort: this shell also wraps /sign-in,
   // /forgot-password, /reset-password and /unauthorized, which are
   // reachable with no session and, in the case of a cold environment, no
   // database either.
-  const [user, settings] = await Promise.all([
+  const [user, settings, menuCategories] = await Promise.all([
     getCurrentUser().catch(() => null),
     getSiteSettings().catch(() => null),
+    prisma.menuCategory
+      .findMany({
+        where: { isActive: true },
+        orderBy: { order: "asc" },
+        include: { products: { where: { isActive: true }, orderBy: { order: "asc" } } },
+      })
+      .catch(() => []),
   ]);
 
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-page font-sans text-ink antialiased">
-        <AppShell siteName={settings?.siteName} userName={user?.name ?? user?.email ?? null} userRole={user?.role ?? null}>
-          {children}
-        </AppShell>
+        <ThemeProvider>
+          <AppShell
+            siteName={settings?.siteName}
+            userName={user?.name ?? user?.email ?? null}
+            userRole={user?.role ?? null}
+            menuCategories={menuCategories}
+          >
+            {children}
+          </AppShell>
+        </ThemeProvider>
       </body>
     </html>
   );

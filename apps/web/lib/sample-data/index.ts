@@ -22,11 +22,3 @@ export const SAMPLE_PRODUCTS: DisplayProduct[] = [...SAMPLE_BOOKS, ...SAMPLE_EBO
 export function findSampleProduct(slug: string): DisplayProduct | undefined {
   return SAMPLE_PRODUCTS.find((product) => product.slug === slug);
 }
-
-/** Homepage category grid — mirrors the four trading lines. */
-export const SAMPLE_CATEGORIES = [
-  { title: "Books", body: "Printed titles, shipped to you", href: "/books" },
-  { title: "E-Books", body: "Instant digital delivery", href: "/ebooks" },
-  { title: "Publishing Services", body: "E-book creation & formatting", href: "/services" },
-  { title: "Self-Publishing", body: "Publish your own book with us", href: "/self-publishing" },
-];

@@ -8,28 +8,29 @@
    preset already uses for `.dark` — it never touches packages/config, so
    apps/web is unaffected).
 
-   The brief: minimalist, rounded, black and white only. Rather than fake
-   "black and white" with a named grey ramp, every tint here is either a
-   neutral (equal-channel) grey or black at some opacity — literally ink at
-   different strengths on paper. Status colour (paid/pending, live/hidden,
-   error/success) is carried by shape and weight instead of hue: filled vs.
-   outlined vs. dashed, not green vs. red. That's the whole idea — a back
-   office that reads like a proof sheet, not a dashboard. */
+   The brief: minimalist, rounded, black and white only — literally #000000
+   and #FFFFFF, with every intermediate tint built as one of those two at
+   an opacity rather than a separate named grey. Status colour (paid/
+   pending, live/hidden, error/success) is carried by shape and weight
+   instead of hue: filled vs. outlined vs. dashed, not green vs. red.
+   That's the whole idea — a back office that reads like a proof sheet,
+   not a dashboard. */
 :root {
   /* Ink-black stands in for "brand" — every primary action is a stamp. */
-  --color-brand: #0a0a0a;
+  --color-brand: #000000;
   --color-brand-press: #000000;
   --color-on-brand: #ffffff;
   --color-brand-soft: rgba(0, 0, 0, 0.06);
 
-  /* Paper, and one step up for a raised sheet. */
-  --color-page: #fafafa;
+  /* Paper, and one step up for a raised sheet — both pure white, so a tile
+     reads as "black ink at low opacity", never a separate grey swatch. */
+  --color-page: #ffffff;
   --color-ground: #ffffff;
-  --color-tile: #f2f2f2;
-  --color-tile-2: #e8e8e8;
-  --color-tile-3: #f5f5f5;
+  --color-tile: rgba(0, 0, 0, 0.05);
+  --color-tile-2: rgba(0, 0, 0, 0.09);
+  --color-tile-3: rgba(0, 0, 0, 0.035);
 
-  --color-ink: #0a0a0a;
+  --color-ink: #000000;
   --color-ink-muted: rgba(0, 0, 0, 0.58);
   --color-ink-subtle: rgba(0, 0, 0, 0.38);
 
@@ -38,30 +39,30 @@
   --color-card-edge: rgba(0, 0, 0, 0.06);
 
   /* Status tokens collapse to ink on purpose — see note above. */
-  --color-ok: #0a0a0a;
-  --color-warn: #0a0a0a;
-  --color-sale: #0a0a0a;
+  --color-ok: #000000;
+  --color-warn: #000000;
+  --color-sale: #000000;
 
-  --color-band: #0a0a0a;
+  --color-band: #000000;
   --color-band-ink: #ffffff;
   --color-band-muted: rgba(255, 255, 255, 0.7);
-  --color-promo: #0a0a0a;
+  --color-promo: #000000;
   --color-promo-ink: #ffffff;
 
-  --color-background: #fafafa;
-  --color-foreground: #0a0a0a;
-  --color-muted: #f2f2f2;
+  --color-background: #ffffff;
+  --color-foreground: #000000;
+  --color-muted: rgba(0, 0, 0, 0.05);
   --color-muted-foreground: rgba(0, 0, 0, 0.58);
   --color-border: rgba(0, 0, 0, 0.1);
   --color-card: #ffffff;
-  --color-card-foreground: #0a0a0a;
-  --color-ring: #0a0a0a;
-  --color-brand-navy: #0a0a0a;
-  --color-brand-accent: #0a0a0a;
+  --color-card-foreground: #000000;
+  --color-ring: #000000;
+  --color-brand-navy: #000000;
+  --color-brand-accent: #000000;
 
-  /* Rounder than the storefront on purpose — the one geometry change the
-     brief asked for by name. */
-  --radius-tile: 28px;
+  /* Matches the approved back-office mockup: a 16px panel/card radius,
+     999px (fully pill) for every interactive control. */
+  --radius-tile: 16px;
   --radius-btn: 14px;
 
   --shadow-tile: 0 1px 2px rgba(0, 0, 0, 0.04), 0 16px 32px -12px rgba(0, 0, 0, 0.08);
@@ -76,4 +77,86 @@
   --font-sans: var(--font-manrope), "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-space-grotesk), "Space Grotesk", var(--font-sans);
   --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+/* Dark mode: the same ink-on-paper idea, inverted — white ink on a black
+   ground rather than a separate palette. Toggled by next-themes' `class`
+   attribute on <html> (see components/theme-provider.tsx); this overrides
+   the shared preset's own `.dark` block (packages/config/tailwind-
+   preset.css), which is navy-tinted and built for apps/web. */
+.dark {
+  --color-brand: #ffffff;
+  --color-brand-press: #ffffff;
+  --color-on-brand: #000000;
+  --color-brand-soft: rgba(255, 255, 255, 0.12);
+
+  --color-page: #000000;
+  --color-ground: #000000;
+  --color-tile: rgba(255, 255, 255, 0.08);
+  --color-tile-2: rgba(255, 255, 255, 0.14);
+  --color-tile-3: rgba(255, 255, 255, 0.05);
+
+  --color-ink: #ffffff;
+  --color-ink-muted: rgba(255, 255, 255, 0.6);
+  --color-ink-subtle: rgba(255, 255, 255, 0.4);
+
+  --color-line: rgba(255, 255, 255, 0.16);
+  --color-line-strong: rgba(255, 255, 255, 0.32);
+  --color-card-edge: rgba(255, 255, 255, 0.08);
+
+  --color-ok: #ffffff;
+  --color-warn: #ffffff;
+  --color-sale: #ffffff;
+
+  --color-band: #ffffff;
+  --color-band-ink: #000000;
+  --color-band-muted: rgba(0, 0, 0, 0.7);
+  --color-promo: #ffffff;
+  --color-promo-ink: #000000;
+
+  --color-background: #000000;
+  --color-foreground: #ffffff;
+  --color-muted: rgba(255, 255, 255, 0.08);
+  --color-muted-foreground: rgba(255, 255, 255, 0.6);
+  --color-border: rgba(255, 255, 255, 0.16);
+  --color-card: #000000;
+  --color-card-foreground: #ffffff;
+  --color-ring: #ffffff;
+  --color-brand-navy: #ffffff;
+  --color-brand-accent: #ffffff;
+
+  --shadow-tile: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 32px -12px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 20px 48px -12px rgba(0, 0, 0, 0.7);
+  --shadow-book: 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* Custom scrollbar, everywhere: a bare vertical line rather than the OS
+   chrome — no track, no buttons, a fixed 100px thumb in --color-ink so it
+   reads as ink at any scroll position rather than shrinking with content
+   length. `var(--color-ink)` already flips black/white between light and
+   dark, so this needs no separate dark-mode rule. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink) transparent;
+}
+*::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-ink);
+  min-height: 100px;
+  max-height: 100px;
+  border-radius: 0;
+}
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+*::-webkit-scrollbar-corner {
+  display: none;
 }

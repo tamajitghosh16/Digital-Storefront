@@ -46,7 +46,7 @@ npm run typecheck
 ## Architecture
 
 **Audience: Publisher (Owner) and Staff only — the whole app is gated.**
-Unlike `apps/web`, `middleware.ts` here locks every route to
+Unlike `apps/web`, `proxy.ts` here locks every route to
 `ADMIN_ROLES` (`SUPPORT`, `EDITOR`, `OWNER` — from `packages/auth/src/roles.ts`)
 by default; the `matcher` excludes only `/sign-in`, `/unauthorized`, and
 static assets. There's no "public" area in this app.
@@ -91,19 +91,67 @@ Server Actions:
   actions — who has staff access is exactly the kind of change that
   needs a paper trail.
 
-**Route map (all under `app/`):** `catalogue` (product/inventory CMS, with
-`catalogue/new` and `catalogue/[id]` create/edit forms), `orders`,
-`submissions` (self-publishing + service-request queues in one view),
-`royalties`, `reviews` (moderation queue), `analytics`, `settings/roles`,
-plus the storefront-CMS routes: `settings/site` (site branding/SEO/contact
-defaults), `settings/navigation` (header/footer links), `content/banners`
-(homepage hero/promo), `content/homepage` (every other heading and
-description on the homepage), `content/faqs`, `content/testimonials`,
-`settings/pricing` (delivery, bundle, GST, class-set tiers, discount
-codes), and the `api/uploads` Route Handler behind the image fields.
+**Route map (all under `app/`):** `educational-material/books`
+(product/inventory CMS — despite the path, this manages every product type,
+not just books; see "The catalogue CMS lives under Books" below — with
+`educational-material/books/new` and `educational-material/books/[id]`
+create/edit forms), `orders`, `submissions` (self-publishing +
+service-request queues in one view), `royalties`, `reviews` (moderation
+queue), `analytics`, `settings/roles`, the three sibling
+Educational-Materials inventory CMSs
+(`educational-material/educational-charts`,
+`educational-material/worksheets-activity-puzzles`,
+`educational-material/teaching-learning-materials` — each with its own
+`new`/`[id]` forms, all sharing `educational-material/_shared/`), the
+placeholder Inventory-sidebar stubs
+(`professional-materials/advocate-diary`, `publishing/self-publishing`,
+`publishing/bulk-publishing`, `lifestyle`), plus the storefront-CMS routes:
+`settings/site` (site branding/SEO/contact defaults), `settings/navigation`
+(header/footer links), `content/banners` (homepage hero/promo),
+`content/homepage` (every other heading and description on the homepage),
+`content/faqs`, `content/testimonials`, `settings/pricing` (delivery,
+bundle, GST, class-set tiers, discount codes), and the `api/uploads` Route
+Handler behind the image fields.
+
+**The catalogue CMS lives under Books, not `/catalogue`.** The product
+create/edit/publish forms manage every `Product` regardless of `type`
+(printed book, e-book, or service package) but live at
+`educational-material/books` because that's the Inventory sidebar item the
+Owner asked them to sit behind — `sidebar-nav.tsx`'s "Books" entry links
+straight there. Because its list query is `type IN (PHYSICAL_BOOK, EBOOK)`
+*and* `productLine: "BOOK"`, it stays a books-only view even though the
+three sibling lines below are also `PHYSICAL_BOOK`.
+
+**Educational Charts / Worksheets & Activity Puzzles / Teaching & Learning
+Materials share one CMS.** These three lines are all plain shippable
+physical products, so instead of a Books-sized form each they share a
+trimmed list, form, schema and Server Actions in
+`educational-material/_shared/` (a `_`-prefixed, non-routable folder). Each
+route folder (`educational-material/<slug>/{page,new/page,[id]/page}.tsx`)
+is a thin wrapper that looks up its `ProductLineConfig` by slug from
+`_shared/product-line-config.ts` — the one place the per-line wording
+lives — and passes it down. The Server Actions
+(`createLineProduct`/`updateLineProduct`/`toggleLineProductPublished`) take
+the route slug as a bound first argument, which resolves to the
+`ProductLine` enum value written to `Product.productLine` and to the
+redirect/`revalidatePath` target. The rows are `type: "PHYSICAL_BOOK"`
+(fulfilment mechanics only) with `bookFormats: []`; `productLine` is what
+classifies them. `_shared/product-line-config.ts` mirrors
+`PRODUCT_LINE_CATALOG` in `@repo/database`'s `taxonomy.ts` by hand, same as
+`FIXED_DEPARTMENTS`.
+
+The remaining Inventory-sidebar routes (`professional-materials/advocate-diary`,
+`publishing/self-publishing`, `publishing/bulk-publishing`, `lifestyle`)
+are still `EmptyState` stubs pointing back at Books. Adding one now is a
+matter of another route folder + config entry like the three simple lines
+above (or, for Books-like complexity, its own form). See
+`sidebar-nav.tsx`'s `FIXED_DEPARTMENTS` for how each Inventory link is
+wired.
 
 **Admin is a full CMS for `apps/web`'s content, not just the product
-catalogue.** `catalogue`, `settings/site`, `settings/navigation`,
+catalogue.** `educational-material/books`, the three
+`educational-material/{educational-charts,worksheets-activity-puzzles,teaching-learning-materials}`
+lines, `settings/site`, `settings/navigation`,
 `settings/pricing`, `content/banners`, `content/homepage`, `content/faqs`,
 and `content/testimonials` all have real create/update (and, for the
 CMS-only ones, delete) Server Actions — each validates with Zod, calls
@@ -134,7 +182,7 @@ confirm-before-delete), `components/image-field.tsx` (file picker →
 ordinary English with help text under anything non-obvious; long forms
 split into titled sections; colour from the shared tokens in
 `packages/config/tailwind-preset.css`, never raw Tailwind greys.
-`catalogue/product-form.tsx` is a Client Component *because* of this — the
+`educational-material/books/product-form.tsx` is a Client Component *because* of this — the
 product type is picked first and only the fields that apply to it render,
 and the web address is generated from the title.
 
@@ -143,11 +191,15 @@ and the web address is generated from the title.
 Vercel's 4.5 MB request-body limit), and verifies the file's *magic bytes*
 rather than trusting `file.type`. It refuses SVG, which can carry script
 and isn't sanitised anywhere — an SVG logo has to be pointed at by URL. It
-calls `uploadImage()` in `packages/storage`, which writes straight to a
-public `images/` path instead of going through
-`uploadToStaging`/`promoteFromStaging`: that pipeline exists for untrusted
-customer manuscripts, and the scan behind it is still a stub that always
-returns `"CLEAN"`.
+calls `uploadImage()` in `packages/storage`, which writes straight to the
+public `images` **Supabase Storage** bucket (service-role client, so it
+bypasses Storage RLS — safe because the role + magic-byte checks already
+ran) instead of going through `uploadToStaging`/`promoteFromStaging`: that
+pipeline exists for untrusted customer manuscripts, still runs on Vercel
+Blob, and the scan behind it is still a stub that always returns
+`"CLEAN"`. Needs `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
+(both already required by this app); `isImageUploadConfigured()` gates the
+route so a missing config falls back to "paste a URL" instead of throwing.
 
 **Still read-only stubs:** `orders`, `submissions`, `royalties`, `reviews`,
 `analytics`, `settings/roles` — these still do a direct read-only Prisma

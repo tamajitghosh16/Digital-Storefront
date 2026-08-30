@@ -20,7 +20,7 @@ npm run typecheck
 ## Architecture
 
 **Audience: Guests, Readers, and Self-Publishing Authors.** Unlike
-`apps/admin`, this app is intentionally mostly public — `middleware.ts`
+`apps/admin`, this app is intentionally mostly public — `proxy.ts`
 only guards `/account/**` and `/self-publishing/wizard/**` (see its
 `matcher`), and applies no role restriction beyond "signed in." Role-
 specific areas (like the publishing dashboard) enforce their own check in
@@ -33,7 +33,7 @@ the page/layout itself.
 - `app/api/` — the three Route Handlers that need a stable HTTP contract: `webhooks/razorpay` (payment source of truth), `inngest` (serves `packages/jobs` functions), `library/[assetId]` (entitlement-checked digital delivery).
 
 **Components are grouped by role, not by page:**
-- `components/layout/` — the chrome: promo marquee, utility bar, masthead, department bar with its hover mega-panels, mobile drawer, footer, theme toggle.
+- `components/layout/` — the chrome: promo marquee, utility bar, masthead, department bar with its hover mega-panels, mobile drawer, footer, theme toggle. The department bar's 5 departments/8 product lines come from `lib/navigation.ts`'s `buildDepartments()`, hardcoded to mirror `apps/admin/components/sidebar-nav.tsx`'s `FIXED_DEPARTMENTS` by hand rather than importing `PRODUCT_LINE_CATALOG` from `@repo/database` — see root `CLAUDE.md`'s "Product & service taxonomy" section for the canonical list, `Product.productLine`, and why the nav files don't read from it yet.
 - `components/commerce/` — anything that sells: the book jacket (four drawable faces), product tile, catalogue and product page bodies, buy box, cart screen.
 - `components/marketing/` — the repeating content blocks: hero, category circles, trust band, dark plan band, newsletter, FAQ.
 - `components/primitives/` — this storefront's style-only pieces (`Wrap`, `buttonClass`, `Callout`, `SectionHead`, table classes). Distinct from `@repo/ui`, which holds the *behavioural* primitives apps/admin shares.

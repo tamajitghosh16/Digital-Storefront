@@ -124,7 +124,7 @@ export function CartScreen({ pricing }: { pricing: PricingConfig }) {
           {items.length === 0 ? (
             <p className="py-7 text-[15px] text-ink-muted">
               Your cart is empty.{" "}
-              <Link href="/books" className="font-bold underline underline-offset-2">
+              <Link href="/educational-material/books" className="font-bold underline underline-offset-2">
                 Browse the catalogue
               </Link>
               .

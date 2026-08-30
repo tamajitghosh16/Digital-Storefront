@@ -142,16 +142,19 @@ export function ProductShot({
   children,
   className,
   square,
+  aspect,
 }: {
   children: React.ReactNode;
   className?: string;
   square?: boolean;
+  /** Tailwind aspect class to use instead of the square/4:5 default. */
+  aspect?: string;
 }) {
   return (
     <div
       className={cn(
         "relative grid place-items-center overflow-hidden rounded-tile bg-tile p-[22px] inset-ring inset-ring-card-edge",
-        square ? "aspect-square" : "aspect-4/5",
+        aspect ?? (square ? "aspect-square" : "aspect-4/5"),
         className
       )}
     >
