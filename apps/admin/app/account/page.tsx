@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { PageHeader } from "@/components/ui";
 import { AccountClient } from "./account-client";
 
 export default async function AccountPage() {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   if (!user) redirect("/sign-in");
 
   return (

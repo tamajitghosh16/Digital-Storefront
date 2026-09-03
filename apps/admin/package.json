@@ -16,6 +16,7 @@
     "react-dom": "^19.0.0",
     "@repo/database": "*",
     "@repo/auth": "*",
+    "@repo/email": "*",
     "@repo/payments": "*",
     "@repo/storage": "*",
     "@repo/jobs": "*",

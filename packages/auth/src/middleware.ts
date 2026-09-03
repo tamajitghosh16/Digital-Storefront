@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { Role } from "@repo/database";
+import { authSupabasePublishableKey, authSupabaseUrl } from "./env";
 
 /**
  * Shared middleware factory used by both apps' middleware.ts. Refreshes the
@@ -15,8 +16,8 @@ export function createAuthMiddleware(options?: { allowedRoles?: Role[]; signInPa
     let response = NextResponse.next({ request });
 
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      authSupabaseUrl(),
+      authSupabasePublishableKey(),
       {
         cookies: {
           getAll() {
@@ -42,11 +43,14 @@ export function createAuthMiddleware(options?: { allowedRoles?: Role[]; signInPa
       return NextResponse.redirect(url);
     }
 
-    // Role check happens against the `users` table (public schema), synced
-    // from auth.users — see packages/database/prisma/sql/sync_user.sql.
-    // Fetched here via a lightweight REST call rather than Prisma, since
-    // this factory is shared code and Prisma's client isn't meant to run
-    // outside a Node.js server process.
+    // Role check happens against the `users` table (public schema) in *this
+    // app's auth project*, synced from that project's auth.users by a trigger
+    // — see packages/database/prisma/sql/sync_user.sql (storefront project)
+    // and sync_staff.sql (the admin-only project). Fetched here via a
+    // lightweight REST call rather than Prisma, since this factory is shared
+    // code and Prisma's client isn't meant to run outside a Node.js server
+    // process (and, for apps/admin, points at the storefront DB, not the
+    // auth project).
     if (options?.allowedRoles?.length) {
       const { data: profile } = await supabase.from("users").select("role").eq("id", user.id).single();
       if (!profile || !options.allowedRoles.includes(profile.role as Role)) {

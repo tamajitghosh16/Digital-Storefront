@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma, type Prisma } from "@repo/database";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
 import { getProductLineConfig, lineBasePath } from "./product-line-config";
 import { simpleProductFormSchema, type SimpleProductFormValues } from "./schema";
@@ -58,7 +58,7 @@ function toProductData(slug: string, raw: SimpleProductFormValues) {
 }
 
 export async function createLineProduct(slug: string, formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const base = lineBasePath(slug);
@@ -73,6 +73,7 @@ export async function createLineProduct(slug: string, formData: FormData) {
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: "product.created",
       entity: "Product",
       entityId: product.id,
@@ -85,7 +86,7 @@ export async function createLineProduct(slug: string, formData: FormData) {
 }
 
 export async function updateLineProduct(slug: string, id: string, formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const base = lineBasePath(slug);
@@ -104,6 +105,7 @@ export async function updateLineProduct(slug: string, id: string, formData: Form
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: "product.updated",
       entity: "Product",
       entityId: id,
@@ -117,7 +119,7 @@ export async function updateLineProduct(slug: string, id: string, formData: Form
 }
 
 export async function toggleLineProductPublished(slug: string, id: string) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const existing = await prisma.product.findUniqueOrThrow({ where: { id } });
@@ -131,6 +133,7 @@ export async function toggleLineProductPublished(slug: string, id: string) {
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: nextPublished ? "product.published" : "product.unpublished",
       entity: "Product",
       entityId: id,

@@ -22,7 +22,13 @@ npm run typecheck
 **Audience: Guests, Readers, and Self-Publishing Authors.** Unlike
 `apps/admin`, this app is intentionally mostly public — `proxy.ts`
 only guards `/account/**` and `/self-publishing/wizard/**` (see its
-`matcher`), and applies no role restriction beyond "signed in." Role-
+`matcher`), and applies no role restriction beyond "signed in."
+
+**Auth = the storefront Supabase project.** This app never sets
+`NEXT_PUBLIC_AUTH_SUPABASE_*`, so `packages/auth` falls back to
+`NEXT_PUBLIC_SUPABASE_*` and authenticates against the same project that
+holds the shared Postgres. `apps/admin` uses a separate auth project (root
+`CLAUDE.md`); customer accounts created here can't reach the back office. Role-
 specific areas (like the publishing dashboard) enforce their own check in
 the page/layout itself.
 

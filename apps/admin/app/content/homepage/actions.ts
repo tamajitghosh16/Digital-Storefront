@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { CONTENT_ENTRIES, prisma, type Prisma } from "@repo/database";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CONTENT_WRITE_ROLES } from "@repo/auth/roles";
 
 /**
@@ -19,7 +19,7 @@ import { assertRole, CONTENT_WRITE_ROLES } from "@repo/auth/roles";
  * release reaches anyone who never overrode that field.
  */
 export async function updateHomepageContent(formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CONTENT_WRITE_ROLES);
 
   const overrides: { key: string; value: string }[] = [];
@@ -50,6 +50,7 @@ export async function updateHomepageContent(formData: FormData) {
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: "content.updated",
       entity: "ContentBlock",
       entityId: "homepage",

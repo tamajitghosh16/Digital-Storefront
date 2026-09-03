@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { PRICING_SETTINGS_ID, prisma, type Prisma } from "@repo/database";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
 import {
   classSetTierFormSchema,
@@ -24,14 +24,19 @@ function back(error?: string): never {
 }
 
 async function requirePricingWriter() {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
   return user!;
 }
 
-async function audit(actorId: string, action: string, entityId: string, diff: Prisma.InputJsonValue) {
+async function audit(
+  actor: { id: string; email: string },
+  action: string,
+  entityId: string,
+  diff: Prisma.InputJsonValue
+) {
   await prisma.auditLog.create({
-    data: { actorId, action, entity: "Pricing", entityId, diff },
+    data: { actorId: actor.id, actorEmail: actor.email, action, entity: "Pricing", entityId, diff },
   });
 }
 
@@ -61,7 +66,7 @@ export async function updatePricingSettings(formData: FormData) {
     create: { id: PRICING_SETTINGS_ID, ...data },
   });
 
-  await audit(user.id, "pricing.settings_updated", PRICING_SETTINGS_ID, data);
+  await audit(user, "pricing.settings_updated", PRICING_SETTINGS_ID, data);
 
   revalidatePath("/settings/pricing");
   back();
@@ -85,7 +90,7 @@ export async function saveClassSetTier(formData: FormData) {
     create: { quantity, discountBps },
   });
 
-  await audit(user.id, "pricing.tier_saved", String(quantity), { quantity, discountBps });
+  await audit(user, "pricing.tier_saved", String(quantity), { quantity, discountBps });
 
   revalidatePath("/settings/pricing");
   back();
@@ -95,7 +100,7 @@ export async function deleteClassSetTier(id: string) {
   const user = await requirePricingWriter();
 
   const tier = await prisma.classSetTier.delete({ where: { id } });
-  await audit(user.id, "pricing.tier_deleted", String(tier.quantity), { quantity: tier.quantity });
+  await audit(user, "pricing.tier_deleted", String(tier.quantity), { quantity: tier.quantity });
 
   revalidatePath("/settings/pricing");
 }
@@ -118,7 +123,7 @@ export async function createDiscountCode(formData: FormData) {
     data: { code: normalised, rateBps: toBps(rate), blurb: blurb ?? null },
   });
 
-  await audit(user.id, "pricing.code_created", normalised, { code: normalised, rateBps: toBps(rate) });
+  await audit(user, "pricing.code_created", normalised, { code: normalised, rateBps: toBps(rate) });
 
   revalidatePath("/settings/pricing");
   back();
@@ -130,7 +135,7 @@ export async function toggleDiscountCode(id: string) {
   const existing = await prisma.discountCode.findUniqueOrThrow({ where: { id } });
   await prisma.discountCode.update({ where: { id }, data: { isActive: !existing.isActive } });
 
-  await audit(user.id, "pricing.code_toggled", existing.code, { isActive: !existing.isActive });
+  await audit(user, "pricing.code_toggled", existing.code, { isActive: !existing.isActive });
 
   revalidatePath("/settings/pricing");
 }
@@ -139,7 +144,7 @@ export async function deleteDiscountCode(id: string) {
   const user = await requirePricingWriter();
 
   const code = await prisma.discountCode.delete({ where: { id } });
-  await audit(user.id, "pricing.code_deleted", code.code, { code: code.code });
+  await audit(user, "pricing.code_deleted", code.code, { code: code.code });
 
   revalidatePath("/settings/pricing");
 }

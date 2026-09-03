@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma, type Prisma } from "@repo/database";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
 import { vendorFormSchema, type VendorFormValues } from "./schema";
 
@@ -24,7 +24,7 @@ function toVendorData(raw: VendorFormValues) {
 }
 
 export async function createVendor(formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const parsed = vendorFormSchema.safeParse(Object.fromEntries(formData));
@@ -37,6 +37,7 @@ export async function createVendor(formData: FormData) {
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: "vendor.created",
       entity: "Vendor",
       entityId: vendor.id,
@@ -49,7 +50,7 @@ export async function createVendor(formData: FormData) {
 }
 
 export async function updateVendor(id: string, formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const parsed = vendorFormSchema.safeParse(Object.fromEntries(formData));
@@ -62,6 +63,7 @@ export async function updateVendor(id: string, formData: FormData) {
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: "vendor.updated",
       entity: "Vendor",
       entityId: id,
@@ -77,7 +79,7 @@ export async function updateVendor(id: string, formData: FormData) {
 // Soft-deactivate rather than delete — purchase orders reference vendorId,
 // and existing orders should stay readable even once a vendor is retired.
 export async function toggleVendorActive(id: string) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const existing = await prisma.vendor.findUniqueOrThrow({ where: { id } });
@@ -88,6 +90,7 @@ export async function toggleVendorActive(id: string) {
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: nextActive ? "vendor.activated" : "vendor.deactivated",
       entity: "Vendor",
       entityId: id,

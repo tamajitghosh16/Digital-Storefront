@@ -74,9 +74,9 @@ later is a real cost.
 
 1. **GitHub** — organization + this repo, private.
 2. **Vercel** — team account linked to the GitHub org; two projects (`web`, `admin`) once the repo is pushed.
-3. **Supabase** — one project (gives you Postgres + Auth together). Grab, from Project Settings:
-   - API → `Project URL`, `anon public` key, `service_role` key (admin app only, never expose to the browser)
-   - Database → pooled connection string (`DATABASE_URL`) and direct connection string (`DIRECT_URL`)
+3. **Supabase** — **two** projects:
+   - *Storefront* project (Postgres + customer Auth). From Project Settings: API → `Project URL`, `anon public` key, `service_role` key; Database → pooled `DATABASE_URL` and direct `DIRECT_URL`.
+   - *Admin auth* project — authentication for `apps/admin` only, so staff identities can't be created by the storefront's public signup. Run `docs/setup/admin-auth-project.sh` for the guided setup (creates the project's `users` table via `sync_staff.sql`, disables sign-ups, creates the Owner). `apps/admin` still uses the storefront project's Postgres and Storage.
 4. **Razorpay** — business account (test mode keys are enough to start); note the Key ID/Secret and set up a webhook once you have a deploy URL.
 5. **Resend** — account + a verified sending domain (or use their sandbox domain while testing).
 6. **Domain/DNS** — registrar account under the Publisher's org, if not already owned.
@@ -86,15 +86,21 @@ later is a real cost.
 ```bash
 npm install                                     # from the repo root — links all workspace packages
 cp apps/web/.env.example apps/web/.env.local     # fill in with the values gathered above
-cp apps/admin/.env.example apps/admin/.env.local # admin's template omits web-only vars (e.g. NEXT_PUBLIC_RAZORPAY_KEY_ID) and vice versa (SUPABASE_SERVICE_ROLE_KEY)
+cp apps/admin/.env.example apps/admin/.env.local # admin's template differs: no web-only vars (e.g. NEXT_PUBLIC_RAZORPAY_KEY_ID), plus its own NEXT_PUBLIC_AUTH_SUPABASE_* (separate auth project) and SUPABASE_SERVICE_ROLE_KEY
 cp packages/database/.env.example packages/database/.env # DATABASE_URL/DIRECT_URL, read by the Prisma CLI directly
 
 npm run db:generate                   # generate the Prisma client
-npm run db:migrate                    # create tables in your Supabase project
-# then, in the Supabase SQL editor, run:
+npm run db:migrate                    # create tables in the storefront Supabase project
+# then, in the STOREFRONT project's SQL editor, run:
 #   packages/database/prisma/sql/sync_user.sql
 # (keeps public.users in sync with Supabase's auth.users, and sets up the
 # starter Row-Level Security policies)
+#
+# and set up the separate ADMIN AUTH project (guided):
+bash docs/setup/admin-auth-project.sh
+# (creates its users table via sync_staff.sql, disables sign-ups, creates
+# the Owner, and prints the NEXT_PUBLIC_AUTH_SUPABASE_* values for
+# apps/admin/.env.local)
 
 npm run seed --workspace=@repo/database   # optional: adds 3 sample products
 
@@ -107,7 +113,7 @@ npm run dev                           # runs both apps via Turborepo
 
 **Real / working today:**
 - Prisma schema — every entity from the BRD's Data Model Overview, with enums, indexes, and relations.
-- `packages/auth` — actual Supabase SSR client setup (server + browser) and a reusable middleware factory with role-gating.
+- `packages/auth` — actual Supabase SSR client setup (server + browser) and a reusable middleware factory with role-gating. `apps/web` and `apps/admin` authenticate against **separate Supabase projects** (`packages/auth/src/env.ts`); a storefront customer account can't reach the back office.
 - `packages/payments` — real Razorpay order creation, payment signature verification, and webhook signature verification.
 - The Razorpay webhook route (`apps/web/app/api/webhooks/razorpay/route.ts`) — marks orders PAID and fires the `order/confirmed` Inngest event on `payment.captured`.
 - `packages/jobs` — a working Inngest client with 3 functions wired to `apps/web/app/api/inngest/route.ts`.
@@ -133,7 +139,7 @@ npm run dev                           # runs both apps via Turborepo
 
 Matches the roadmap in the Technical Design Document, Section 9:
 
-1. Finish auth end-to-end (sign-in/sign-up UI, session on both apps, confirm `sync_user.sql` trigger fires).
+1. Finish auth end-to-end (sign-in/sign-up UI, session on both apps, confirm `sync_user.sql` fires on the storefront project and `sync_staff.sql` on the admin auth project). The "revamped admin auth" work (MFA, `settings/roles` staff management) also lands here.
 2. Add-to-cart + checkout Server Action + Razorpay Checkout on the client; confirm the webhook flips an order to PAID.
 3. ~~Admin catalogue CRUD~~ — done; admin is now the CMS for the whole storefront (site settings, nav, hero, every homepage heading and description, FAQs, testimonials, and pricing), with cover-image upload built into the catalogue form.
 4. Self-publishing wizard (steps 1–6), file upload + malware scan pipeline.

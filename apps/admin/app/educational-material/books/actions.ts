@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma, type Prisma, type BookFormat, type ProductType, type ProductLine } from "@repo/database";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
 import { productFormSchema, type ProductFormValues } from "./schema";
 
@@ -58,7 +58,7 @@ function toProductData(raw: ProductFormValues) {
 
 // FR-11.1: create a catalogue item (book, e-book, or service package).
 export async function createProduct(formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const parsed = productFormSchema.safeParse(Object.fromEntries(formData));
@@ -72,7 +72,7 @@ export async function createProduct(formData: FormData) {
   await prisma.auditLog.create({
     // Log the submitted form values, not `data` — the latter includes a
     // Date (publishedAt), and AuditLog.diff is a plain Json column.
-    data: { actorId: user!.id, action: "product.created", entity: "Product", entityId: product.id, diff: parsed.data as Prisma.InputJsonValue },
+    data: { actorId: user!.id, actorEmail: user!.email, action: "product.created", entity: "Product", entityId: product.id, diff: parsed.data as Prisma.InputJsonValue },
   });
 
   revalidatePath("/educational-material/books");
@@ -81,7 +81,7 @@ export async function createProduct(formData: FormData) {
 
 // FR-11.1: edit an existing catalogue item.
 export async function updateProduct(id: string, formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const parsed = productFormSchema.safeParse(Object.fromEntries(formData));
@@ -97,7 +97,7 @@ export async function updateProduct(id: string, formData: FormData) {
   await prisma.product.update({ where: { id }, data });
 
   await prisma.auditLog.create({
-    data: { actorId: user!.id, action: "product.updated", entity: "Product", entityId: id, diff: parsed.data as Prisma.InputJsonValue },
+    data: { actorId: user!.id, actorEmail: user!.email, action: "product.updated", entity: "Product", entityId: id, diff: parsed.data as Prisma.InputJsonValue },
   });
 
   revalidatePath("/educational-material/books");
@@ -108,7 +108,7 @@ export async function updateProduct(id: string, formData: FormData) {
 // Quick publish/unpublish toggle from the catalogue list — flips whatever
 // the current DB state is, so it can't go stale between page load and click.
 export async function toggleProductPublished(id: string) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const existing = await prisma.product.findUniqueOrThrow({ where: { id } });
@@ -122,6 +122,7 @@ export async function toggleProductPublished(id: string) {
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: nextPublished ? "product.published" : "product.unpublished",
       entity: "Product",
       entityId: id,

@@ -3,14 +3,14 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma, SITE_SETTINGS_ID, type Prisma } from "@repo/database";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CONTENT_WRITE_ROLES } from "@repo/auth/roles";
 import { siteSettingsFormSchema } from "./schema";
 
 // FR-11.1-adjacent: the one screen that controls apps/web's global branding,
 // default SEO metadata, and contact/social info (rendered in its root layout).
 export async function updateSiteSettings(formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CONTENT_WRITE_ROLES);
 
   const parsed = siteSettingsFormSchema.safeParse(Object.fromEntries(formData));
@@ -41,6 +41,7 @@ export async function updateSiteSettings(formData: FormData) {
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: "site_settings.updated",
       entity: "SiteSettings",
       entityId: SITE_SETTINGS_ID,

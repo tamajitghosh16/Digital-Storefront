@@ -51,6 +51,19 @@ Unlike `apps/web`, `proxy.ts` here locks every route to
 by default; the `matcher` excludes only `/sign-in`, `/unauthorized`, and
 static assets. There's no "public" area in this app.
 
+**This app authenticates against its own Supabase project, not the
+storefront's** (`NEXT_PUBLIC_AUTH_SUPABASE_*` — see the root `CLAUDE.md` auth
+section and `packages/auth/src/env.ts`). A storefront customer identity
+cannot sign in here; there is no sign-up path and email sign-ups are
+disabled on the project itself. Only auth moves: `DATABASE_URL` is still the
+shared storefront Postgres, and `NEXT_PUBLIC_SUPABASE_URL` /
+`SUPABASE_SERVICE_ROLE_KEY` still target the storefront project for
+`packages/storage` image uploads. Because the staff UID has no row in the
+storefront DB, staff role/profile is read over Supabase REST via
+`getCurrentStaff()` (`packages/auth/src/server.ts`), not Prisma — use that,
+never `getCurrentUser()`, in this app. Setup: `docs/setup/admin-auth-project.sh`
++ `packages/database/prisma/sql/sync_staff.sql`.
+
 **Owner-only pages are not further restricted by middleware.**
 `app/settings/roles/page.tsx`, for example, is reachable by any admin role
 at the middleware layer — Owner-only-ness comes entirely from an explicit
@@ -58,38 +71,46 @@ at the middleware layer — Owner-only-ness comes entirely from an explicit
 assume a page under this app is Owner-only just because it looks
 sensitive; check for an explicit `assertRole` call.
 
-**Staff access is Owner-granted, not self-service — designed, not yet
-built.** There's no sign-up path into staff roles; every `SUPPORT` /
-`EDITOR` account exists because the Owner put it there from
-`settings/roles`. The intended flow, once `settings/roles` grows its
-Server Actions:
-- **Invite new staff:** Owner enters an email + role (`SUPPORT` or
-  `EDITOR`; granting `OWNER` is a separate, more deliberate action — see
-  below). The action `assertRole(role, OWNER_ONLY_ROLES)`, then calls
-  Supabase's admin API, `auth.admin.inviteUserByEmail(email, { data: {
-  role } })` — this requires `SUPABASE_SERVICE_ROLE_KEY`, which is why
-  invites can only be sent from `apps/admin`, never `apps/web`. Supabase
-  emails the invite; the person sets a password and is signed in.
-  `sync_user.sql`'s trigger needs a matching change before this works —
-  it currently hardcodes new rows to `'READER'` — to instead insert
-  `coalesce(new.raw_user_meta_data->>'role', 'READER')`, so an invited
-  staff member lands in `public.users` with the role the Owner chose
-  instead of being created as `READER` and needing a second step.
-- **Promote an existing account:** if the person already has a `READER`
-  (or `SELF_PUB_AUTHOR`) account, the Owner looks them up by email on the
-  same page and sets a role directly — a plain `prisma.user.update`,
-  no Supabase Admin API call needed since `sync_user.sql`'s trigger only
-  ever touches `email`/`updatedAt` on conflict, never `role`, so an
-  app-side role change is never clobbered by a later auth.users sync.
-- **Change or revoke a role:** same update path, moving someone back to
-  `READER` removes their `ADMIN_ROLES` membership and locks them out of
-  `apps/admin` at the next middleware check. The action must refuse a
-  change that would leave zero `OWNER` accounts — that's the one guard
-  beyond `assertRole` this page needs, since nothing else in the schema
-  prevents a publisher from locking themselves out.
-- Every one of these writes an `AuditLog` row, same as the catalogue/CMS
-  actions — who has staff access is exactly the kind of change that
-  needs a paper trail.
+**Staff access is Owner-granted, not self-service — now built.** There's no
+public sign-up path into staff roles; every account exists because the Owner
+invited it. `app/settings/roles` is the UI:
+
+- **Add new Staff** (`inviteStaff` in `app/settings/roles/actions.ts`,
+  `OWNER_ONLY_ROLES`): Owner enters a name + email; a `StaffInvite` row
+  (`packages/database`, storefront DB) is created with a SHA-256 of a random
+  token and a 1-hour `expiresAt`, and `@repo/email`'s `sendStaffInvite()`
+  emails the `/join/<token>` link.
+- **`/join/[token]`** (`app/join/[token]`, excluded from `proxy.ts`'s auth
+  matcher and from the app-shell chrome): the only route the sign-up form
+  lives at — no `/sign-up` exists. Validates the token hash + expiry + unused
+  flag, then `acceptStaffInvite` creates the auth identity in the admin auth
+  project via `createStaffAuthUser()` (`packages/auth/src/server.ts`), burns
+  the invite, and redirects to `/sign-in`. New accounts land as `READER`.
+- **Role change** (`changeStaffRole`, `OWNER_ONLY_ROLES`): the per-row
+  dropdown on `app/settings/roles`. Service-role write to the admin auth
+  project's `users.role` via `setStaffRole()`; refuses a change that would
+  leave zero `OWNER`s.
+- **Cancel / Resend** a pending invite: `cancelStaffInvite` /
+  `resendStaffInvite` (resend re-issues a fresh token + 1-hour window).
+- Every one of these writes an `AuditLog` row (storefront DB), same as the
+  catalogue/CMS actions.
+
+Needs `AUTH_SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` + `EMAIL_FROM`, and
+`NEXT_PUBLIC_ADMIN_URL` (see `.env.example`), plus the `staff_invites`
+migration applied to the storefront DB. `sync_staff.sql`'s trigger still
+seeds new rows as `READER` — the invite flow relies on that and promotes
+afterwards, so no trigger change is needed.
+
+How the built flow differs from an earlier sketch you may see referenced
+elsewhere: it does **not** use Supabase's `inviteUserByEmail` (that mails a
+Supabase-hosted link and needs SMTP configured on the auth project) — the
+invite email is ours, via Resend, pointing at our own `/join/<token>` page,
+and the auth identity is created only when the person submits a password
+there. The Owner does **not** pick a role at invite time; everyone starts
+`READER` and is promoted from the same screen afterwards. The
+`sync_staff.sql` trigger is unchanged (still seeds `READER`), and
+`setStaffRole()` writes `role` directly — the trigger never touches `role`
+on conflict, so a later `auth.users` sync won't clobber it.
 
 **Route map (all under `app/`):** `educational-material/books`
 (product/inventory CMS — despite the path, this manages every product type,
@@ -202,10 +223,7 @@ Blob, and the scan behind it is still a stub that always returns
 route so a missing config falls back to "paste a URL" instead of throwing.
 
 **Still read-only stubs:** `orders`, `submissions`, `royalties`, `reviews`,
-`analytics`, `settings/roles` — these still do a direct read-only Prisma
-query with no create/update forms or status-change actions wired up yet
-(see the root README's "What's real vs. what's a stub" list).
-`settings/roles` is the one with its target design already written down —
-see "Staff access is Owner-granted" above — so building it is a matter of
-adding the two Server Actions and the `sync_user.sql` trigger change, not
-inventing the flow from scratch.
+`analytics` — these still do a direct read-only Prisma query with no
+create/update forms or status-change actions wired up yet (see the root
+README's "What's real vs. what's a stub" list). `settings/roles` is now
+fully wired — see "Staff access is Owner-granted" above.

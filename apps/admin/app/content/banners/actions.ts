@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import type { z } from "zod";
 import { Prisma, prisma } from "@repo/database";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CONTENT_WRITE_ROLES } from "@repo/auth/roles";
 import { bannerFormSchema } from "./schema";
 
@@ -24,7 +24,7 @@ function toBannerData(raw: z.infer<typeof bannerFormSchema>) {
 }
 
 export async function createBanner(formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CONTENT_WRITE_ROLES);
 
   const parsed = bannerFormSchema.safeParse(Object.fromEntries(formData));
@@ -36,7 +36,7 @@ export async function createBanner(formData: FormData) {
   const banner = await prisma.banner.create({ data });
 
   await prisma.auditLog.create({
-    data: { actorId: user!.id, action: "banner.created", entity: "Banner", entityId: banner.id, diff: data as Prisma.InputJsonValue },
+    data: { actorId: user!.id, actorEmail: user!.email, action: "banner.created", entity: "Banner", entityId: banner.id, diff: data as Prisma.InputJsonValue },
   });
 
   revalidatePath("/content/banners");
@@ -44,7 +44,7 @@ export async function createBanner(formData: FormData) {
 }
 
 export async function updateBanner(id: string, formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CONTENT_WRITE_ROLES);
 
   const parsed = bannerFormSchema.safeParse(Object.fromEntries(formData));
@@ -56,7 +56,7 @@ export async function updateBanner(id: string, formData: FormData) {
   await prisma.banner.update({ where: { id }, data });
 
   await prisma.auditLog.create({
-    data: { actorId: user!.id, action: "banner.updated", entity: "Banner", entityId: id, diff: data as Prisma.InputJsonValue },
+    data: { actorId: user!.id, actorEmail: user!.email, action: "banner.updated", entity: "Banner", entityId: id, diff: data as Prisma.InputJsonValue },
   });
 
   revalidatePath("/content/banners");
@@ -65,27 +65,27 @@ export async function updateBanner(id: string, formData: FormData) {
 }
 
 export async function toggleBannerActive(id: string) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CONTENT_WRITE_ROLES);
 
   const existing = await prisma.banner.findUniqueOrThrow({ where: { id } });
   await prisma.banner.update({ where: { id }, data: { isActive: !existing.isActive } });
 
   await prisma.auditLog.create({
-    data: { actorId: user!.id, action: "banner.toggled", entity: "Banner", entityId: id, diff: { isActive: !existing.isActive } },
+    data: { actorId: user!.id, actorEmail: user!.email, action: "banner.toggled", entity: "Banner", entityId: id, diff: { isActive: !existing.isActive } },
   });
 
   revalidatePath("/content/banners");
 }
 
 export async function deleteBanner(id: string) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CONTENT_WRITE_ROLES);
 
   await prisma.banner.delete({ where: { id } });
 
   await prisma.auditLog.create({
-    data: { actorId: user!.id, action: "banner.deleted", entity: "Banner", entityId: id, diff: Prisma.JsonNull },
+    data: { actorId: user!.id, actorEmail: user!.email, action: "banner.deleted", entity: "Banner", entityId: id, diff: Prisma.JsonNull },
   });
 
   revalidatePath("/content/banners");

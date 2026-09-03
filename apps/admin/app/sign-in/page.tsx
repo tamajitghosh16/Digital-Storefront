@@ -6,13 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@repo/auth/client";
 import { buttonClass, ErrorBanner, TextField } from "@/components/ui";
 
-// Staff sign-in — same Supabase Auth instance as apps/web (Technical Design
-// Document, Section 3.3: a staff member's identity can be shared across
-// both apps if they're also a storefront customer).
+// Staff sign-in — authenticates against apps/admin's OWN dedicated Supabase
+// project (NEXT_PUBLIC_AUTH_SUPABASE_*, resolved in packages/auth), separate
+// from the storefront's. A storefront customer account cannot sign in here:
+// that identity simply doesn't exist in this project.
 //
 // No sign-up here, by design (see apps/admin/CLAUDE.md, "Staff access is
 // Owner-granted, not self-service"): every staff account is created by an
-// Owner from Staff & roles, never by someone showing up at this form.
+// Owner from Staff & roles, never by someone showing up at this form. Email
+// sign-ups are also disabled on the auth project itself.
 
 function SignInForm() {
   const router = useRouter();

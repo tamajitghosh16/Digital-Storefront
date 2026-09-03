@@ -152,16 +152,40 @@ redirect, not a security boundary) and again inside every Server Action via
 `assertRole()` from `packages/auth/src/roles.ts`. Never rely on proxy
 alone to protect a mutation.
 
-`public.users` is kept in sync with Supabase's own `auth.users` table by a
-Postgres trigger in `packages/database/prisma/sql/sync_user.sql` — this has
-to be run manually in the Supabase SQL editor, since Prisma doesn't manage
-the `auth` schema. That same file defines the starter Row-Level Security
-policies (a database-level backstop behind the app-level role checks).
-Everyone lands in `public.users` as `READER` by default — nobody signs up
-directly into a staff role. `apps/admin` is the only place `SUPPORT`/
-`EDITOR`/`OWNER` gets assigned, and only the Owner can do it; see "Staff
-access is Owner-granted" in `apps/admin/CLAUDE.md` for the invite/promote/
-revoke design (not yet built — `settings/roles` is still read-only).
+**The two apps authenticate against two separate Supabase projects.** A
+storefront customer signs up worldwide and self-service; a staff account
+must be impossible to create that way, so `apps/admin` points its auth at
+its **own** Supabase project — `NEXT_PUBLIC_AUTH_SUPABASE_URL` /
+`NEXT_PUBLIC_AUTH_SUPABASE_PUBLISHABLE_KEY` (resolved in
+`packages/auth/src/env.ts`, falling back to `NEXT_PUBLIC_SUPABASE_*` when
+unset, which is how `apps/web` keeps using the storefront project). Only
+`apps/admin`'s *auth endpoint* moves: its `DATABASE_URL` still points at
+the shared storefront Postgres for all business/CMS data, and its
+`NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` still point at the
+storefront project for `packages/storage` image uploads. Setup for the
+admin project lives in `docs/setup/admin-auth-project.sh` (wizard) +
+`packages/database/prisma/sql/sync_staff.sql`.
+
+Each project keeps its own `public.users` in sync with its `auth.users` via
+a Postgres trigger run manually in that project's SQL editor (Prisma
+doesn't manage the `auth` schema): `sync_user.sql` for the storefront
+project (also defines the starter RLS policies), `sync_staff.sql` for the
+admin project (a trimmed `users` table + trigger + self-read RLS — that
+project has no other Prisma-managed schema). Everyone lands as `READER` by
+default in both — nobody signs up into a staff role, and a `READER` row in
+the admin project still can't pass `createAuthMiddleware`'s `ADMIN_ROLES`
+gate. `apps/web` reads a customer's role/profile with Prisma
+(`getCurrentUser()`); `apps/admin` reads a staff member's role from its
+auth project over Supabase REST (`getCurrentStaff()` and the middleware
+role check) because its Prisma client can't see that project's DB.
+`apps/admin` is the only place `SUPPORT`/`EDITOR`/`OWNER` is assigned, and
+only the Owner can do it; see "Staff access is Owner-granted" in
+`apps/admin/CLAUDE.md` for the invite/promote/revoke design (not yet built
+— `settings/roles` is still read-only).
+
+**`AuditLog.actorId` is a bare `@db.Uuid`, not an FK.** It holds a staff
+UID from the admin auth project, which has no row in the storefront
+`users` table; `actorEmail` is denormalised next to it for legibility.
 
 **Payments run through `packages/payments` (Razorpay).** Order status is
 only ever flipped to `PAID` by the signature-verified webhook at

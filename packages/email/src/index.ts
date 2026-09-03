@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { OrderConfirmation } from "./templates/OrderConfirmation";
 import { ProjectStatusChanged } from "./templates/ProjectStatusChanged";
+import { StaffInvite } from "./templates/StaffInvite";
 
 // Built lazily, not at module load — Resend's constructor throws
 // synchronously if no API key is available (env or arg), and this module is
@@ -36,6 +37,21 @@ export async function sendProjectStatusChanged(params: { to: string; bookTitle: 
     to: params.to,
     subject: `Your project "${params.bookTitle}" is now ${params.status}`,
     react: ProjectStatusChanged(params),
+  });
+}
+
+export async function sendStaffInvite(params: {
+  to: string;
+  name: string;
+  inviteUrl: string;
+  invitedByEmail: string;
+  expiresInMinutes: number;
+}) {
+  return getResendClient().emails.send({
+    from: FROM,
+    to: params.to,
+    subject: "Your invitation to the Book Press back office",
+    react: StaffInvite(params),
   });
 }
 

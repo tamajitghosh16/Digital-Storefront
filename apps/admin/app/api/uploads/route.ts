@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { CATALOGUE_WRITE_ROLES, CONTENT_WRITE_ROLES } from "@repo/auth/roles";
 import { uploadImage, isImageUploadConfigured } from "@repo/storage";
 
@@ -51,7 +51,7 @@ function fail(message: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   // Either write role may upload — catalogue editors need covers, content
   // editors need banner art, and today both resolve to EDITOR/OWNER.
   const allowed = [...new Set([...CATALOGUE_WRITE_ROLES, ...CONTENT_WRITE_ROLES])];

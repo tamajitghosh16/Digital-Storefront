@@ -11,6 +11,7 @@ export type InventoryCategory = MenuCategory & { products: MenuProduct[] };
 
 /** Routes reachable with no session, or without a completed session — no dock, no topbar. */
 const NO_CHROME_ROUTES = ["/sign-in", "/forgot-password", "/reset-password", "/unauthorized"];
+const NO_CHROME_PREFIXES = ["/join/"]; // hashed staff sign-up link
 
 const STOREFRONT_URL = process.env.NEXT_PUBLIC_STOREFRONT_URL ?? "http://localhost:3000";
 
@@ -76,7 +77,7 @@ export function AppShell({
   const sidebarWidth = useSyncExternalStore(subscribeSidebarWidth, getSidebarWidth, getServerSidebarWidth);
   const handleWidthChange = useCallback((width: number) => setSidebarWidth(width), []);
 
-  if (NO_CHROME_ROUTES.includes(pathname)) {
+  if (NO_CHROME_ROUTES.includes(pathname) || NO_CHROME_PREFIXES.some((p) => pathname.startsWith(p))) {
     return <main className="min-h-screen">{children}</main>;
   }
 

@@ -3,14 +3,14 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma, type Prisma } from "@repo/database";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
 import { purchaseOrderFormSchema } from "./schema";
 
 // FR: raise a purchase order against a vendor — goes straight to SENT since
 // there's no separate draft/send step in this form.
 export async function createPurchaseOrder(formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const parsed = purchaseOrderFormSchema.safeParse(Object.fromEntries(formData));
@@ -41,6 +41,7 @@ export async function createPurchaseOrder(formData: FormData) {
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: "purchase_order.created",
       entity: "PurchaseOrder",
       entityId: po.id,
@@ -56,7 +57,7 @@ export async function createPurchaseOrder(formData: FormData) {
 // quantity (not a delta) — the detail page pre-fills it with the current
 // value, so only rows the operator actually edits produce a stock change.
 export async function receivePurchaseOrderItems(id: string, formData: FormData) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const po = await prisma.purchaseOrder.findUniqueOrThrow({ where: { id }, include: { items: true } });
@@ -100,6 +101,7 @@ export async function receivePurchaseOrderItems(id: string, formData: FormData) 
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: "purchase_order.items_received",
       entity: "PurchaseOrder",
       entityId: id,
@@ -113,7 +115,7 @@ export async function receivePurchaseOrderItems(id: string, formData: FormData) 
 }
 
 export async function cancelPurchaseOrder(id: string) {
-  const user = await getCurrentUser();
+  const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const existing = await prisma.purchaseOrder.findUniqueOrThrow({ where: { id } });
@@ -126,6 +128,7 @@ export async function cancelPurchaseOrder(id: string) {
   await prisma.auditLog.create({
     data: {
       actorId: user!.id,
+      actorEmail: user!.email,
       action: "purchase_order.cancelled",
       entity: "PurchaseOrder",
       entityId: id,

@@ -26,6 +26,13 @@ export interface FixedDepartmentProduct {
 }
 
 export interface FixedDepartment {
+  /**
+   * Stable slug shared with apps/web. `app/menu/categories` writes it to a
+   * `DepartmentVisibility` row to hide the department from the storefront
+   * menu, and apps/web's `buildDepartments()` filters on the same value —
+   * keep the two lists of keys in sync if either changes.
+   */
+  key: string;
   label: string;
   /** Storefront path the department name links to (its first product line). */
   href: string;
@@ -34,6 +41,7 @@ export interface FixedDepartment {
 
 export const FIXED_DEPARTMENTS: FixedDepartment[] = [
   {
+    key: "educational-materials",
     label: "Educational Materials",
     href: "/educational-material/books",
     products: [
@@ -60,6 +68,7 @@ export const FIXED_DEPARTMENTS: FixedDepartment[] = [
     ],
   },
   {
+    key: "professional-materials",
     label: "Professional Materials",
     href: "/advocate-diary",
     products: [
@@ -71,6 +80,7 @@ export const FIXED_DEPARTMENTS: FixedDepartment[] = [
     ],
   },
   {
+    key: "digital-tech-solutions",
     label: "Digital & Tech Solutions",
     href: "/naya-bandhu",
     products: [
@@ -79,6 +89,7 @@ export const FIXED_DEPARTMENTS: FixedDepartment[] = [
     ],
   },
   {
+    key: "services",
     label: "Services",
     href: "/self-publishing",
     products: [
@@ -87,6 +98,7 @@ export const FIXED_DEPARTMENTS: FixedDepartment[] = [
     ],
   },
   {
+    key: "lifestyle",
     label: "Lifestyle",
     href: "/indoor-plants",
     products: [

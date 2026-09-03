@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Manrope, Space_Grotesk } from "next/font/google";
-import { getCurrentUser } from "@repo/auth/server";
+import { getCurrentStaff } from "@repo/auth/server";
 import { getSiteSettings, prisma } from "@repo/database";
 import { AppShell } from "@/components/app-shell";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -40,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // reachable with no session and, in the case of a cold environment, no
   // database either.
   const [user, settings, menuCategories] = await Promise.all([
-    getCurrentUser().catch(() => null),
+    getCurrentStaff().catch(() => null),
     getSiteSettings().catch(() => null),
     prisma.menuCategory
       .findMany({

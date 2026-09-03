@@ -157,12 +157,25 @@ export async function buildDepartments(): Promise<Department[]> {
     ],
   }));
 
+  // An operator can hide a built-in department from apps/admin's Menu →
+  // Categories screen; each hidden one has a `DepartmentVisibility` row.
+  // Keys must match `FIXED_DEPARTMENTS` in apps/admin/app/menu/fixed-departments.ts.
+  const hiddenKeys = new Set(
+    (await withFallback(() => prisma.departmentVisibility.findMany({ where: { hidden: true } }), [])).map(
+      (row) => row.key
+    )
+  );
+
+  const fixedDepartments: { key: string; department: Department }[] = [
+    { key: "educational-materials", department: educationalMaterials },
+    { key: "professional-materials", department: professionalMaterials },
+    { key: "digital-tech-solutions", department: digitalAndTech },
+    { key: "services", department: services },
+    { key: "lifestyle", department: lifestyle },
+  ];
+
   return [
-    educationalMaterials,
-    professionalMaterials,
-    digitalAndTech,
-    services,
-    lifestyle,
+    ...fixedDepartments.filter(({ key }) => !hiddenKeys.has(key)).map(({ department }) => department),
     ...adminDepartments,
     allProducts,
   ];

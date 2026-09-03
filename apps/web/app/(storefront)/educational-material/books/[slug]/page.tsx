@@ -82,11 +82,24 @@ export default async function BookDetailPage({ params }: { params: Promise<{ slu
 
   const isEbook = primary.type === "EBOOK";
   const companion = isEbook ? print : ebook;
+
+  // The admin catalogue form and prisma/seed.ts write one row per title —
+  // `bookFormats: [PHYSICAL, EBOOK]` with both `priceCents` and
+  // `ebookPriceCents` on it — not a separate `${base}-ebook` row. (The
+  // bundled sample catalogue still uses two rows, so a real companion row
+  // is honoured too.) When the primary row carries both formats itself, the
+  // other edition's price is its own second price, not a sibling row's.
+  const carriesBothFormats =
+    Boolean(primary.bookFormats?.includes("PHYSICAL")) && Boolean(primary.bookFormats?.includes("EBOOK"));
+  const companionPriceCents =
+    companion?.priceCents ??
+    (carriesBothFormats ? (isEbook ? primary.priceCents : primary.ebookPriceCents ?? undefined) : undefined);
+
   const display = primary as Partial<DisplayProduct>;
 
   return (
     <ProductPage
-      companionPriceCents={companion?.priceCents}
+      companionPriceCents={companionPriceCents}
       related={related}
       pricing={pricing}
       product={

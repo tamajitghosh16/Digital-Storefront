@@ -168,7 +168,6 @@ model User {
   serviceRequests   ServiceRequest[]
   reviews           Review[]
   notifications     Notification[]
-  auditLogEntries   AuditLog[]
 
   @@map("users")
 }
@@ -465,18 +464,52 @@ model Notification {
 /// FR-11.6 / NFR-9: every admin mutation on orders, royalties, and content
 /// is recorded here for audit purposes.
 model AuditLog {
-  id        String   @id @default(cuid())
-  actorId   String   @db.Uuid
-  actor     User     @relation(fields: [actorId], references: [id])
-  action    String   // "order.status_changed", "product.updated", ...
-  entity    String   // "Order", "Product", "SelfPublishingProject", ...
-  entityId  String
-  diff      Json?
-  createdAt DateTime @default(now())
+  id     String @id @default(cuid())
+  // The actor's auth UID. NOT a foreign key: staff authenticate against a
+  // separate Supabase project (see packages/auth) whose UIDs have no row in
+  // this database's `users` table, which holds storefront customers only.
+  // `actorEmail` is denormalised alongside so an entry stays legible without
+  // a cross-project lookup.
+  actorId    String  @db.Uuid
+  actorEmail String?
+  action     String // "order.status_changed", "product.updated", ...
+  entity     String // "Order", "Product", "SelfPublishingProject", ...
+  entityId   String
+  diff       Json?
+  createdAt  DateTime @default(now())
 
   @@index([entity, entityId])
   @@index([actorId])
   @@map("audit_logs")
+}
+
+/// A one-time, time-boxed invitation for a new back-office staff member.
+/// Created by an Owner from apps/admin's Staff & roles screen; consumed once
+/// at `/join/<token>` where the person sets a password. Staff identities
+/// themselves live in the dedicated admin auth Supabase project (see
+/// packages/auth) — this table only governs who may reach the sign-up form
+/// and for how long. `tokenHash` is a SHA-256 of the random token that goes
+/// in the emailed URL; the raw token is never stored, so the link can't be
+/// reconstructed from a database leak. apps/admin-only — no apps/web reads.
+model StaffInvite {
+  id             String    @id @default(cuid())
+  email          String
+  name           String
+  /// SHA-256 (hex) of the raw invite token. The raw token exists only in the
+  /// emailed `/join/<token>` link.
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  /// Set the moment the invite is redeemed; a non-null value makes the link dead.
+  acceptedAt     DateTime?
+  /// Auth UID + email of the Owner who sent the invite (admin auth project —
+  /// no FK, same rationale as AuditLog.actorId).
+  invitedById    String    @db.Uuid
+  invitedByEmail String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([email])
+  @@map("staff_invites")
 }
 
 // ────────────────────────────────────────────────────────────
@@ -611,6 +644,22 @@ model MenuProduct {
 
   @@index([categoryId])
   @@map("menu_products")
+}
+
+/// Visibility overrides for apps/web's hardcoded department-bar entries —
+/// the five fixed business lines in apps/web's navigation.ts, mirrored in
+/// apps/admin's app/menu/fixed-departments.ts. Those aren't `MenuCategory`
+/// rows, so hiding one from the storefront's top menu is recorded here,
+/// keyed by the stable slug both apps agree on (`educational-materials`,
+/// `professional-materials`, `digital-tech-solutions`, `services`,
+/// `lifestyle`). No row = shown (the default); `hidden = true` drops it
+/// from `buildDepartments()`.
+model DepartmentVisibility {
+  key       String   @id
+  hidden    Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  @@map("department_visibility")
 }
 
 /// Header and footer navigation, fully admin-managed (replaces the
