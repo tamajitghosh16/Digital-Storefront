@@ -107,7 +107,28 @@ that show this copy (`TrustBand`, `Newsletter`, `PlanBand`, `Hero`) take
 it as props rather than reaching for it themselves, which keeps them
 usable from `catalog/[slug]` too.
 
-**`app/api/library/[assetId]/route.ts`** checks purchase entitlement and
-the per-asset download-count limit before serving a file, but currently
-redirects to the asset's public Blob path rather than minting a signed,
-expiring URL — that's a known stub, not the intended final behavior (FR-9.1/9.2 in the BRD).
+**`app/api/library/[assetId]/route.ts`** checks purchase entitlement
+(`FileAsset` → product → an `OrderItem` on a `PAID` order owned by the
+caller) and the per-asset download-count limit, increments the count, then
+redirects to the file. For an e-book uploaded from `apps/admin` the stored
+`blobPath` is a **private** Supabase Storage path, so the route mints a
+~5-minute signed URL via `createEbookDownloadUrl()` (`@repo/storage`); a
+legacy/seed row whose `blobPath` is already an `http(s)` URL is redirected
+as-is. Needs `SUPABASE_SERVICE_ROLE_KEY` (server-only) + a private `ebooks`
+bucket.
+
+**Checkout is wired: `app/(checkout)/actions.ts`.** `startCheckout` requires
+a signed-in user, re-derives every line price from `Product` (never trusts
+the client cart), creates the `Order` + `OrderItem`s + `Payment`, and a real
+Razorpay order; `cart-screen.tsx` opens Razorpay Checkout with it.
+`confirmCheckout` verifies the returned signature (`verifyPaymentSignature`),
+flips the order `PENDING → PAID`, captures the `Payment`, fires
+`order/confirmed`, and returns the redirect (`/account/library` when any line
+is `DIGITAL`, else `/account/orders`). It is **idempotent** and the Razorpay
+webhook (`api/webhooks/razorpay`) remains the authoritative status source —
+whichever runs first does the work, the other is a no-op. Sign-in is also
+gated client-side on "Buy now" (`buy-box.tsx`) and the cart's pay button.
+
+**`account/library/page.tsx` reads real data only** — the `EBOOK_FILE`
+`FileAsset`s for products the signed-in customer has a `PAID` order for, each
+with a working `/api/library/[assetId]` download link. No sample fallback.

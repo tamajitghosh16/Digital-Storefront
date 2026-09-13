@@ -189,7 +189,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         <h2 className="font-display text-lg font-bold tracking-[-0.01em] text-ink">Everyday jobs</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Shortcut
-            href="/educational-material/books/new"
+            href="/educational-material/books"
             title="Add a book"
             body="Printed, e-book, or a service package — with its front cover."
           />

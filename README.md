@@ -102,7 +102,7 @@ bash docs/setup/admin-auth-project.sh
 # the Owner, and prints the NEXT_PUBLIC_AUTH_SUPABASE_* values for
 # apps/admin/.env.local)
 
-npm run seed --workspace=@repo/database   # optional: adds 3 sample products
+npm run seed --workspace=@repo/database   # optional: seeds CMS defaults + one sample service package
 
 npm run dev                           # runs both apps via Turborepo
 # apps/web   → http://localhost:3000
@@ -122,16 +122,16 @@ npm run dev                           # runs both apps via Turborepo
 - **Admin catalogue create/edit/publish forms** (`apps/admin/app/educational-material/books`) — full CRUD with Zod validation, `assertRole`, and `AuditLog` entries. The form adapts to what you're selling (printed book / e-book / service package) and only asks for the fields that apply, generates the web address from the title, and takes the front cover from a **file picker with a live preview** rather than asking for a URL.
 - **Admin inventory CMS for three more Educational Materials lines** (`apps/admin/app/educational-material/{educational-charts,worksheets-activity-puzzles,teaching-learning-materials}`) — same list/create/edit/publish shape as Books, sharing one trimmed form + Server Actions in `educational-material/_shared/`; each writes its own `Product.productLine` value, and the Books views (admin + storefront) now filter to `productLine: "BOOK"` so the three don't leak into the book listings.
 - **Cover and banner image upload** (`apps/admin/app/api/uploads` → `packages/storage`'s `uploadImage`) — role-checked, 4 MB cap, magic-byte type verification, SVG refused. Stores to the public `images` Supabase Storage bucket via `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (no separate token); without those the image fields say so and fall back to pasting a link.
+- **E-book PDF upload + paid download, end to end.** The admin book form shows an "Upload .pdf file" field whenever "E-book" is ticked; the browser uploads straight to a **private** `ebooks` Supabase Storage bucket via a signed URL (no request-body size cap) and the action records a `FileAsset` (`kind EBOOK_FILE`, `maxDownloads 5`). On the storefront, "Buy now" / the cart pay button require sign-in, `startCheckout` creates the `Order`/`Payment` and a real Razorpay order, Razorpay Checkout opens, `confirmCheckout` verifies the signature and flips the order to PAID, and the shopper lands on **My Library** — which lists every purchased e-book with a working download served by `api/library/[assetId]` (entitlement + download-count checked, mints a ~5-minute signed URL). The Razorpay webhook stays the idempotent source of truth for status.
 - **Admin-as-CMS for the storefront** (`apps/admin/app/settings/site`, `settings/navigation`, `settings/pricing`, `content/banners`, `content/homepage`, `content/faqs`, `content/testimonials`) — site branding/SEO defaults, header/footer nav, the homepage hero, **every other homepage heading and description**, FAQs, testimonials, and **the pricing rules** are all admin-managed rows (`SiteSettings`, `NavLink`, `Banner`, `ContentBlock`, `Faq`, `Testimonial`, `PricingSettings`, `ClassSetTier`, `DiscountCode`) that `apps/web`'s root layout, header, footer, homepage, product pages and cart read directly — no runtime call between the two apps, same shared-Postgres pattern as `Product`. Per-product SEO fields (`metaTitle`/`metaDescription`/`ogImageUrl`) are also admin-editable and rendered via `generateMetadata` on the product detail pages.
   - *Homepage text* works off a registry in `packages/database/src/content.ts` that carries each string's label, help text and **default copy**; the database stores only overrides, so clearing a box in the admin restores the original wording and the storefront can never render blank.
   - *Pricing & delivery* covers the free-delivery threshold, express/same-day fees and their arrival wording, the print + e-book bundle uplift, GST rates, class-set quantity discounts, and checkout discount codes. The defaults reproduce exactly what the storefront used to hardcode.
 
 **Stubbed — needs implementation:**
 - Sign-in UI (Supabase Auth's email/OAuth components aren't wired into `app/sign-in`).
-- Add-to-cart Server Action, checkout Server Action (create Order + Razorpay order together), shipping/tax calculation.
+- Add-to-cart Server Action and server-side cart persistence. Checkout itself is now wired (`apps/web/app/(checkout)/actions.ts` — `startCheckout`/`confirmCheckout` + Razorpay Checkout on the client); the class-set **bundle** line is priced from its component editions' DB prices until `Product` carries real multi-format pricing.
 - The self-publishing wizard's actual multi-step form (currently a static step list).
-- File upload UI + the staging → malware-scan → promote pipeline end-to-end (the pieces exist in `packages/storage` and `packages/jobs/functions/malwareScan.ts`, but the scan() function is a stub returning `"CLEAN"` — wire up Cloudmersive or a ClamAV sidecar).
-- Signed, expiring Blob URLs for digital delivery (`api/library/[assetId]/route.ts` currently redirects to the public path).
+- The customer-manuscript staging → malware-scan → promote pipeline end-to-end (the pieces exist in `packages/storage` and `packages/jobs/functions/malwareScan.ts`, but the scan() function is a stub returning `"CLEAN"` — wire up Cloudmersive or a ClamAV sidecar). Admin e-book PDF uploads deliberately skip this, like image uploads.
 - Refund flow, review moderation actions.
 - Product-line/department categorization in the UI — `Product.productLine` (the 8 lines across 5 departments) is a real schema field now, and `packages/database/src/taxonomy.ts` is its canonical label list, but `apps/admin`'s `FIXED_DEPARTMENTS` and `apps/web`'s `buildDepartments()` still hardcode their own copy instead of reading from it. Four of the eight lines now have an admin CMS that writes the field (Books plus Educational Charts / Worksheets & Activity Puzzles / Teaching & Learning Materials); the storefront still has no per-line browsing for the latter three. See root `CLAUDE.md`'s "Product & service taxonomy" section.
 
@@ -140,7 +140,7 @@ npm run dev                           # runs both apps via Turborepo
 Matches the roadmap in the Technical Design Document, Section 9:
 
 1. Finish auth end-to-end (sign-in/sign-up UI, session on both apps, confirm `sync_user.sql` fires on the storefront project and `sync_staff.sql` on the admin auth project). The "revamped admin auth" work (MFA, `settings/roles` staff management) also lands here.
-2. Add-to-cart + checkout Server Action + Razorpay Checkout on the client; confirm the webhook flips an order to PAID.
+2. ~~Checkout Server Action + Razorpay Checkout on the client~~ — done (`startCheckout`/`confirmCheckout`, e-book delivery to My Library). Still open: add-to-cart Server Action and server-side cart persistence on login.
 3. ~~Admin catalogue CRUD~~ — done; admin is now the CMS for the whole storefront (site settings, nav, hero, every homepage heading and description, FAQs, testimonials, and pricing), with cover-image upload built into the catalogue form.
 4. Self-publishing wizard (steps 1–6), file upload + malware scan pipeline.
 5. Submissions queue actions (assign, move status, publish → auto-create Product), royalty calculation job.

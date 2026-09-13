@@ -77,8 +77,8 @@ export function MobileNav({ departments, signedIn }: { departments: Department[]
         </nav>
 
         <SheetClose asChild>
-          <Link href={signedIn ? "/account/orders" : "/sign-in"} className={buttonClass("primary", "md", "mt-4 w-full")}>
-            {signedIn ? "My account" : "Sign in"}
+          <Link href={signedIn ? "/account/details" : "/sign-in"} className={buttonClass("primary", "md", "mt-4 w-full")}>
+            {signedIn ? "My Account" : "Sign in"}
           </Link>
         </SheetClose>
       </SheetContent>

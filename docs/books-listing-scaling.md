@@ -27,10 +27,11 @@ Key modules:
 
 The Postgres branch is what's live. `fetchBookPage()` / `countBookListings()`
 (`lib/books-data.ts`) query `Product` directly and fall back to the bundled
-~100-title sample catalogue (`lib/sample-data/books.ts`, itself expanded
-from the same seed data as `prisma/seed.ts` — see `@repo/database`'s
-`src/book-catalog.ts`) only via `withFallback()`, when the database is
-unreachable or the query throws. That means a title added, edited, or
+sample catalogue (`lib/sample-data/books.ts`, expanded from the seed data
+in `@repo/database`'s `src/book-catalog.ts` — whose `BOOK_SEEDS` is empty
+during the testing phase, so this fallback is currently an empty catalogue)
+only via `withFallback()`, when the database is unreachable or the query
+throws. That means a title added, edited, or
 hidden from the admin's Books CMS shows up on the storefront on the very
 next request — no redeploy, no cache to invalidate.
 
@@ -39,8 +40,8 @@ What made the Postgres branch real, from the state described below:
 1. **One `Product` row per title.** The branch assumes the single-row model
    the admin already writes (`bookFormats: [PHYSICAL, EBOOK]`,
    `priceCents` + `ebookPriceCents` on one row) so that `LIMIT` counts
-   titles, not editions. `prisma/seed.ts` writes the 100-title demo
-   catalogue the same way, rather than as the `-ebook`-slug two-row model
+   titles, not editions. `prisma/seed.ts` writes any seeded catalogue the
+   same way, rather than as the `-ebook`-slug two-row model
    `groupBookEditions()` collapses — that model cannot be `LIMIT`ed and
    must not be used here.
 

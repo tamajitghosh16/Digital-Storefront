@@ -3,6 +3,7 @@ import { cn } from "@repo/ui/utils";
 import { Callout, Stars } from "@/components/primitives";
 import { formatINRWhole } from "@/lib/format";
 import { BookJacket, ProductShot } from "./book-jacket";
+import { WishlistButton } from "./wishlist-button";
 
 /**
  * The catalogue tile.
@@ -42,7 +43,7 @@ function fulfilment(product: ProductTileData): { text: string; tone: string } {
 
   const stock = product.stockQty ?? 0;
   if (stock <= 0) return { text: "Out of stock", tone: "text-sale" };
-  if (stock <= 12) return { text: `Only ${stock} left`, tone: "text-warn" };
+  if (stock < 10) return { text: `Only ${stock} left`, tone: "text-warn" };
   if (stock >= 30) return { text: "Same Day Delivery — Kolkata", tone: "text-ok" };
   return { text: "Ships in 2 days", tone: "text-ok" };
 }
@@ -77,10 +78,11 @@ export function ProductTile({
             {flag.label}
           </Callout>
         )}
+        <WishlistButton productId={product.id} size="sm" className="absolute right-2.5 top-2.5 z-10" />
         <BookJacket
           title={product.title}
           author={product.author}
-          coverImageUrl={product.coverImageUrl}
+          imageUrl={product.coverImageUrl}
           from={product.coverFrom}
           to={product.coverTo}
           className="w-[62%]"

@@ -207,6 +207,20 @@ split into titled sections; colour from the shared tokens in
 product type is picked first and only the fields that apply to it render,
 and the web address is generated from the title.
 
+**E-book PDF upload (`components/pdf-field.tsx` + `app/api/uploads/ebook`).**
+The catalogue form's "Upload .pdf file" field renders only when "E-book" is
+ticked. The PDF never passes through the app server: `api/uploads/ebook`
+checks the caller's role and returns a one-time signed URL from
+`createEbookUploadUrl()` (`@repo/storage`), and the browser `PUT`s the file
+straight to a **private** `ebooks` Supabase Storage bucket — so there's no
+4.5 MB request-body ceiling. `createProduct`/`updateProduct` then reconcile a
+single `FileAsset` (`kind EBOOK_FILE`, `malwareScanStatus "CLEAN"`,
+`maxDownloads 5`) for the product via the local `syncEbookFileAsset()`
+helper, deleting the old object best-effort when the PDF is replaced or the
+e-book format is turned off. Like image uploads, it skips the malware scan
+(trusted signed-in EDITOR/OWNER). `apps/web`'s `api/library/[assetId]` route
+mints the signed download URL from the stored path.
+
 **Image uploads skip the malware-scan pipeline on purpose.**
 `api/uploads/route.ts` checks the caller's role, caps size at 4 MB (under
 Vercel's 4.5 MB request-body limit), and verifies the file's *magic bytes*

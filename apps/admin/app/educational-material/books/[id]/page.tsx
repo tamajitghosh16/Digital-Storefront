@@ -16,6 +16,10 @@ export default async function EditProductPage({
   const product = await prisma.product.findUnique({ where: { id } });
   if (!product) notFound();
 
+  const ebookAsset = await prisma.fileAsset.findFirst({
+    where: { productId: product.id, kind: "EBOOK_FILE" },
+  });
+
   return (
     <div>
       <PageHeader
@@ -29,7 +33,16 @@ export default async function EditProductPage({
           </Pill>
         }
       />
-      <ProductForm action={updateProduct.bind(null, product.id)} product={product} error={error} />
+      <ProductForm
+        action={updateProduct.bind(null, product.id)}
+        product={product}
+        ebookFile={
+          ebookAsset
+            ? { path: ebookAsset.blobPath, fileName: ebookAsset.fileName, sizeBytes: ebookAsset.sizeBytes }
+            : null
+        }
+        error={error}
+      />
     </div>
   );
 }

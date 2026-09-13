@@ -168,8 +168,24 @@ model User {
   serviceRequests   ServiceRequest[]
   reviews           Review[]
   notifications     Notification[]
+  wishlists         Wishlist[]
 
   @@map("users")
+}
+
+/// A customer's saved-for-later titles (FR-2.x). One row per (user, product);
+/// re-hearting a product the customer already saved is a no-op, not a duplicate.
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+  @@map("wishlists")
 }
 
 model Address {
@@ -210,6 +226,13 @@ model Product {
   ebookPriceCents Int?
   currency    String      @default("INR")
   coverImageUrl String?
+  // The three below are books only, and optional — a scan of the back
+  // cover, the preface page and the index/contents page, alongside the
+  // front cover, so the back office holds a full pictorial record of the
+  // physical book without anyone needing to re-scan it later.
+  backCoverImageUrl String?
+  prefaceImageUrl   String?
+  indexPageImageUrl String?
 
   // Books only — which format(s) this book is sold in. A book can be
   // physical-only, e-book-only, or both at once; [] for service packages.
@@ -259,6 +282,7 @@ model Product {
   orderItems  OrderItem[]
   reviews     Review[]
   purchaseOrderItems PurchaseOrderItem[]
+  wishlists   Wishlist[]
 
   @@index([type])
   @@index([slug])

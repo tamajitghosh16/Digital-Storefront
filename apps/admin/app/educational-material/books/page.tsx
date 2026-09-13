@@ -1,6 +1,7 @@
 import { prisma } from "@repo/database";
-import { ButtonLink, PageHeader } from "@/components/ui";
+import { PageHeader, SavedBanner } from "@/components/ui";
 import { bookCoverGradient } from "@/lib/book-cover";
+import { AddBookDialog } from "./add-book-dialog";
 import { BooksList } from "./books-list";
 
 // FR-11.1: CMS for creating/editing the book catalogue (printed books and e-books).
@@ -8,7 +9,12 @@ import { BooksList } from "./books-list";
 // appear in this list — see apps/admin/CLAUDE.md's "catalogue CMS lives
 // under Books" note.
 
-export default async function BooksPage() {
+export default async function BooksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; created?: string }>;
+}) {
+  const { error, created } = await searchParams;
   // The whole list is handed to a Client Component that searches and sorts
   // it in the browser, so the cap has to sit above the catalogue rather than
   // at a page boundary — at 100 it silently hid titles once the demo
@@ -30,7 +36,12 @@ export default async function BooksPage() {
 
   return (
     <div className="max-w-6xl pt-10">
-      <PageHeader title="Books" action={<ButtonLink href="/educational-material/books/new">Add new book</ButtonLink>} />
+      <PageHeader title="Books" action={<AddBookDialog error={error} />} />
+      {created && (
+        <div className="mb-6">
+          <SavedBanner message="Book added." />
+        </div>
+      )}
       <BooksList products={products} />
     </div>
   );

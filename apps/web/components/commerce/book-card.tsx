@@ -5,6 +5,7 @@ import { formatINRWhole } from "@/lib/format";
 import { BOOKS_BASE, type BookView } from "@/lib/books-query";
 import type { BookListing } from "@/lib/books";
 import { BookJacket, ProductShot } from "./book-jacket";
+import { WishlistButton } from "./wishlist-button";
 
 /**
  * One title in the books catalogue, in either a grid tile or a list row.
@@ -23,7 +24,7 @@ function priceLabel(listing: BookListing): string {
 function fulfilment(listing: BookListing): { text: string; tone: string } {
   const stock = listing.stockQty ?? 0;
   if (listing.hasPrint && stock > 0) {
-    if (stock <= 12) return { text: `Only ${stock} left`, tone: "text-warn" };
+    if (stock < 10) return { text: `Only ${stock} left`, tone: "text-warn" };
     if (stock >= 30) return { text: "Same-day delivery — Kolkata", tone: "text-ok" };
     return { text: "Ships in 2 days", tone: "text-ok" };
   }
@@ -52,7 +53,7 @@ export function BookCard({ listing, view }: { listing: BookListing; view: BookVi
           <BookJacket
             title={listing.title}
             author={listing.author}
-            coverImageUrl={listing.coverImageUrl}
+            imageUrl={listing.coverImageUrl}
             from={listing.coverFrom}
             to={listing.coverTo}
             sizes="70px"
@@ -66,6 +67,8 @@ export function BookCard({ listing, view }: { listing: BookListing; view: BookVi
           {rating && <span className="mt-1.5">{rating}</span>}
         </span>
 
+        <WishlistButton productId={listing.id} size="sm" className="self-center" />
+
         <span className="flex shrink-0 flex-col items-end justify-center text-right">
           <span className="text-sm font-bold tabular-nums">{priceLabel(listing)}</span>
           <span className={cn("mt-0.5 text-xs font-bold", ship.tone)}>{ship.text}</span>
@@ -77,10 +80,11 @@ export function BookCard({ listing, view }: { listing: BookListing; view: BookVi
   return (
     <Link href={href} className="group flex flex-col">
       <ProductShot className="mx-auto w-[92%] p-1.5 transition-transform duration-200 group-hover:-translate-y-[3px] sm:p-2">
+        <WishlistButton productId={listing.id} size="sm" className="absolute right-2.5 top-2.5 z-10" />
         <BookJacket
           title={listing.title}
           author={listing.author}
-          coverImageUrl={listing.coverImageUrl}
+          imageUrl={listing.coverImageUrl}
           from={listing.coverFrom}
           to={listing.coverTo}
           className="w-[86%]"

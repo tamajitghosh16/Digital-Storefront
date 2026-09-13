@@ -5,7 +5,49 @@ import { revalidatePath } from "next/cache";
 import { prisma, type Prisma, type BookFormat, type ProductType, type ProductLine } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
+import { deleteEbookFile } from "@repo/storage";
 import { productFormSchema, type ProductFormValues } from "./schema";
+
+/**
+ * Reconcile the single `EBOOK_FILE` FileAsset for a product against what the
+ * form submitted. PdfField uploads the PDF to Supabase Storage before the
+ * form posts, so by the time we're here `ebookFilePath` (if set) already
+ * points at a stored object.
+ *
+ * The asset is written with `malwareScanStatus: "CLEAN"` and no scan, the
+ * same trust model as admin image uploads — it comes from a signed-in
+ * EDITOR/OWNER. `maxDownloads: 5` matches the storefront's "Five downloads
+ * per e-book format" promise.
+ */
+async function syncEbookFileAsset(productId: string, raw: ProductFormValues) {
+  const wantsEbook = !raw.isService && raw.formatEbook;
+  const nextPath = wantsEbook ? raw.ebookFilePath?.trim() || null : null;
+
+  const existing = await prisma.fileAsset.findFirst({ where: { productId, kind: "EBOOK_FILE" } });
+  if (existing?.blobPath === nextPath) return; // nothing changed
+
+  if (existing) {
+    await prisma.fileAsset.delete({ where: { id: existing.id } });
+    if (existing.blobPath && existing.blobPath !== nextPath && !/^https?:\/\//.test(existing.blobPath)) {
+      await deleteEbookFile(existing.blobPath);
+    }
+  }
+
+  if (nextPath) {
+    await prisma.fileAsset.create({
+      data: {
+        kind: "EBOOK_FILE",
+        blobPath: nextPath,
+        fileName: raw.ebookFileName?.trim() || "ebook.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: raw.ebookFileSize ?? 0,
+        malwareScanStatus: "CLEAN",
+        maxDownloads: 5,
+        productId,
+      },
+    });
+  }
+}
 
 function toProductData(raw: ProductFormValues) {
   // A book's bookFormats[] is the source of truth for physical vs e-book;
@@ -35,8 +77,11 @@ function toProductData(raw: ProductFormValues) {
         ? Math.round(raw.ebookPrice * 100)
         : null,
     coverImageUrl: raw.coverImageUrl ?? null,
+    backCoverImageUrl: raw.backCoverImageUrl ?? null,
+    prefaceImageUrl: raw.prefaceImageUrl ?? null,
+    indexPageImageUrl: raw.indexPageImageUrl ?? null,
     stockQty: bookFormats.includes("PHYSICAL") ? (raw.stockQty ?? null) : null,
-    isbn: bookFormats.includes("PHYSICAL") ? (raw.isbn ?? null) : null,
+    isbn: bookFormats.length ? (raw.isbn ?? null) : null,
     weightGrams: bookFormats.includes("PHYSICAL") ? (raw.weightGrams ?? null) : null,
     formats: bookFormats.includes("EBOOK")
       ? raw.formats
@@ -61,13 +106,17 @@ export async function createProduct(formData: FormData) {
   const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
+  // The "Add a book" form is a modal on the list page (see add-book-dialog.tsx),
+  // so both outcomes redirect back there: `?error=` reopens the dialog with the
+  // message, `?created=1` leaves it shut and shows the saved banner.
   const parsed = productFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    redirect(`/educational-material/books/new?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid input")}`);
+    redirect(`/educational-material/books?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid input")}`);
   }
 
   const data = toProductData(parsed.data);
   const product = await prisma.product.create({ data });
+  await syncEbookFileAsset(product.id, parsed.data);
 
   await prisma.auditLog.create({
     // Log the submitted form values, not `data` — the latter includes a
@@ -76,7 +125,7 @@ export async function createProduct(formData: FormData) {
   });
 
   revalidatePath("/educational-material/books");
-  redirect("/educational-material/books");
+  redirect("/educational-material/books?created=1");
 }
 
 // FR-11.1: edit an existing catalogue item.
@@ -95,6 +144,7 @@ export async function updateProduct(id: string, formData: FormData) {
   if (existing.isPublished && parsed.data.isPublished) data.publishedAt = existing.publishedAt;
 
   await prisma.product.update({ where: { id }, data });
+  await syncEbookFileAsset(id, parsed.data);
 
   await prisma.auditLog.create({
     data: { actorId: user!.id, actorEmail: user!.email, action: "product.updated", entity: "Product", entityId: id, diff: parsed.data as Prisma.InputJsonValue },

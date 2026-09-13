@@ -5,6 +5,7 @@ import { getSiteSettings } from "@repo/database";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { WishlistProvider } from "@/components/commerce/wishlist-provider";
 
 // Graphik is the reference face and isn't licensed here; Inter is the
 // closest grotesque available and the only weights the design uses are
@@ -32,9 +33,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" data-scroll-behavior="smooth" className={inter.variable} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col bg-page font-sans text-ink antialiased">
         <ThemeProvider>
-          <SiteHeader />
-          <main className="flex-1">{children}</main>
-          <SiteFooter />
+          <WishlistProvider>
+            <SiteHeader />
+            <main className="flex-1">{children}</main>
+            <SiteFooter />
+          </WishlistProvider>
         </ThemeProvider>
       </body>
     </html>

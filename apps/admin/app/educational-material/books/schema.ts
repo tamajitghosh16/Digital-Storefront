@@ -33,10 +33,20 @@ export const productFormSchema = z
     // physical price in that case; the sole price otherwise.
     ebookPrice: optional(z.coerce.number().min(0, "Price must be zero or positive")),
     coverImageUrl: optional(z.string().url("Must be a valid URL")),
+    backCoverImageUrl: optional(z.string().url("Must be a valid URL")),
+    prefaceImageUrl: optional(z.string().url("Must be a valid URL")),
+    indexPageImageUrl: optional(z.string().url("Must be a valid URL")),
     stockQty: optionalInt(),
     isbn: optional(z.string()),
     weightGrams: optionalInt(),
     formats: optional(z.string()),
+    // The e-book PDF, uploaded straight to Supabase Storage by PdfField
+    // before the form is submitted — these three hidden inputs carry the
+    // stored object path, original filename and size. Only meaningful when
+    // formatEbook is checked.
+    ebookFilePath: optional(z.string()),
+    ebookFileName: optional(z.string()),
+    ebookFileSize: optionalInt(),
     sampleUrl: optional(z.string().url("Must be a valid URL")),
     turnaroundDays: optionalInt(),
     metaTitle: optional(z.string()),

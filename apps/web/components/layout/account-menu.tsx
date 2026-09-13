@@ -2,7 +2,16 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleUserRound, LayoutDashboard, Library, LogOut, Package } from "lucide-react";
+import {
+  CircleUserRound,
+  Heart,
+  LayoutDashboard,
+  Library,
+  LogIn,
+  LogOut,
+  Package,
+  UserRound,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@repo/ui/dropdown-menu";
 import { createClient } from "@repo/auth/client";
-import { ICON_BUTTON_CLASS, ICON_LABEL_CLASS, IconButtonLink } from "./icon-button";
+import { ICON_BUTTON_CLASS, ICON_LABEL_CLASS } from "./icon-button";
 
 export interface AccountMenuUser {
   name: string | null;
@@ -20,20 +29,22 @@ export interface AccountMenuUser {
   role: string;
 }
 
+// The four account destinations every reader gets, in the order the
+// masthead dropdown lists them. Guests see the same list — the pages
+// themselves bounce an unauthenticated visitor to /sign-in.
+const ACCOUNT_LINKS = [
+  { href: "/account/details", label: "Account details", icon: UserRound },
+  { href: "/account/library", label: "My Library", icon: Library },
+  { href: "/account/orders", label: "My Orders", icon: Package },
+  { href: "/account/wishlist", label: "Wishlist", icon: Heart },
+] as const;
+
 // The header (a Server Component) fetches the user; this only owns the
 // dropdown and the sign-out call.
 export function AccountMenu({ user }: { user: AccountMenuUser | null }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
-
-  if (!user) {
-    return (
-      <IconButtonLink href="/sign-in" label="Sign in">
-        <CircleUserRound className="h-[22px] w-[22px]" strokeWidth={1.9} />
-      </IconButtonLink>
-    );
-  }
 
   function handleSignOut() {
     startTransition(async () => {
@@ -48,38 +59,46 @@ export function AccountMenu({ user }: { user: AccountMenuUser | null }) {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label="Account menu" className={ICON_BUTTON_CLASS}>
+        <button type="button" aria-label="My Account" className={ICON_BUTTON_CLASS}>
           <span className="text-lg leading-none">
             <CircleUserRound className="h-[22px] w-[22px]" strokeWidth={1.9} />
           </span>
-          <span className={ICON_LABEL_CLASS}>Account</span>
+          <span className={ICON_LABEL_CLASS}>My Account</span>
         </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="rounded-tile">
-        <DropdownMenuLabel className="truncate">{user.name || user.email}</DropdownMenuLabel>
+        <DropdownMenuLabel className="truncate">{user ? user.name || user.email : "My Account"}</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/account/library">
-            <Library className="h-4 w-4" /> Digital library
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/account/orders">
-            <Package className="h-4 w-4" /> Orders
-          </Link>
-        </DropdownMenuItem>
-        {user.role === "SELF_PUB_AUTHOR" && (
+
+        {ACCOUNT_LINKS.map(({ href, label, icon: Icon }) => (
+          <DropdownMenuItem key={href} asChild>
+            <Link href={href}>
+              <Icon className="h-4 w-4" /> {label}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+
+        {user?.role === "SELF_PUB_AUTHOR" && (
           <DropdownMenuItem asChild>
             <Link href="/account/publishing">
               <LayoutDashboard className="h-4 w-4" /> Publishing
             </Link>
           </DropdownMenuItem>
         )}
+
         <DropdownMenuSeparator />
-        <DropdownMenuItem destructive onSelect={handleSignOut} disabled={isPending}>
-          <LogOut className="h-4 w-4" /> {isPending ? "Signing out…" : "Sign out"}
-        </DropdownMenuItem>
+        {user ? (
+          <DropdownMenuItem destructive onSelect={handleSignOut} disabled={isPending}>
+            <LogOut className="h-4 w-4" /> {isPending ? "Signing out…" : "Sign out"}
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem asChild>
+            <Link href="/sign-in">
+              <LogIn className="h-4 w-4" /> Sign in
+            </Link>
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

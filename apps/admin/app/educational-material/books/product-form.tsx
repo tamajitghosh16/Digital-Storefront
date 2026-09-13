@@ -5,9 +5,7 @@ import { useState } from "react";
 import type { Product } from "@repo/database";
 import { cn } from "@repo/ui/utils";
 import {
-  CheckboxField,
   ErrorBanner,
-  Field,
   FieldRow,
   MoneyField,
   Section,
@@ -16,6 +14,7 @@ import {
   TextField,
 } from "@/components/ui";
 import { ImageField } from "@/components/image-field";
+import { PdfField } from "@/components/pdf-field";
 import { SaveButton } from "@/components/form-controls";
 
 /**
@@ -31,13 +30,6 @@ import { SaveButton } from "@/components/form-controls";
  * address from the title so nobody has to know what a slug is, and it takes
  * the cover from a file picker instead of asking for a URL.
  */
-
-const KINDS: { value: "book" | "service"; label: string; blurb: string }[] = [
-  { value: "book", label: "Book", blurb: "Printed, e-book, or both — pick which formats it's sold in below." },
-  { value: "service", label: "Service package", blurb: "A self-publishing or e-book creation package." },
-];
-
-const EBOOK_FORMATS = ["EPUB", "MOBI", "PDF"];
 
 // Drives the storefront's genre filter — hand-mirrored from apps/web's
 // `BOOK_GENRES` (lib/navigation.ts) the same way the department/nav
@@ -65,113 +57,46 @@ function slugify(value: string) {
 export function ProductForm({
   action,
   product,
+  ebookFile,
   error,
+  onCancel,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   product?: Product;
+  /** The already-stored e-book PDF for this product, if one exists (edit form only). */
+  ebookFile?: { path: string; fileName: string; sizeBytes: number } | null;
   error?: string;
+  /** When set, "Cancel" closes the surrounding modal instead of linking back to the list. */
+  onCancel?: () => void;
 }) {
   const isEdit = Boolean(product);
-  const [isService, setIsService] = useState(product?.type === "SERVICE_PACKAGE");
+  // This form is only ever reached from the "Add a book" dialog (always a
+  // book) or the Books list's own edit page (which only lists PHYSICAL_BOOK/
+  // EBOOK rows) — so there's no picker for this any more. It stays derived,
+  // not state, purely so a pre-existing SERVICE_PACKAGE row opened directly
+  // by id still renders its own fields instead of being mislabelled a book.
+  const isService = product?.type === "SERVICE_PACKAGE";
   const [hasPhysical, setHasPhysical] = useState(product?.bookFormats?.includes("PHYSICAL") ?? true);
   const [hasEbook, setHasEbook] = useState(product?.bookFormats?.includes("EBOOK") ?? false);
   const [title, setTitle] = useState(product?.title ?? "");
   const [slug, setSlug] = useState(product?.slug ?? "");
   // Once a record is live its web address is a published link, and changing
-  // it silently would break anyone's bookmark — so auto-fill only runs while
-  // creating, and stops the moment the address is typed in by hand.
-  const [slugTouched, setSlugTouched] = useState(isEdit);
-  const [formats, setFormats] = useState<string[]>(product?.formats ?? ["EPUB", "PDF"]);
+  // it silently would break anyone's bookmark — with no more manual slug
+  // field to hand-edit, "touched" just means "already has one": true from
+  // the start when editing (so it stays frozen), false when creating (so it
+  // keeps tracking the title as the operator types).
+  const [slugTouched] = useState(isEdit);
 
   const noun = isService ? "package" : "book";
-  const kind = isService ? "service" : "book";
 
   return (
     <form action={action} className="max-w-3xl space-y-5">
       <ErrorBanner message={error} />
 
-      <Section title="What are you adding?" description="This decides what else the form asks you for.">
-        <div className="grid gap-3 sm:grid-cols-2">
-          {KINDS.map((option) => (
-            <label
-              key={option.value}
-              className={cn(
-                "cursor-pointer rounded-btn border p-3.5 transition-colors",
-                kind === option.value
-                  ? "border-brand bg-brand-soft ring-1 ring-brand"
-                  : "border-line bg-tile-3 hover:border-brand/50"
-              )}
-            >
-              <span className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  name="kind"
-                  value={option.value}
-                  checked={kind === option.value}
-                  onChange={() => setIsService(option.value === "service")}
-                  className="h-4 w-4 accent-[var(--color-brand)]"
-                />
-                <span className="text-sm font-bold text-ink">{option.label}</span>
-              </span>
-              <span className="mt-1 block text-[12px] leading-snug text-ink-muted">{option.blurb}</span>
-            </label>
-          ))}
-        </div>
-        <input type="hidden" name="isService" value={isService ? "true" : "false"} />
-
-        {!isService && (
-          <Field label="Available as" help="A book can be sold as a printed copy, an e-book, or both.">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label
-                className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-btn border p-3.5 transition-colors",
-                  hasPhysical ? "border-brand bg-brand-soft ring-1 ring-brand" : "border-line bg-tile-3 hover:border-brand/50"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  name="formatPhysical"
-                  checked={hasPhysical}
-                  onChange={(event) => setHasPhysical(event.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-brand)]"
-                />
-                <span>
-                  <span className="block text-sm font-bold text-ink">Physical book</span>
-                  <span className="mt-0.5 block text-[12px] leading-snug text-ink-muted">
-                    A paperback or hardback you post to the customer.
-                  </span>
-                </span>
-              </label>
-              <label
-                className={cn(
-                  "flex cursor-pointer items-start gap-3 rounded-btn border p-3.5 transition-colors",
-                  hasEbook ? "border-brand bg-brand-soft ring-1 ring-brand" : "border-line bg-tile-3 hover:border-brand/50"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  name="formatEbook"
-                  checked={hasEbook}
-                  onChange={(event) => setHasEbook(event.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-brand)]"
-                />
-                <span>
-                  <span className="block text-sm font-bold text-ink">E-book</span>
-                  <span className="mt-0.5 block text-[12px] leading-snug text-ink-muted">
-                    A file the customer downloads straight away.
-                  </span>
-                </span>
-              </label>
-            </div>
-            {!hasPhysical && !hasEbook && (
-              <p className="mt-2 text-[12px] text-warn">Pick at least one format.</p>
-            )}
-          </Field>
-        )}
-      </Section>
+      <input type="hidden" name="isService" value={isService ? "true" : "false"} />
 
       <Section
-        title={isService ? "About this package" : "About this book"}
+        title={isService ? "About this package" : "About the book"}
         description={`What shoppers read on the ${noun}'s own page and in the shop listing.`}
       >
         <TextField
@@ -212,38 +137,120 @@ export function ProductForm({
         />
 
         {!isService && (
-          <SelectField
-            label="Genre"
-            help="Lets shoppers filter the catalogue by genre. Leave unset if none quite fits."
-            name="genre"
-            defaultValue={product?.genre ?? ""}
-          >
-            <option value="">No genre set</option>
-            {BOOK_GENRES.map((genre) => (
-              <option key={genre} value={genre}>
-                {genre}
-              </option>
-            ))}
-          </SelectField>
+          <FieldRow>
+            <SelectField
+              label="Genre"
+              help="Lets shoppers filter the catalogue by genre. Leave unset if none quite fits."
+              name="genre"
+              defaultValue={product?.genre ?? ""}
+            >
+              <option value="">No genre set</option>
+              {BOOK_GENRES.map((genre) => (
+                <option key={genre} value={genre}>
+                  {genre}
+                </option>
+              ))}
+            </SelectField>
+            <TextField label="ISBN" name="isbn" defaultValue={product?.isbn ?? ""} placeholder="978-81-XXXXX-XX-X" />
+          </FieldRow>
         )}
 
-        <ImageField
-          name="coverImageUrl"
-          label={isService ? "Picture for this package" : "Front cover"}
-          help={
-            isService
-              ? "Optional. Shown alongside the package where the storefront has room for it."
-              : "The image shoppers see in the shop. A photo or scan of the front cover works — portrait shape looks best."
-          }
-          defaultValue={product?.coverImageUrl}
-          shape={isService ? "wide" : "cover"}
-        />
+        {isService && (
+          <ImageField
+            name="coverImageUrl"
+            label="Picture for this package"
+            help="Optional. Shown alongside the package where the storefront has room for it."
+            defaultValue={product?.coverImageUrl}
+            shape="wide"
+          />
+        )}
       </Section>
 
-      <Section title="Price and availability" description="Prices include GST, the way Indian shops quote them.">
+      {!isService && (
+        <Section title="Select format" description="A book can be sold as a printed copy, an e-book, or both.">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-btn border p-3.5 transition-colors",
+                hasPhysical ? "border-brand bg-brand-soft ring-1 ring-brand" : "border-line bg-tile-3 hover:border-brand/50"
+              )}
+            >
+              <input
+                type="checkbox"
+                name="formatPhysical"
+                checked={hasPhysical}
+                onChange={(event) => setHasPhysical(event.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-brand)]"
+              />
+              <span>
+                <span className="block text-sm font-bold text-ink">Physical book</span>
+                <span className="mt-0.5 block text-[12px] leading-snug text-ink-muted">
+                  A paperback or hardback you post to the customer.
+                </span>
+              </span>
+            </label>
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-btn border p-3.5 transition-colors",
+                hasEbook ? "border-brand bg-brand-soft ring-1 ring-brand" : "border-line bg-tile-3 hover:border-brand/50"
+              )}
+            >
+              <input
+                type="checkbox"
+                name="formatEbook"
+                checked={hasEbook}
+                onChange={(event) => setHasEbook(event.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-brand)]"
+              />
+              <span>
+                <span className="block text-sm font-bold text-ink">E-book</span>
+                <span className="mt-0.5 block text-[12px] leading-snug text-ink-muted">
+                  A file the customer downloads straight away.
+                </span>
+              </span>
+            </label>
+          </div>
+          {!hasPhysical && !hasEbook && <p className="mt-2 text-[12px] text-warn">Pick at least one format.</p>}
+        </Section>
+      )}
+
+      {!isService && (
+        <Section title="Upload book pictures" description="Scans or photos of the physical book, used in the shop listing and kept on file.">
+          <ImageField
+            name="coverImageUrl"
+            label="Front cover *"
+            help="The image shoppers see in the shop. A photo or scan of the front cover works — portrait shape looks best."
+            defaultValue={product?.coverImageUrl}
+            shape="cover"
+          />
+          <ImageField
+            name="backCoverImageUrl"
+            label="Back cover"
+            help="Optional. Kept on file alongside the front cover."
+            defaultValue={product?.backCoverImageUrl}
+            shape="cover"
+          />
+          <ImageField
+            name="prefaceImageUrl"
+            label="Preface"
+            help="Optional. A scan of the preface page."
+            defaultValue={product?.prefaceImageUrl}
+            shape="cover"
+          />
+          <ImageField
+            name="indexPageImageUrl"
+            label="Index page"
+            help="Optional. A scan of the index or contents page."
+            defaultValue={product?.indexPageImageUrl}
+            shape="cover"
+          />
+        </Section>
+      )}
+
+      <Section title="Pricing" description="Prices include GST, the way Indian shops quote them.">
         <FieldRow>
           <MoneyField
-            label={hasPhysical && hasEbook ? "Physical book price" : "Price"}
+            label={hasPhysical && hasEbook ? "Price per stock (In Rupees) Physical Book" : "Price per stock (In Rupees)"}
             help="What the customer pays."
             name="price"
             required
@@ -251,7 +258,7 @@ export function ProductForm({
           />
           {hasPhysical && hasEbook && (
             <MoneyField
-              label="E-book price"
+              label="Price per stock (In Rupees) E-book"
               help="E-books are usually priced lower than the printed copy."
               name="ebookPrice"
               required
@@ -259,172 +266,81 @@ export function ProductForm({
             />
           )}
         </FieldRow>
-
-        <FieldRow>
-          {hasPhysical && (
-            <TextField
-              label="Copies in stock"
-              help="Leave empty if you aren't counting stock."
-              name="stockQty"
-              type="number"
-              min={0}
-              defaultValue={product?.stockQty ?? ""}
-            />
-          )}
-          {isService && (
-            <TextField
-              label="Turnaround (days)"
-              help="Shown as “14-day turnaround” on the homepage."
-              name="turnaroundDays"
-              type="number"
-              min={0}
-              defaultValue={product?.turnaroundDays ?? ""}
-            />
-          )}
-        </FieldRow>
-
-        <CheckboxField
-          label={`Show this ${noun} in the shop`}
-          help="Untick to keep working on it privately. Nobody outside the back office can see it while it's unticked."
-          name="isPublished"
-          defaultChecked={product?.isPublished ?? true}
-        />
       </Section>
 
-      {hasPhysical && (
-        <Section title="Printed book details" description="Used on the product page and for working out postage.">
-          <FieldRow>
-            <TextField label="ISBN" name="isbn" defaultValue={product?.isbn ?? ""} placeholder="978-81-XXXXX-XX-X" />
-            <TextField
-              label="Weight (grams)"
-              help="One copy, packed."
-              name="weightGrams"
-              type="number"
-              min={0}
-              defaultValue={product?.weightGrams ?? ""}
-            />
-          </FieldRow>
+      {!isService && hasPhysical && (
+        <Section title="Stocks" description="How many printed copies you currently have on hand.">
+          <TextField
+            label="Total copies"
+            help="Leave empty if you aren't counting stock."
+            name="stockQty"
+            type="number"
+            min={0}
+            defaultValue={product?.stockQty ?? ""}
+          />
         </Section>
       )}
 
       {hasEbook && (
-        <Section title="E-book details" description="What the reader gets when they download.">
-          <Field label="File formats you supply" help="Listed on the product page.">
-            <div className="flex flex-wrap gap-2">
-              {EBOOK_FORMATS.map((format) => {
-                const on = formats.includes(format);
-                return (
-                  <label
-                    key={format}
-                    className={cn(
-                      "cursor-pointer rounded-full border px-3.5 py-1.5 text-sm font-bold transition-colors",
-                      on ? "border-brand bg-brand text-on-brand" : "border-line-strong bg-ground text-ink-muted"
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={on}
-                      onChange={() =>
-                        setFormats((current) =>
-                          current.includes(format) ? current.filter((item) => item !== format) : [...current, format]
-                        )
-                      }
-                      className="sr-only"
-                    />
-                    {format}
-                  </label>
-                );
-              })}
-            </div>
-            {/* The Server Action still reads one comma-separated string. */}
-            <input type="hidden" name="formats" value={formats.join(", ")} />
-          </Field>
+        <Section title="E-book upload" description="What the reader gets when they download.">
+          {/* Only PDF is sold — no format picker needed. */}
+          <input type="hidden" name="formats" value="PDF" />
 
-          <TextField
-            label="Free sample link"
-            help="Optional. A link to a preview chapter."
-            name="sampleUrl"
-            type="url"
-            defaultValue={product?.sampleUrl ?? ""}
-            placeholder="https://…"
+          <PdfField
+            name="ebookFile"
+            label="Upload .pdf file"
+            help="The PDF the customer downloads from their library after buying the e-book."
+            defaultValue={ebookFile ?? null}
           />
         </Section>
       )}
 
-      <details className="group rounded-tile border border-line bg-ground">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-6 [&::-webkit-details-marker]:hidden">
-          <span>
-            <span className="block text-base font-bold tracking-[-0.01em] text-ink">
-              Web address and Google listing
-            </span>
-            <span className="mt-1 block text-sm text-ink-muted">
-              Filled in for you. Open this only if you want to change how it looks in search results.
-            </span>
-          </span>
-          <span aria-hidden className="text-xl text-ink-muted">
-            <span className="group-open:hidden">+</span>
-            <span className="hidden group-open:inline">−</span>
-          </span>
-        </summary>
+      {/*
+        Weight and the free sample link lost their form fields but keep
+        flowing through as hidden inputs, same reasoning as the block below:
+        an existing book's postage weight or sample link shouldn't silently
+        vanish just because editing it no longer offers a field for it.
+      */}
+      <input type="hidden" name="weightGrams" value={product?.weightGrams ?? ""} />
+      <input type="hidden" name="sampleUrl" value={product?.sampleUrl ?? ""} />
 
-        <div className="space-y-5 px-6 pb-6">
-          <Field
-            label="Web address"
-            help="The last part of the link to this page. Lowercase letters, numbers and hyphens."
-            htmlFor="slug"
-            required
-          >
-            <div className="flex items-center rounded-btn border border-line bg-ground focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/30">
-              <span className="whitespace-nowrap pl-3 text-sm text-ink-subtle" aria-hidden>
-                /{isService ? "services" : hasPhysical ? "books" : "ebooks"}/
-              </span>
-              <input
-                id="slug"
-                name="slug"
-                required
-                value={slug}
-                onChange={(event) => {
-                  setSlugTouched(true);
-                  setSlug(event.target.value);
-                }}
-                className="w-full bg-transparent px-1.5 py-2.5 text-sm text-ink focus:outline-none"
-              />
-            </div>
-            {isEdit && (
-              <p className="mt-1 text-[12px] text-warn">Changing this breaks any existing link to this {noun}.</p>
-            )}
-          </Field>
+      {/*
+        No visible "Availability" or "Web address / Google listing" controls
+        any more — a new book publishes immediately and picks up its web
+        address from the title, same as before, just without a form section
+        to look at. These hidden inputs are what keep that data flowing to
+        the Server Action: `slug` still tracks `title` live (see the
+        `slugify` call in the Title field's onChange above), and the SEO
+        fields carry forward whatever an existing product already had rather
+        than wiping it out. Publish/unpublish for an existing book still
+        works from its row on the Books list (`toggleProductPublished`).
+      */}
+      <input type="hidden" name="slug" value={slug} />
+      <input type="hidden" name="isPublished" value={isEdit ? (product?.isPublished ? "true" : "false") : "true"} />
+      <input type="hidden" name="metaTitle" value={product?.metaTitle ?? ""} />
+      <input type="hidden" name="metaDescription" value={product?.metaDescription ?? ""} />
+      <input type="hidden" name="ogImageUrl" value={product?.ogImageUrl ?? ""} />
 
-          <TextField
-            label="Title in Google results"
-            help="Leave empty to use the title above."
-            name="metaTitle"
-            defaultValue={product?.metaTitle ?? ""}
-          />
-          <TextAreaField
-            label="Description in Google results"
-            help="Around 150 characters. Leave empty to use the description above."
-            name="metaDescription"
-            rows={2}
-            defaultValue={product?.metaDescription ?? ""}
-          />
-          <ImageField
-            name="ogImageUrl"
-            label="Picture when shared on social media"
-            help="Optional. Leave empty and the cover is used. Wide images (about 1200×630) work best."
-            defaultValue={product?.ogImageUrl}
-            shape="wide"
-          />
-        </div>
-      </details>
-
-      <div className="sticky bottom-4 flex flex-wrap items-center gap-3 rounded-tile border border-line bg-ground/95 p-4 backdrop-blur">
+      <div className="flex flex-wrap items-center gap-3 rounded-tile border border-line bg-ground p-4">
         <SaveButton pendingLabel={isEdit ? "Saving…" : "Adding…"}>
           {isEdit ? "Save changes" : `Add this ${noun}`}
         </SaveButton>
-        <Link href="/educational-material/books" className="text-sm font-semibold text-ink-muted hover:text-ink hover:underline">
-          Cancel
-        </Link>
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm font-semibold text-ink-muted hover:text-ink hover:underline"
+          >
+            Cancel
+          </button>
+        ) : (
+          <Link
+            href="/educational-material/books"
+            className="text-sm font-semibold text-ink-muted hover:text-ink hover:underline"
+          >
+            Cancel
+          </Link>
+        )}
       </div>
     </form>
   );

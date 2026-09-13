@@ -23,6 +23,12 @@ export async function POST(request: Request) {
 
     const payment = await prisma.payment.findFirst({ where: { gatewayOrderId: razorpayOrderId } });
     if (payment?.orderId) {
+      const existing = await prisma.order.findUnique({ where: { id: payment.orderId } });
+      // The client-side confirmCheckout may have already flipped this order
+      // (both verify Razorpay's signature). Whichever runs first does the
+      // fan-out; the other only needs to make sure the row is consistent.
+      const alreadyPaid = existing?.status === "PAID";
+
       const order = await prisma.order.update({
         where: { id: payment.orderId },
         data: { status: "PAID" },
@@ -34,17 +40,19 @@ export async function POST(request: Request) {
         data: { status: "CAPTURED", gatewayPaymentId: event.payload.payment.entity.id },
       });
 
-      // Digital items → instant entitlement; physical → fulfillment queue;
-      // confirmation email → Inngest fan-out (Section 3.8).
-      await inngest.send({
-        name: "order/confirmed",
-        data: {
-          orderId: order.id,
-          userEmail: order.user?.email ?? order.guestEmail ?? "",
-          totalCents: order.totalCents,
-          items: order.items.map((i) => ({ title: i.product.title, quantity: i.quantity, priceCents: i.unitPriceCents })),
-        },
-      });
+      if (!alreadyPaid) {
+        // Digital items → instant entitlement; physical → fulfillment queue;
+        // confirmation email → Inngest fan-out (Section 3.8).
+        await inngest.send({
+          name: "order/confirmed",
+          data: {
+            orderId: order.id,
+            userEmail: order.user?.email ?? order.guestEmail ?? "",
+            totalCents: order.totalCents,
+            items: order.items.map((i) => ({ title: i.product.title, quantity: i.quantity, priceCents: i.unitPriceCents })),
+          },
+        });
+      }
     }
   }
 

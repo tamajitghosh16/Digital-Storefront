@@ -39,6 +39,9 @@ export interface ProductPageData {
   description: string | null;
   priceCents: number;
   coverImageUrl: string | null;
+  backCoverImageUrl?: string | null;
+  prefaceImageUrl?: string | null;
+  indexPageImageUrl?: string | null;
   stockQty?: number | null;
   isbn?: string | null;
   pages?: number | null;
@@ -127,6 +130,9 @@ export function ProductPage({
                 title={product.title}
                 author={product.author}
                 coverImageUrl={product.coverImageUrl}
+                backCoverImageUrl={product.backCoverImageUrl}
+                prefaceImageUrl={product.prefaceImageUrl}
+                indexPageImageUrl={product.indexPageImageUrl}
                 from={product.coverFrom}
                 to={product.coverTo}
                 flag={(product.reviewCount ?? 0) > 100 ? "Bestseller" : undefined}
@@ -320,6 +326,7 @@ export function ProductPage({
               reviewCount={product.reviewCount}
               editions={editions}
               printCents={printCents}
+              stockQty={product.stockQty}
               supportsClassSets={printCents !== undefined}
               pricing={pricing}
             />

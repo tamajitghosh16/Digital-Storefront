@@ -1,30 +1,23 @@
-import { BOOK_SEEDS } from "@repo/database";
-
 /**
  * The drawn-jacket gradient for a book that has no uploaded cover.
  *
  * apps/web draws every cover-less book as a 2:3 gradient block (see
- * `BookJacket`), coloured from `coverFrom`/`coverTo` pairs that live in
- * `@repo/database`'s `book-catalog.ts`. `Product` has no column for those,
- * so the admin can't read them back — it recomputes them here instead:
- *
- * - a demo-catalogue slug gets its *exact* storefront colours, so the two
- *   apps show the same jacket for the same title;
- * - anything added from the admin gets a stable colour pair picked from the
- *   same palette by slug, so it looks on-brand and never changes on reload.
- *
- * This module imports a *value* from `@repo/database`, so it must only be
- * used from Server Components — `books/page.tsx` calls it and passes the
- * result down as a prop, the same way the pricing config is threaded.
+ * `BookJacket`), coloured from a `coverFrom`/`coverTo` pair. `Product` has
+ * no column for those, so the admin can't read them back — it derives a
+ * stable pair here instead, picked from the shared palette by slug, so a
+ * book added from the admin looks on-brand and never changes on reload.
  */
 
-const SEEDED = new Map(BOOK_SEEDS.map((b) => [b.slug, { from: b.coverFrom, to: b.coverTo }] as const));
-
-/** The distinct colour pairs the demo catalogue uses — the fallback palette. */
-const PALETTE = [
-  ...new Map(
-    BOOK_SEEDS.map((b) => [`${b.coverFrom}|${b.coverTo}`, { from: b.coverFrom, to: b.coverTo }]),
-  ).values(),
+/** The on-brand cover gradient pairs, sampled from the storefront palette. */
+const PALETTE: Array<{ from: string; to: string }> = [
+  { from: "#1b2a4a", to: "#2e74b5" },
+  { from: "#4a7c59", to: "#2c4a35" },
+  { from: "#b3543f", to: "#7a3626" },
+  { from: "#8e4a7c", to: "#4a2a52" },
+  { from: "#c9973b", to: "#8a641f" },
+  { from: "#34495e", to: "#1b2a4a" },
+  { from: "#3f6bb3", to: "#254b85" },
+  { from: "#7a8c3f", to: "#4d5a26" },
 ];
 
 function hash(value: string): number {
@@ -35,5 +28,5 @@ function hash(value: string): number {
 
 export function bookCoverGradient(slug: string): { from: string; to: string } {
   const base = slug.replace(/-ebook$/, "");
-  return SEEDED.get(base) ?? PALETTE[hash(base) % PALETTE.length]!;
+  return PALETTE[hash(base) % PALETTE.length]!;
 }

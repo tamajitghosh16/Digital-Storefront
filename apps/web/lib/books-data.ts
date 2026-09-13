@@ -12,15 +12,14 @@
  * plus 20 rows). `countBookListings` is one aggregate, run only on the
  * initial render, never per scroll.
  *
- * The Postgres branch below is what's live: real inventory (the 100-title
- * demo catalogue plus anything added from the admin) is seeded into
- * `Product` — see `packages/database/prisma/seed.ts` — and every request
- * reads from there, so a book added or hidden in the admin appears on the
- * next request with no redeploy. `withFallback()` (see `lib/safe-fetch`)
- * still falls back to the bundled sample catalogue in `lib/sample-data` —
- * built from the very same seed file, `@repo/database`'s
- * `book-catalog.ts` — if the database is unreachable, so a fresh checkout
- * with no `DATABASE_URL` still renders. `docs/books-listing-scaling.md`
+ * The Postgres branch below is what's live: real inventory added from the
+ * admin is written to `Product` — see `packages/database/prisma/seed.ts` —
+ * and every request reads from there, so a book added or hidden in the
+ * admin appears on the next request with no redeploy. `withFallback()` (see
+ * `lib/safe-fetch`) still falls back to the bundled sample catalogue in
+ * `lib/sample-data` — built from `@repo/database`'s `book-catalog.ts`, whose
+ * `BOOK_SEEDS` is empty during the testing phase, so that fallback renders
+ * an empty catalogue until it is re-seeded. `docs/books-listing-scaling.md`
  * covers the index work that keeps this branch flat at 1M rows.
  */
 

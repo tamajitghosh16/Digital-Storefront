@@ -1,11 +1,16 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Script from "next/script";
+import { useRouter } from "next/navigation";
 import { Minus, Plus } from "lucide-react";
 import { cn } from "@repo/ui/utils";
+import type { Address } from "@repo/database";
 import { Breadcrumb, Callout, CheckList, Rule, Wrap, buttonClass } from "@/components/primitives";
 import { formatINRWhole } from "@/lib/format";
 import { useCartStore } from "@/lib/cart-store";
+import { startCheckout, confirmCheckout } from "@/app/(checkout)/actions";
+import { createAddress } from "@/lib/actions/addresses";
 import {
   deliveryFeeCents,
   deliveryOptions,
@@ -29,18 +34,59 @@ import { BookJacket, ProductShot } from "./book-jacket";
 const REQUIRED_FIELDS = ["name", "email", "address", "city", "state", "pin"] as const;
 type FieldName = (typeof REQUIRED_FIELDS)[number] | "gst";
 
-export function CartScreen({ pricing }: { pricing: PricingConfig }) {
-  const { items, removeItem, updateQuantity } = useCartStore();
+/** The address list is server-sorted default-first, but this stays explicit in case that ever changes. */
+function pickDefaultAddress(addresses: Address[]): Address | null {
+  return addresses.find((address) => address.isDefault) ?? addresses[0] ?? null;
+}
+
+function addressToFields(address: Address) {
+  return {
+    address: address.line2 ? `${address.line1}, ${address.line2}` : address.line1,
+    city: address.city,
+    state: address.state,
+    pin: address.postalCode,
+  };
+}
+
+export function CartScreen({
+  pricing,
+  isSignedIn,
+  paymentsConfigured,
+  initialAddresses,
+}: {
+  pricing: PricingConfig;
+  isSignedIn: boolean;
+  paymentsConfigured: boolean;
+  initialAddresses: Address[];
+}) {
+  const router = useRouter();
+  const { items, removeItem, updateQuantity, clear } = useCartStore();
   const speeds = useMemo(() => deliveryOptions(pricing), [pricing]);
 
-  const [fields, setFields] = useState<Record<FieldName, string>>({
-    name: "",
-    email: "",
-    address: "",
-    city: "",
-    state: "",
-    pin: "",
-    gst: "",
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+
+  const [addresses, setAddresses] = useState<Address[]>(initialAddresses);
+  const [selectedAddressId, setSelectedAddressId] = useState(() => pickDefaultAddress(initialAddresses)?.id ?? "");
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
+  const [addressPromptDone, setAddressPromptDone] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
+  const saveDialogRef = useRef<HTMLDialogElement>(null);
+
+  // Pre-fills from the default saved address (if any) so a returning
+  // customer lands on checkout with it already applied, not just offered
+  // in a dropdown they might not notice.
+  const [fields, setFields] = useState<Record<FieldName, string>>(() => {
+    const defaultAddress = pickDefaultAddress(initialAddresses);
+    return {
+      name: "",
+      email: "",
+      address: defaultAddress ? addressToFields(defaultAddress).address : "",
+      city: defaultAddress?.city ?? "",
+      state: defaultAddress?.state ?? "",
+      pin: defaultAddress?.postalCode ?? "",
+      gst: "",
+    };
   });
   const [speed, setSpeed] = useState<DeliverySpeed>("standard");
   const [couponInput, setCouponInput] = useState("");
@@ -87,6 +133,129 @@ export function CartScreen({ pricing }: { pricing: PricingConfig }) {
 
   const canPay = formValid && items.length > 0;
 
+  useEffect(() => {
+    const dialog = saveDialogRef.current;
+    if (!dialog) return;
+    if (showSavePrompt) {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) {
+      dialog.close();
+    }
+  }, [showSavePrompt]);
+
+  function handlePay() {
+    if (!isSignedIn) {
+      router.push("/sign-in?next=/cart");
+      return;
+    }
+    if (paying) return;
+    // A signed-in shopper with nothing saved yet gets asked once, right at
+    // the moment they're about to pay with a real address in hand — rather
+    // than a generic prompt on the account page they'd have no reason to
+    // visit ahead of time.
+    if (addresses.length === 0 && !addressPromptDone) {
+      setShowSavePrompt(true);
+      return;
+    }
+    proceedToPayment();
+  }
+
+  function handleSaveAddressChoice(save: boolean) {
+    setShowSavePrompt(false);
+    setAddressPromptDone(true);
+    if (!save) {
+      proceedToPayment();
+      return;
+    }
+    setSavingAddress(true);
+    createAddress({
+      line1: fields.address,
+      city: fields.city,
+      state: fields.state,
+      postalCode: fields.pin,
+    })
+      .then((result) => {
+        if (result.ok) setAddresses((prev) => [...prev, result.address]);
+      })
+      .catch(() => {})
+      .finally(() => {
+        setSavingAddress(false);
+        proceedToPayment();
+      });
+  }
+
+  async function proceedToPayment() {
+    setPayError(null);
+    setPaying(true);
+
+    const started = await startCheckout({
+      items: items.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+      contact: {
+        name: fields.name,
+        email: fields.email,
+        address: fields.address,
+        city: fields.city,
+        state: fields.state,
+        pin: fields.pin,
+        gst: fields.gst || undefined,
+      },
+      speed,
+      couponCode: coupon?.code,
+    });
+
+    if (!started.ok) {
+      setPaying(false);
+      if (started.error === "SIGN_IN_REQUIRED") {
+        router.push("/sign-in?next=/cart");
+        return;
+      }
+      setPayError(
+        started.error === "NOT_CONFIGURED"
+          ? "Card payments aren't switched on yet. Please try again later."
+          : started.error === "PRODUCT_MISSING"
+            ? "One of these items is no longer available. Please remove it and try again."
+            : "We couldn't start the payment. Please try again."
+      );
+      return;
+    }
+
+    if (typeof window === "undefined" || !window.Razorpay) {
+      setPaying(false);
+      setPayError("The payment window couldn't load. Check your connection and try again.");
+      return;
+    }
+
+    const checkout = new window.Razorpay({
+      key: started.keyId,
+      amount: started.amountCents,
+      currency: started.currency,
+      order_id: started.razorpayOrderId,
+      name: "New School Book Press",
+      prefill: { name: fields.name, email: fields.email },
+      theme: { color: "#007ACC" },
+      handler: async (response) => {
+        const confirmed = await confirmCheckout({
+          orderId: started.orderId,
+          razorpayOrderId: response.razorpay_order_id,
+          razorpayPaymentId: response.razorpay_payment_id,
+          razorpaySignature: response.razorpay_signature,
+        });
+        if (confirmed.ok) {
+          clear();
+          router.push(confirmed.redirect);
+          router.refresh();
+        } else {
+          setPaying(false);
+          setPayError(
+            "Your payment went through but we couldn't confirm it here. It'll appear in your orders shortly — no need to pay again."
+          );
+        }
+      },
+      modal: { ondismiss: () => setPaying(false) },
+    });
+    checkout.open();
+  }
+
   function applyCoupon() {
     const code = couponInput.trim().toUpperCase();
     if (!code) {
@@ -114,6 +283,9 @@ export function CartScreen({ pricing }: { pricing: PricingConfig }) {
 
   return (
     <>
+      {isSignedIn && paymentsConfigured && (
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="afterInteractive" />
+      )}
       <Wrap>
         <Breadcrumb trail={[{ label: "Home", href: "/" }, { label: "Cart" }]} />
         <h1 className="pb-[26px]">Your cart</h1>
@@ -134,6 +306,10 @@ export function CartScreen({ pricing }: { pricing: PricingConfig }) {
               {items.map((item) => {
                 const net = item.priceCents * item.quantity;
                 const list = (item.listPriceCents ?? item.priceCents) * item.quantity;
+                const knownStock = typeof item.stockQty === "number";
+                const outOfStock = knownStock && (item.stockQty as number) <= 0;
+                const atStockLimit = knownStock && item.quantity >= (item.stockQty as number);
+                const lowStock = knownStock && (item.stockQty as number) > 0 && (item.stockQty as number) < 10;
                 return (
                   <div
                     key={item.productId}
@@ -151,6 +327,13 @@ export function CartScreen({ pricing }: { pricing: PricingConfig }) {
                           <Callout>Bundle saving applied</Callout>
                         </p>
                       )}
+                      {outOfStock ? (
+                        <p className="mt-1.5 text-xs font-bold text-sale">Out of stock</p>
+                      ) : (
+                        lowStock && (
+                          <p className="mt-1.5 text-xs font-bold text-warn">Only {item.stockQty} left in stock</p>
+                        )
+                      )}
 
                       <div className="mt-3 flex flex-wrap items-center gap-3.5">
                         <div className="inline-flex items-center overflow-hidden rounded-full bg-tile">
@@ -166,8 +349,9 @@ export function CartScreen({ pricing }: { pricing: PricingConfig }) {
                           <button
                             type="button"
                             aria-label={`Increase quantity of ${item.title}`}
+                            disabled={outOfStock || atStockLimit}
                             onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                            className="grid h-[34px] w-[34px] place-items-center hover:bg-tile-2"
+                            className="grid h-[34px] w-[34px] place-items-center hover:bg-tile-2 disabled:opacity-40 disabled:hover:bg-transparent"
                           >
                             <Plus className="h-4 w-4" strokeWidth={2.5} />
                           </button>
@@ -221,6 +405,36 @@ export function CartScreen({ pricing }: { pricing: PricingConfig }) {
           <p className="mt-2 text-sm text-ink-muted">Fill these in to unlock payment.</p>
 
           <div className="mt-5 grid gap-[18px]">
+            {isSignedIn && addresses.length > 0 && (
+              <div className="flex flex-col gap-[7px]">
+                <label htmlFor="cart-saved-address" className="caps text-ink-muted">
+                  Use a saved address
+                </label>
+                <select
+                  id="cart-saved-address"
+                  value={selectedAddressId}
+                  onChange={(event) => {
+                    const id = event.target.value;
+                    setSelectedAddressId(id);
+                    if (!id) {
+                      setFields((current) => ({ ...current, address: "", city: "", state: "", pin: "" }));
+                      return;
+                    }
+                    const address = addresses.find((item) => item.id === id);
+                    if (!address) return;
+                    setFields((current) => ({ ...current, ...addressToFields(address) }));
+                  }}
+                  className="h-12 rounded-btn border-2 border-line-strong bg-ground px-3.5 text-[15px] focus:border-ink focus:outline-none"
+                >
+                  <option value="">Enter a different address…</option>
+                  {addresses.map((address) => (
+                    <option key={address.id} value={address.id}>
+                      {address.label?.trim() || `${address.line1}, ${address.city}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
               <Field name="name" label="Full name" placeholder="Ananya Sharma" fields={fields} setFields={setFields} />
               <Field
@@ -305,16 +519,37 @@ export function CartScreen({ pricing }: { pricing: PricingConfig }) {
               : "No GST on this order — printed books are nil-rated."}
           </p>
 
-          <button
-            type="button"
-            disabled={!canPay}
-            className={buttonClass("primary", "lg", "mt-5 w-full")}
-          >
-            {canPay ? "Pay with Razorpay" : "Continue to delivery"}
-          </button>
+          {!isSignedIn ? (
+            <button
+              type="button"
+              onClick={handlePay}
+              className={buttonClass("primary", "lg", "mt-5 w-full")}
+            >
+              Sign in to pay
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handlePay}
+              disabled={!canPay || !paymentsConfigured || paying}
+              className={buttonClass("primary", "lg", "mt-5 w-full")}
+            >
+              {paying
+                ? "Opening payment…"
+                : !paymentsConfigured
+                  ? "Card payments unavailable"
+                  : canPay
+                    ? "Pay with Razorpay"
+                    : "Continue to delivery"}
+            </button>
+          )}
+
+          {payError && <p className="mt-3 text-xs font-bold text-sale">{payError}</p>}
 
           <p className="mt-3.5 text-xs leading-relaxed text-ink-muted">
-            Your order is confirmed only after the payment gateway verifies it — you&rsquo;ll get an email either way.
+            {isSignedIn
+              ? "Your order is confirmed only after the payment gateway verifies it — you’ll get an email either way."
+              : "You’ll need to sign in before paying, so your e-books land in your library."}
           </p>
 
           <Rule />
@@ -328,6 +563,32 @@ export function CartScreen({ pricing }: { pricing: PricingConfig }) {
           />
         </aside>
       </Wrap>
+
+      <dialog
+        ref={saveDialogRef}
+        onClose={() => setShowSavePrompt(false)}
+        className="fixed inset-0 m-auto h-fit w-[min(28rem,calc(100vw-2rem))] rounded-tile border border-line-strong bg-ground p-0 text-ink backdrop:bg-ink/40"
+      >
+        <div className="p-6">
+          <h3>Save this address?</h3>
+          <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+            Save it to your account so you don&rsquo;t have to type it again next time.
+          </p>
+          <div className="mt-5 flex justify-end gap-3">
+            <button type="button" className={buttonClass("secondary")} onClick={() => handleSaveAddressChoice(false)}>
+              Not now
+            </button>
+            <button
+              type="button"
+              className={buttonClass("primary")}
+              disabled={savingAddress}
+              onClick={() => handleSaveAddressChoice(true)}
+            >
+              {savingAddress ? "Saving…" : "Save address"}
+            </button>
+          </div>
+        </div>
+      </dialog>
     </>
   );
 }

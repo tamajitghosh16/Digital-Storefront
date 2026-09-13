@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { Heart } from "lucide-react";
 import { getPricingConfig, getSiteSettings } from "@repo/database";
 import { getCurrentUser } from "@repo/auth/server";
 import { withFallback } from "@/lib/safe-fetch";
@@ -11,7 +10,6 @@ import { AccountMenu } from "./account-menu";
 import { CartIndicator } from "./cart-indicator";
 import { DepartmentNav } from "./department-nav";
 import { HeaderSearch } from "./header-search";
-import { IconButtonLink } from "./icon-button";
 import { MobileNav } from "./mobile-nav";
 import { PromoBar } from "./promo-bar";
 import { ThemeToggle } from "./theme-toggle";
@@ -58,9 +56,6 @@ export async function SiteHeader() {
 
         <div className="ml-auto flex shrink-0 items-center gap-0.5">
           <ThemeToggle />
-          <IconButtonLink href="/account/library" label="Library">
-            <Heart className="h-[22px] w-[22px]" strokeWidth={1.9} />
-          </IconButtonLink>
           <CartIndicator />
           <AccountMenu user={user ? { name: user.name, email: user.email, role: user.role } : null} />
         </div>

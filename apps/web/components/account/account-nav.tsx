@@ -5,8 +5,10 @@ import { cn } from "@repo/ui/utils";
 
 /** Pill nav down the side of the account area. */
 const LINKS = [
+  { href: "/account/details", label: "Account details" },
   { href: "/account/library", label: "Digital library" },
   { href: "/account/orders", label: "Orders" },
+  { href: "/account/wishlist", label: "Wishlist" },
 ];
 
 const AUTHOR_LINKS = [{ href: "/account/publishing", label: "Publishing & royalties" }];

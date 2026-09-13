@@ -1,9 +1,13 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Minus, Plus } from "lucide-react";
+import { createClient } from "@repo/auth/client";
 import { cn } from "@repo/ui/utils";
 import { CheckList, Rule, Stars, buttonClass } from "@/components/primitives";
 import { formatINRWhole } from "@/lib/format";
-import { useCartStore } from "@/lib/cart-store";
+import { useCartStore, type CartItem } from "@/lib/cart-store";
+import { WishlistButton } from "./wishlist-button";
 import {
   deliveryOptions,
   editionUnitCents,
@@ -23,7 +27,16 @@ import {
  * copy costs at that tier, and a digital-only selection has no tiers at
  * all because there is nothing to print. Keeping that arithmetic in one
  * place is why this is a single component rather than three.
+ *
+ * Stock only constrains editions that ship a physical copy (`print` and
+ * `both`). When `stockQty` is a known number it caps the quantity, drives
+ * the low-stock nudge (< 10 left), and — at zero — disables ordering
+ * entirely. A null/undefined `stockQty` means "not tracked", so nothing
+ * is blocked (e-books, service rows, un-migrated catalogue rows).
  */
+const LOW_STOCK_THRESHOLD = 10;
+const MAX_QTY = 99;
+
 export function BuyBox({
   productId,
   title,
@@ -33,6 +46,7 @@ export function BuyBox({
   reviewCount,
   editions,
   printCents,
+  stockQty,
   supportsClassSets,
   pricing,
 }: {
@@ -45,11 +59,35 @@ export function BuyBox({
   editions: Edition[];
   /** Single-copy printed price — the base every tier is derived from. */
   printCents?: number;
+  /** Units of the printed edition on hand. `null`/`undefined` = not tracked. */
+  stockQty?: number | null;
   supportsClassSets: boolean;
   /** Admin-managed delivery, bundle and class-set rules, loaded by the page. */
   pricing: PricingConfig;
 }) {
+  const router = useRouter();
   const addItem = useCartStore((state) => state.addItem);
+
+  // Payment requires a signed-in account (so e-books can be tied to it). We
+  // check on the client to avoid threading the flag through every page that
+  // renders a buy box; the checkout Server Action re-checks server-side.
+  // Default true so the primary CTA never flashes as blocked before the
+  // check resolves.
+  const [isSignedIn, setIsSignedIn] = useState(true);
+  useEffect(() => {
+    let active = true;
+    createClient()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (active) setIsSignedIn(Boolean(data.session));
+      })
+      .catch(() => {
+        if (active) setIsSignedIn(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [editionKind, setEditionKind] = useState(editions[0]?.kind ?? "print");
   const [quantity, setQuantity] = useState(1);
@@ -60,9 +98,19 @@ export function BuyBox({
   const edition = editions.find((candidate) => candidate.kind === editionKind) ?? editions[0];
   const digitalOnly = edition?.kind === "ebook";
 
-  // Tiers are meaningless without a printed copy to discount.
-  const tiersEnabled = supportsClassSets && printCents !== undefined && !digitalOnly;
-  const effectiveQuantity = tiersEnabled ? quantity : 1;
+  // Physical stock only matters for editions that ship something.
+  const knownStock = typeof stockQty === "number";
+  const physicalSelected = !digitalOnly;
+  const outOfStock = physicalSelected && knownStock && (stockQty as number) <= 0;
+  const lowStock =
+    physicalSelected && knownStock && (stockQty as number) > 0 && (stockQty as number) < LOW_STOCK_THRESHOLD;
+  const maxQty = digitalOnly
+    ? 1
+    : knownStock && (stockQty as number) > 0
+      ? Math.min(stockQty as number, MAX_QTY)
+      : MAX_QTY;
+
+  const effectiveQuantity = Math.min(Math.max(1, quantity), maxQty);
   const tier = tierForQuantity(pricing.classSetTiers, effectiveQuantity);
 
   const printUnit = printCents !== undefined ? tierUnitCents(printCents, tier.discount) : 0;
@@ -71,21 +119,37 @@ export function BuyBox({
 
   if (!edition) return null;
 
-  function handleAdd() {
-    addItem({
+  function buildItem(): CartItem {
+    return {
       productId: editionKind === "print" ? productId : `${productId}:${editionKind}`,
       title: editionKind === "print" ? title : `${title} — ${edition!.label.toLowerCase()}`,
       priceCents: unitCents,
       quantity: effectiveQuantity,
       fulfillmentType: editionKind === "ebook" ? "DIGITAL" : "SHIP",
-    });
+      taxType: editionKind === "ebook" ? "EBOOK" : "PHYSICAL_BOOK",
+      stockQty: physicalSelected ? (stockQty ?? null) : null,
+    };
+  }
+
+  function handleAdd() {
+    if (outOfStock) return;
+    addItem(buildItem());
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1800);
   }
 
+  function handleBuyNow() {
+    if (outOfStock) return;
+    addItem(buildItem());
+    router.push(isSignedIn ? "/cart" : "/sign-in?next=/cart");
+  }
+
   return (
     <div className="rounded-tile bg-ground p-[26px] inset-ring inset-ring-line">
-      <p className="text-[22px] font-bold leading-[1.15] tracking-[-0.02em]">{title}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[22px] font-bold leading-[1.15] tracking-[-0.02em]">{title}</p>
+        <WishlistButton productId={productId} className="mt-0.5" />
+      </div>
       <p className="mt-1.5 text-sm text-ink-muted">
         {author}
         {genre && ` · ${genre}`}
@@ -158,6 +222,33 @@ export function BuyBox({
 
       <Rule />
 
+      <div className="flex items-center justify-between gap-3">
+        <span className="caps text-ink-muted">Quantity</span>
+        <div className="inline-flex items-center overflow-hidden rounded-full bg-tile">
+          <button
+            type="button"
+            aria-label="Decrease quantity"
+            disabled={digitalOnly || outOfStock || effectiveQuantity <= 1}
+            onClick={() => setQuantity((current) => Math.max(1, Math.min(current, maxQty) - 1))}
+            className="grid h-[34px] w-[34px] place-items-center hover:bg-tile-2 disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            <Minus className="h-4 w-4" strokeWidth={2.5} />
+          </button>
+          <span className="min-w-10 text-center text-sm font-bold tabular-nums">{effectiveQuantity}</span>
+          <button
+            type="button"
+            aria-label="Increase quantity"
+            disabled={digitalOnly || outOfStock || effectiveQuantity >= maxQty}
+            onClick={() => setQuantity((current) => Math.min(maxQty, Math.max(1, current) + 1))}
+            className="grid h-[34px] w-[34px] place-items-center hover:bg-tile-2 disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
+
+      <Rule />
+
       <p className="text-4xl font-bold leading-none tracking-[-0.03em] tabular-nums">{formatINRWhole(totalCents)}</p>
       <p className="mt-[7px] text-sm text-ink-muted">
         MRP (inclusive of all taxes) ·{" "}
@@ -165,15 +256,32 @@ export function BuyBox({
           ? "1 copy"
           : `${effectiveQuantity} copies at ${formatINRWhole(unitCents)} each`}
       </p>
-      <p className="mt-2.5 text-sm font-bold text-ok">{edition.note}</p>
+      {outOfStock ? (
+        <p className="mt-2.5 text-sm font-bold text-sale">Out of stock</p>
+      ) : (
+        <>
+          <p className="mt-2.5 text-sm font-bold text-ok">{edition.note}</p>
+          {lowStock && (
+            <p className="mt-1 text-sm font-bold text-warn">Only {stockQty} left in stock</p>
+          )}
+        </>
+      )}
 
       <div className="mt-5 grid gap-2.5">
-        <button type="button" onClick={handleAdd} className={buttonClass("primary", "lg", "w-full")}>
-          {added ? "Added to cart ✓" : "Add to cart"}
-        </button>
-        <button type="button" className={buttonClass("secondary", "lg", "w-full")}>
-          Buy now
-        </button>
+        {outOfStock ? (
+          <button type="button" disabled className={buttonClass("primary", "lg", "w-full")}>
+            Out of stock
+          </button>
+        ) : (
+          <>
+            <button type="button" onClick={handleAdd} className={buttonClass("primary", "lg", "w-full")}>
+              {added ? "Added to cart ✓" : "Add to cart"}
+            </button>
+            <button type="button" onClick={handleBuyNow} className={buttonClass("secondary", "lg", "w-full")}>
+              Buy now
+            </button>
+          </>
+        )}
       </div>
 
       {supportsClassSets && printCents !== undefined && (
@@ -189,7 +297,8 @@ export function BuyBox({
 
             <div className="mt-3.5 grid gap-2.5 [grid-template-columns:repeat(auto-fit,minmax(134px,1fr))]">
               {pricing.classSetTiers.map((candidate) => {
-                const disabled = digitalOnly && candidate.quantity > 1;
+                const overStock = knownStock && !digitalOnly && candidate.quantity > (stockQty as number);
+                const disabled = (digitalOnly && candidate.quantity > 1) || outOfStock || overStock;
                 const selected = !disabled && candidate.quantity === effectiveQuantity;
                 const each = tierUnitCents(printCents, candidate.discount);
                 return (
@@ -212,7 +321,7 @@ export function BuyBox({
                       {disabled ? "—" : formatINRWhole(editionUnitCents(edition, each))}
                     </span>
                     <span className="mt-px block text-xs font-bold">
-                      {candidate.discount > 0 && !disabled ? `Save ${Math.round(candidate.discount * 100)}%` : " "}
+                      {candidate.discount > 0 && !disabled ? `Save ${Math.round(candidate.discount * 100)}%` : " "}
                     </span>
                   </button>
                 );

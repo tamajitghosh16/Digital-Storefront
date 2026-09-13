@@ -116,7 +116,7 @@ const INVENTORY_INITIAL_COUNT = 5;
 export function SidebarNav({ menuCategories }: { menuCategories: InventoryCategory[] }) {
   const pathname = usePathname();
 
-  // "/educational-material/books/new" should light up "Books & products";
+  // "/educational-material/books/[id]" should light up "Books & products";
   // "/" only lights up the dashboard, or every prefix check would match it.
   const isCurrent = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 

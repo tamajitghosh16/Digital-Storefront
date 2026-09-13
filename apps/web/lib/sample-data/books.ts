@@ -1,9 +1,10 @@
 // The storefront-shaped view of the shared demo catalogue. The seed data
-// itself lives in @repo/database (src/book-catalog.ts) so the same 100
-// titles back the database seed and the admin's list; here each seed is
+// itself lives in @repo/database (src/book-catalog.ts); here each seed is
 // expanded into the two display rows the storefront groups back together
 // (printed edition + e-book), with the display-only fields the schema
-// does not carry.
+// does not carry. `BOOK_SEEDS` is empty during the testing phase, so these
+// arrays are currently empty — the offline fallback shows no books until
+// the catalogue is re-seeded.
 
 import { BOOK_SEEDS } from "@repo/database";
 import { baseProductFields, type DisplayProduct } from "./shared";

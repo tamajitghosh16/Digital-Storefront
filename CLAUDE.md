@@ -43,7 +43,7 @@ npm run db:generate                      # regenerate the Prisma client — do t
 npm run db:migrate                       # prisma migrate dev, against Supabase
 npm run db:studio                        # prisma studio
 npm run migrate:deploy --workspace=@repo/database
-npm run seed --workspace=@repo/database  # adds 3 sample products
+npm run seed --workspace=@repo/database  # seeds CMS defaults + one sample service package (book catalogue is empty for the testing phase)
 ```
 
 To run any script in a single workspace directly: `npm run <script> --workspace=<name>` (app names are `web`/`admin`; package names are `@repo/database`, `@repo/auth`, etc.).
