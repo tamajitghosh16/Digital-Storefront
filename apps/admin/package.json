@@ -14,6 +14,7 @@
     "@repo/auth": "*",
     "@repo/database": "*",
     "@repo/email": "*",
+    "@repo/jobs": "*",
     "@repo/security": "*",
     "@repo/storage": "*",
     "@repo/ui": "*",

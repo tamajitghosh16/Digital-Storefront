@@ -286,7 +286,28 @@ without `CLOUDMERSIVE_API_KEY`). Needs `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SE
 (both already required by this app); `isImageUploadConfigured()` gates the
 route so a missing config falls back to "paste a URL" instead of throwing.
 
-**Still read-only stubs:** `orders`, `submissions`, `royalties`, `reviews`,
+**Orders move forward from `orders/[id]`.** The list (`orders/page.tsx`,
+with a "To do" filter = PAID + PROCESSING, which the dashboard links to)
+opens each order's page, where `updateOrder` / `markCashCollected` in
+`orders/actions.ts` change it. The allowed moves live in one place,
+`orders/order-status.ts` (`nextStatuses`), used by both the page (to offer
+choices) and the actions (to refuse anything else): forward-only
+PAID → PROCESSING → SHIPPED → DELIVERED for parcels, PAID → PROCESSING →
+DELIVERED for e-book/service orders, CANCELLED until delivered, REFUNDED
+only once `Payment.status` is CAPTURED (and it flips the Payment to REFUNDED
+too). SHIPPED needs both `carrier` and `trackingNumber`. COD cash is
+recorded as `Payment.status = CAPTURED`, only once the order is SHIPPED or
+DELIVERED. Gated on `ORDER_WRITE_ROLES` (Support included). Each save is
+conditional on the status the page rendered with (`expectedStatus`), and
+writes an `AuditLog` row (`order.status_changed`, `order.tracking_updated`,
+`order.cod_collected`, old/new values in `diff`) that the order page lists
+as its History. Marking SHIPPED sends `order/shipped` via `@repo/jobs` from
+`after()`, best-effort. There is **no** PENDING → PAID move here, by design:
+online payment is settled only by `apps/web`'s `settleOrderPayment`.
+Cancelling doesn't put stock back yet, and "Refunded" records a refund made
+in Razorpay — it doesn't send one.
+
+**Still read-only stubs:** `submissions`, `royalties`, `reviews`,
 `analytics` — these still do a direct read-only Prisma query with no
 create/update forms or status-change actions wired up yet (see the root
 README's "What's real vs. what's a stub" list). `settings/roles` is now
