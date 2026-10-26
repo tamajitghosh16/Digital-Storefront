@@ -17,6 +17,6 @@
     "tailwind-merge": "^2.6.0"
   },
   "peerDependencies": {
-    "react": "^19.0.0"
+    "react": "^19.3.1"
   }
 }
