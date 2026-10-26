@@ -3,6 +3,7 @@ import { PageHeader, SavedBanner } from "@/components/ui";
 import { bookCoverGradient } from "@/lib/book-cover";
 import { AddBookDialog } from "./add-book-dialog";
 import { BooksList } from "./books-list";
+import { requireStaffPage } from "@/lib/guard";
 
 // FR-11.1: CMS for creating/editing the book catalogue (printed books and e-books).
 // Service packages are managed through the same Server Actions but don't
@@ -14,6 +15,7 @@ export default async function BooksPage({
 }: {
   searchParams: Promise<{ error?: string; created?: string }>;
 }) {
+  await requireStaffPage();
   const { error, created } = await searchParams;
   // The whole list is handed to a Client Component that searches and sorts
   // it in the browser, so the cap has to sit above the catalogue rather than
@@ -24,6 +26,7 @@ export default async function BooksPage({
     // lines (charts, worksheets, teaching materials) are also PHYSICAL_BOOK
     // for fulfilment — `productLine` is what keeps this list to books.
     where: { type: { in: ["PHYSICAL_BOOK", "EBOOK"] }, productLine: "BOOK" },
+    include: { editions: true },
     orderBy: { createdAt: "desc" },
     take: 500,
   });

@@ -3,8 +3,10 @@ import { prisma } from "@repo/database";
 import { ButtonLink, EmptyState, PageHeader, Pill, Table } from "@/components/ui";
 import { ConfirmButton, LinkButton } from "@/components/form-controls";
 import { deleteTestimonial, toggleTestimonialActive } from "./actions";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function TestimonialsPage() {
+  await requireStaffPage();
   const testimonials = await prisma.testimonial.findMany({ orderBy: { order: "asc" } });
 
   return (

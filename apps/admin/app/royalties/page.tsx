@@ -1,5 +1,6 @@
 import { prisma } from "@repo/database";
 import { EmptyState, PageHeader, Pill, Table } from "@/components/ui";
+import { requireStaffPage } from "@/lib/guard";
 
 // FR-11.4: calculate and report author royalties owed per published title.
 // Read-only for now — the payout run is still to be built.
@@ -7,6 +8,7 @@ import { EmptyState, PageHeader, Pill, Table } from "@/components/ui";
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
 export default async function RoyaltiesPage() {
+  await requireStaffPage();
   const royalties = await prisma.royalty.findMany({
     orderBy: { createdAt: "desc" },
     take: 50,

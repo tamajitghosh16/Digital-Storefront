@@ -4,10 +4,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@repo/ui/sheet";
 import { cn } from "@repo/ui/utils";
 import { SORT_OPTIONS, booksHref } from "@/lib/books-query";
+import type { ListingLine } from "@/lib/product-lines";
 import { BooksFilters } from "./books-filter-rail";
 
 /**
- * The one control row that sits beside the "All Books" heading: keyword
+ * The one control row that sits beside the "All {line}" heading: keyword
  * search, a "Filter" button that opens the facet rail in a sheet, and the
  * sort / view selects. Every control writes the query string so a narrowed
  * result set stays a shareable URL.
@@ -16,7 +17,7 @@ import { BooksFilters } from "./books-filter-rail";
 const CONTROL =
   "h-[42px] rounded-full border-2 border-ink bg-ground px-4 text-sm font-bold text-ink focus:outline-none";
 
-export function BooksToolbar({ availableGenres }: { availableGenres: readonly string[] }) {
+export function BooksToolbar({ availableGenres, line }: { availableGenres: readonly string[]; line: ListingLine }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const current = Object.fromEntries(searchParams.entries());
@@ -27,7 +28,7 @@ export function BooksToolbar({ availableGenres }: { availableGenres: readonly st
   ).length;
 
   function go(next: Record<string, string | undefined>) {
-    router.push(booksHref({ ...current, page: undefined, ...next }));
+    router.push(booksHref({ ...current, page: undefined, ...next }, line.base));
   }
 
   return (
@@ -47,8 +48,8 @@ export function BooksToolbar({ availableGenres }: { availableGenres: readonly st
           type="search"
           name="q"
           defaultValue={current.q ?? ""}
-          placeholder="Search books"
-          aria-label="Search books"
+          placeholder={`Search ${line.label.toLowerCase()}`}
+          aria-label={`Search ${line.label.toLowerCase()}`}
           className="h-[42px] w-full min-w-[180px] rounded-full border-2 border-line-strong bg-ground pl-4 pr-10 text-sm focus:border-ink focus:outline-none sm:w-[210px]"
         />
         <button
@@ -74,9 +75,11 @@ export function BooksToolbar({ availableGenres }: { availableGenres: readonly st
         </SheetTrigger>
         <SheetContent side="right" className="overflow-y-auto bg-page text-ink">
           <SheetHeader>
-            <SheetTitle className="text-lg font-bold tracking-[-0.01em]">Filter books</SheetTitle>
+            <SheetTitle className="text-lg font-bold tracking-[-0.01em]">
+              Filter {line.label.toLowerCase()}
+            </SheetTitle>
           </SheetHeader>
-          <BooksFilters availableGenres={availableGenres} onNavigate={() => setFiltersOpen(false)} />
+          <BooksFilters availableGenres={availableGenres} line={line} onNavigate={() => setFiltersOpen(false)} />
         </SheetContent>
       </Sheet>
 

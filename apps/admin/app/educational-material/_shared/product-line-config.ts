@@ -31,9 +31,11 @@ export interface ProductLineConfig {
   copy: {
     /** Sentence under the list page's title. */
     listDescription: string;
-    /** Heading + blurb for the create page. */
+    /** Heading + blurb for the "Add new …" dialog. */
     newTitle: string;
     newDescription: string;
+    /** Banner on the list page after the dialog saves. */
+    addedMessage: string;
     /** "About this …" section. */
     aboutTitle: string;
     aboutDescription: string;
@@ -71,6 +73,7 @@ export const PRODUCT_LINE_CONFIGS: Record<string, ProductLineConfig> = {
       listDescription: "Wall and learning charts — the kind hung up at home or in a classroom to help children learn a topic at a glance.",
       newTitle: "Add an educational chart",
       newDescription: "Fill in what you know — you can come back and change any of it later.",
+      addedMessage: "Chart added.",
       aboutTitle: "About this chart",
       aboutDescription: "What shoppers read on the chart's own page and in the shop listing.",
       titleLabel: "Chart title",
@@ -98,6 +101,7 @@ export const PRODUCT_LINE_CONFIGS: Record<string, ProductLineConfig> = {
       listDescription: "Worksheet packs, puzzle books and activity sets — word puzzles, Sudoku, brain-development games and the like for younger children.",
       newTitle: "Add a worksheet or puzzle book",
       newDescription: "Fill in what you know — you can come back and change any of it later.",
+      addedMessage: "Workbook added.",
       aboutTitle: "About this workbook",
       aboutDescription: "What shoppers read on its own page and in the shop listing.",
       titleLabel: "Title",
@@ -126,6 +130,7 @@ export const PRODUCT_LINE_CONFIGS: Record<string, ProductLineConfig> = {
       listDescription: "Classroom aids teachers use to do their job more easily — flash cards, model sets, wall friezes, manipulatives and teacher handbooks.",
       newTitle: "Add a teaching or learning material",
       newDescription: "Fill in what you know — you can come back and change any of it later.",
+      addedMessage: "Teaching aid added.",
       aboutTitle: "About this teaching aid",
       aboutDescription: "What teachers read on its own page and in the shop listing.",
       titleLabel: "Name",

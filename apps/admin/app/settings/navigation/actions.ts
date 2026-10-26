@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/storefront-cache";
 import { Prisma, prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CONTENT_WRITE_ROLES } from "@repo/auth/roles";
@@ -22,6 +23,7 @@ export async function createNavLink(formData: FormData) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "nav_link.created", entity: "NavLink", entityId: link.id, diff: parsed.data as Prisma.InputJsonValue },
   });
 
+  revalidateStorefront();
   revalidatePath("/settings/navigation");
   redirect("/settings/navigation");
 }
@@ -41,6 +43,7 @@ export async function updateNavLink(id: string, formData: FormData) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "nav_link.updated", entity: "NavLink", entityId: id, diff: parsed.data as Prisma.InputJsonValue },
   });
 
+  revalidateStorefront();
   revalidatePath("/settings/navigation");
   revalidatePath(`/settings/navigation/${id}`);
   redirect("/settings/navigation");
@@ -64,6 +67,7 @@ export async function toggleNavLinkActive(id: string) {
     },
   });
 
+  revalidateStorefront();
   revalidatePath("/settings/navigation");
 }
 
@@ -77,5 +81,6 @@ export async function deleteNavLink(id: string) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "nav_link.deleted", entity: "NavLink", entityId: id, diff: Prisma.JsonNull },
   });
 
+  revalidateStorefront();
   revalidatePath("/settings/navigation");
 }

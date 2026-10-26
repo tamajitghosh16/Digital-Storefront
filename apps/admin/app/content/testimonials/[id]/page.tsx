@@ -3,6 +3,7 @@ import { prisma } from "@repo/database";
 import { PageHeader } from "@/components/ui";
 import { updateTestimonial } from "../actions";
 import { TestimonialForm } from "../testimonial-form";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function EditTestimonialPage({
   params,
@@ -11,6 +12,7 @@ export default async function EditTestimonialPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireStaffPage();
   const { id } = await params;
   const { error } = await searchParams;
   const testimonial = await prisma.testimonial.findUnique({ where: { id } });

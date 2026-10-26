@@ -1,26 +1,24 @@
+import Link from "next/link";
 import { DEFAULT_PRICING_CONFIG, PRICING_SETTINGS_ID, bpsToRate, prisma, rateToBps } from "@repo/database";
 import {
   ErrorBanner,
   FieldRow,
   MoneyField,
   PageHeader,
-  Pill,
   SavedBanner,
   Section,
   Table,
   TextField,
   controlClass,
 } from "@/components/ui";
-import { ConfirmButton, LinkButton, SaveButton } from "@/components/form-controls";
+import { ConfirmButton, SaveButton } from "@/components/form-controls";
 import {
-  createDiscountCode,
   deleteClassSetTier,
-  deleteDiscountCode,
   saveClassSetTier,
-  toggleDiscountCode,
   updatePricingSettings,
 } from "./actions";
 import { toPercent, toRupees } from "./schema";
+import { requireStaffPage } from "@/lib/guard";
 
 // FR-11.1: every price rule that isn't attached to a single product. Per-book
 // prices stay on the book itself, under Books & products.
@@ -32,12 +30,12 @@ export default async function PricingPage({
 }: {
   searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
+  await requireStaffPage();
   const { saved, error } = await searchParams;
 
-  const [settings, tiers, codes] = await Promise.all([
+  const [settings, tiers] = await Promise.all([
     prisma.pricingSettings.findUnique({ where: { id: PRICING_SETTINGS_ID } }),
     prisma.classSetTier.findMany({ orderBy: { quantity: "asc" } }),
-    prisma.discountCode.findMany({ orderBy: { code: "asc" } }),
   ]);
 
   // Never saved? Show the values the storefront is actually using right now,
@@ -232,80 +230,13 @@ export default async function PricingPage({
         </form>
       </Section>
 
-      {/* ── Discount codes ──────────────────────────────────────────── */}
-      <Section
-        title="Discount codes"
-        description="Codes shoppers can type at checkout. Turning one off keeps it on this list but stops it working."
-      >
-        {codes.length > 0 ? (
-          <Table
-            head={
-              <>
-                <th>Code</th>
-                <th>Takes off</th>
-                <th>Message shown</th>
-                <th>Status</th>
-                <th className="text-right">&nbsp;</th>
-              </>
-            }
-          >
-            {codes.map((code) => (
-              <tr key={code.id}>
-                <td className="font-mono text-sm font-bold">{code.code}</td>
-                <td>{toPercent(code.rateBps)}%</td>
-                <td className="text-ink-muted">{code.blurb || "—"}</td>
-                <td>
-                  <Pill tone={code.isActive ? "on" : "off"}>{code.isActive ? "Working" : "Off"}</Pill>
-                </td>
-                <td className="space-x-4 text-right">
-                  <form action={toggleDiscountCode.bind(null, code.id)} className="inline">
-                    <LinkButton>{code.isActive ? "Turn off" : "Turn on"}</LinkButton>
-                  </form>
-                  <form action={deleteDiscountCode.bind(null, code.id)} className="inline">
-                    <ConfirmButton message={`Delete the code ${code.code}? Shoppers using it will stop getting the discount.`}>
-                      Delete
-                    </ConfirmButton>
-                  </form>
-                </td>
-              </tr>
-            ))}
-          </Table>
-        ) : (
-          <p className="text-sm text-ink-muted">No discount codes yet.</p>
-        )}
-
-        <form action={createDiscountCode} className="flex flex-wrap items-end gap-3 border-t border-line pt-5">
-          <label className="text-sm">
-            <span className="block font-semibold text-ink">Code</span>
-            <input
-              name="code"
-              required
-              placeholder="SCHOOL5"
-              className={`${controlClass} mt-1.5 w-40 uppercase`}
-            />
-          </label>
-          <label className="text-sm">
-            <span className="block font-semibold text-ink">Takes off %</span>
-            <input
-              name="rate"
-              type="number"
-              min="0.01"
-              max="100"
-              step="0.5"
-              required
-              placeholder="5"
-              className={`${controlClass} mt-1.5 w-28`}
-            />
-          </label>
-          <label className="min-w-[14rem] flex-1 text-sm">
-            <span className="block font-semibold text-ink">Message shown when it works</span>
-            <input name="blurb" placeholder="5% off this order." className={`${controlClass} mt-1.5`} />
-          </label>
-          <SaveButton variant="secondary" pendingLabel="Adding…">
-            Add code
-          </SaveButton>
-        </form>
-      </Section>
+      <p className="text-sm text-ink-muted">
+        Coupon codes for the cart have moved to their own page:{" "}
+        <Link href="/discounts" className="font-semibold text-brand hover:underline">
+          Users and Staffs → Discount
+        </Link>
+        .
+      </p>
     </div>
   );
 }

@@ -37,13 +37,13 @@ next request — no redeploy, no cache to invalidate.
 
 What made the Postgres branch real, from the state described below:
 
-1. **One `Product` row per title.** The branch assumes the single-row model
-   the admin already writes (`bookFormats: [PHYSICAL, EBOOK]`,
-   `priceCents` + `ebookPriceCents` on one row) so that `LIMIT` counts
-   titles, not editions. `prisma/seed.ts` writes any seeded catalogue the
-   same way, rather than as the `-ebook`-slug two-row model
-   `groupBookEditions()` collapses — that model cannot be `LIMIT`ed and
-   must not be used here.
+1. **One `Product` row per title.** The branch assumes the model the admin
+   writes — one `Product` per title, with a `BookEdition` row per format
+   (Paperback / Hardcover / E-book) included alongside — so that `LIMIT`
+   counts titles, not editions. `Product.priceCents` on a book is its
+   cheapest edition, which is what the price sort and bands key on.
+   `prisma/seed.ts` writes any seeded catalogue the same way. (The old
+   `-ebook`-slug two-row model cannot be `LIMIT`ed and is gone.)
 
 2. **`Product.genre`, `Product.ratingAvg`, `Product.reviewCount`.** Added
    (with `@@index`es) so `sort=rating` / `sort=reviews` and the genre /

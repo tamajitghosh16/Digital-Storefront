@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@repo/auth/client";
 import { buttonClass, ErrorBanner, TextField } from "@/components/ui";
+import { safeNextPath } from "@repo/security/redirect";
 
 // Staff sign-in — authenticates against apps/admin's OWN dedicated Supabase
 // project (NEXT_PUBLIC_AUTH_SUPABASE_*, resolved in packages/auth), separate
@@ -19,7 +20,8 @@ import { buttonClass, ErrorBanner, TextField } from "@/components/ui";
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/";
+  // Attacker-controllable: only ever a same-origin path (no open redirect).
+  const next = safeNextPath(searchParams.get("next"), "/");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -36,7 +38,11 @@ function SignInForm() {
 
     setLoading(false);
     if (authError) {
-      setError(authError.message);
+      setError(
+        authError.status === 429
+          ? "Too many attempts. Please wait a few minutes and try again."
+          : "That email and password don't match. Please try again."
+      );
       return;
     }
     router.push(next);
@@ -50,7 +56,7 @@ function SignInForm() {
       provider: "google",
       options: { redirectTo: `${window.location.origin}${next}` },
     });
-    if (authError) setError(authError.message);
+    if (authError) setError("Google sign-in isn't available. Use your email and password.");
   }
 
   return (
@@ -75,7 +81,6 @@ function SignInForm() {
               name="password"
               type="password"
               required
-              minLength={6}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="••••••••"

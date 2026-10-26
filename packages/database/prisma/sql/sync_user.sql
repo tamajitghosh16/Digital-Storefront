@@ -31,7 +31,12 @@ create trigger on_auth_user_created
   for each row execute procedure public.handle_new_or_updated_user();
 
 -- Row-Level Security — defense-in-depth backstop alongside app-level role
--- checks (see packages/auth). Enable per-table as each is created.
+-- checks (see packages/auth). The Prisma migration
+-- 20260927100100_lock_down_data_api now enables RLS on EVERY public table,
+-- revokes anon/authenticated privileges, and (re)creates the three policies
+-- below idempotently; run prisma/sql/auto_enable_rls.sql once so tables
+-- added later get RLS automatically. The statements below are kept for
+-- projects set up before that migration existed.
 alter table public.users enable row level security;
 create policy "Users can read their own row"
   on public.users for select
@@ -47,6 +52,6 @@ create policy "Authors can read their own projects"
   on public.self_publishing_projects for select
   using (auth.uid() = "authorId");
 
--- Admin app uses the Supabase service-role key (bypasses RLS) for staff
--- operations; the storefront app uses the anon key + user session, so RLS
--- applies to every direct-from-client query.
+-- Both apps reach business tables only through Prisma (the `postgres`
+-- role, which bypasses RLS). RLS exists to stop the *other* path: anyone
+-- with the public publishable key calling Supabase's REST API directly.

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BookListing } from "@/lib/books";
 import { queryToParams, type BookQuery } from "@/lib/books-query";
+import type { ListingLine } from "@/lib/product-lines";
 import { BookCard } from "./book-card";
 
 /**
@@ -16,13 +17,17 @@ import { BookCard } from "./book-card";
  * matching first page. Nothing here grows with catalogue size.
  */
 
+/** Covers fetched eagerly — one full grid row at the widest (5-column) layout. */
+const FIRST_ROW = 5;
+
 interface BooksGridProps {
   initialItems: BookListing[];
   initialCursor: string | null;
   query: BookQuery;
+  line: ListingLine;
 }
 
-export function BooksGrid({ initialItems, initialCursor, query }: BooksGridProps) {
+export function BooksGrid({ initialItems, initialCursor, query, line }: BooksGridProps) {
   const [items, setItems] = useState(initialItems);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const cursorRef = useRef(initialCursor);
@@ -42,6 +47,7 @@ export function BooksGrid({ initialItems, initialCursor, query }: BooksGridProps
         )
       );
       params.set("cursor", cursor);
+      if (!line.isBook) params.set("line", line.slug);
 
       const res = await fetch(`/api/books?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -57,7 +63,7 @@ export function BooksGrid({ initialItems, initialCursor, query }: BooksGridProps
     } catch {
       setStatus("error");
     }
-  }, [query]);
+  }, [query, line]);
 
   useEffect(() => {
     const node = sentinelRef.current;
@@ -82,9 +88,9 @@ export function BooksGrid({ initialItems, initialCursor, query }: BooksGridProps
             : "grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
         }
       >
-        {items.map((book) => (
+        {items.map((book, index) => (
           <li key={book.id} className={list ? "py-4 first:pt-0 last:pb-0" : undefined}>
-            <BookCard listing={book} view={query.view} />
+            <BookCard listing={book} view={query.view} base={line.base} priority={index < FIRST_ROW} />
           </li>
         ))}
       </ul>
@@ -101,7 +107,7 @@ export function BooksGrid({ initialItems, initialCursor, query }: BooksGridProps
             </button>
           ) : (
             <span className="text-sm text-ink-muted" aria-live="polite">
-              Loading more titles&hellip;
+              Loading more {line.noun.many}&hellip;
             </span>
           )}
         </div>

@@ -5,6 +5,8 @@ import { prisma } from "@repo/database";
 import { SectionHead, buttonClass } from "@/components/primitives";
 import { WishlistList } from "@/components/commerce/wishlist-list";
 import type { ProductTileData } from "@/components/commerce/product-tile";
+import { lineProductHref } from "@/lib/product-lines";
+import { bookToListing } from "@/lib/books";
 
 export const metadata: Metadata = { title: "Wishlist" };
 
@@ -18,7 +20,7 @@ export default async function WishlistPage() {
   const rows = user
     ? await prisma.wishlist.findMany({
         where: { userId: user.id },
-        include: { product: true },
+        include: { product: { include: { editions: { select: { format: true, priceCents: true, stockQty: true } } } } },
         orderBy: { createdAt: "desc" },
       })
     : [];
@@ -27,15 +29,19 @@ export default async function WishlistPage() {
     .filter((row) => row.product.isPublished)
     .map((row) => {
       const product = row.product;
+      // A book's price and stock come from its editions (cheapest price,
+      // printed copies on hand); any other product carries its own.
+      const listing = bookToListing(product);
       return {
         id: product.id,
         type: product.type,
         title: product.title,
         author: product.author,
         slug: product.slug,
-        priceCents: product.priceCents,
+        href: lineProductHref(product.productLine, product.slug),
+        priceCents: listing.fromPriceCents,
         coverImageUrl: product.coverImageUrl,
-        stockQty: product.stockQty,
+        stockQty: listing.stockQty,
         genre: product.genre ?? undefined,
         rating: product.reviewCount > 0 ? product.ratingAvg : undefined,
         reviewCount: product.reviewCount > 0 ? product.reviewCount : undefined,

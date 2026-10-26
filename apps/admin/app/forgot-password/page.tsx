@@ -23,8 +23,10 @@ export default function ForgotPasswordPage() {
     });
 
     setLoading(false);
-    if (authError) {
-      setError(authError.message);
+    // Same confirmation whether or not the address exists, so this form
+    // can't be used to discover staff emails. Only rate limiting is surfaced.
+    if (authError?.status === 429) {
+      setError("Too many requests. Please wait a few minutes and try again.");
       return;
     }
     setSent(true);

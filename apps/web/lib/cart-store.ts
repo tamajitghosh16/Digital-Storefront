@@ -15,7 +15,10 @@ export interface CartItem {
   taxType?: "PHYSICAL_BOOK" | "EBOOK" | "SERVICE_PACKAGE";
   /** One line of fulfilment detail under the title. */
   note?: string;
-  /** Units on hand for a `SHIP` line, as of when it was added. `null`/undefined = not tracked. */
+  /**
+   * Units on hand for a `SHIP` line, as of when it was added — or when the
+   * cart page last refreshed it (`syncStock`). `null`/undefined = not tracked.
+   */
   stockQty?: number | null;
 }
 
@@ -24,7 +27,15 @@ interface CartState {
   addItem: (item: CartItem) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
+  /** Replaces each listed line's `stockQty` with a live figure (`getCartStock`), re-capping its quantity. */
+  syncStock: (stock: Record<string, number | null>) => void;
   clear: () => void;
+}
+
+/** Most of an item the cart will hold: on-hand stock for a shipped line, one copy of an e-book. */
+function capQuantity(item: Pick<CartItem, "fulfillmentType" | "stockQty">, quantity: number): number {
+  if (item.fulfillmentType === "DIGITAL") return Math.min(quantity, 1);
+  return typeof item.stockQty === "number" && item.stockQty > 0 ? Math.min(quantity, item.stockQty) : quantity;
 }
 
 // Client-side cart state (Technical Design Document, Section 1 — Zustand).
@@ -42,16 +53,12 @@ export const useCartStore = create<CartState>()(
             return {
               items: state.items.map((i) =>
                 i.productId === item.productId
-                  ? {
-                      ...i,
-                      stockQty,
-                      quantity: typeof stockQty === "number" && stockQty > 0 ? Math.min(merged, stockQty) : merged,
-                    }
+                  ? { ...i, stockQty, quantity: capQuantity({ fulfillmentType: i.fulfillmentType, stockQty }, merged) }
                   : i
               ),
             };
           }
-          return { items: [...state.items, item] };
+          return { items: [...state.items, { ...item, quantity: capQuantity(item, item.quantity) }] };
         }),
       removeItem: (productId) => set((state) => ({ items: state.items.filter((i) => i.productId !== productId) })),
       updateQuantity: (productId, quantity) =>
@@ -60,16 +67,16 @@ export const useCartStore = create<CartState>()(
             quantity <= 0
               ? state.items.filter((i) => i.productId !== productId)
               : state.items.map((i) =>
-                  i.productId === productId
-                    ? {
-                        ...i,
-                        quantity:
-                          typeof i.stockQty === "number" && i.stockQty > 0
-                            ? Math.min(quantity, i.stockQty)
-                            : quantity,
-                      }
-                    : i
+                  i.productId === productId ? { ...i, quantity: capQuantity(i, quantity) } : i
                 ),
+        })),
+      syncStock: (stock) =>
+        set((state) => ({
+          items: state.items.map((i) => {
+            if (!(i.productId in stock)) return i;
+            const stockQty = stock[i.productId] ?? null;
+            return { ...i, stockQty, quantity: capQuantity({ fulfillmentType: i.fulfillmentType, stockQty }, i.quantity) };
+          }),
         })),
       clear: () => set({ items: [] }),
     }),

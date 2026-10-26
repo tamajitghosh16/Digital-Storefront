@@ -1,5 +1,5 @@
 // Razorpay Checkout is loaded from https://checkout.razorpay.com/v1/checkout.js
-// at runtime (see cart-screen.tsx), so it has no npm types. This is the small
+// at runtime (see payment-screen.tsx), so it has no npm types. This is the small
 // slice we actually call.
 
 interface RazorpayHandlerResponse {
@@ -15,7 +15,7 @@ interface RazorpayOptions {
   order_id: string;
   name?: string;
   description?: string;
-  prefill?: { name?: string; email?: string; contact?: string };
+  prefill?: { name?: string; email?: string; contact?: string; method?: "upi" | "netbanking" | "card" | "wallet" };
   notes?: Record<string, string>;
   theme?: { color?: string };
   handler?: (response: RazorpayHandlerResponse) => void | Promise<void>;

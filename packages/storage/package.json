@@ -4,8 +4,17 @@
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
+  "scripts": {
+    "harden-buckets": "tsx scripts/harden-buckets.ts"
+  },
   "dependencies": {
+    "@repo/security": "*",
     "@supabase/supabase-js": "^2.47.0",
-    "@vercel/blob": "^2.8.0"
+    "@vercel/blob": "^2.8.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.0",
+    "tsx": "^4.19.0"
   }
 }

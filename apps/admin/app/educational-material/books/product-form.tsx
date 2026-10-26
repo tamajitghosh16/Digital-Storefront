@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { Product } from "@repo/database";
+import type { BookEdition, BookFormat, Product } from "@repo/database";
 import { cn } from "@repo/ui/utils";
 import {
   ErrorBanner,
@@ -44,6 +44,40 @@ const BOOK_GENRES = [
   "Thriller",
 ] as const;
 
+/**
+ * The three formats a book can be sold in, in the order they're shown.
+ * Hand-mirrored from `BOOK_FORMATS` in `@repo/database` (that module is
+ * importable here, but only as types — the package entry point also builds
+ * the Prisma client), plus the copy this form needs.
+ */
+const FORMATS = [
+  {
+    value: "PAPERBACK",
+    field: "Paperback",
+    label: "Paperback",
+    blurb: "A soft-cover printed copy you post to the customer.",
+    isPrint: true,
+  },
+  {
+    value: "HARDCOVER",
+    field: "Hardcover",
+    label: "Hardcover",
+    blurb: "A hard-bound printed copy you post to the customer.",
+    isPrint: true,
+  },
+  {
+    value: "EBOOK",
+    field: "Ebook",
+    label: "E-book",
+    blurb: "A PDF the customer downloads straight away.",
+    isPrint: false,
+  },
+] as const satisfies readonly { value: BookFormat; field: string; label: string; blurb: string; isPrint: boolean }[];
+
+type FormatValue = (typeof FORMATS)[number]["value"];
+
+const rupees = (cents: number | null | undefined) => (cents != null ? (cents / 100).toFixed(2) : "");
+
 /** Title → web address, matching the pattern the Zod schema enforces. */
 function slugify(value: string) {
   return value
@@ -62,7 +96,8 @@ export function ProductForm({
   onCancel,
 }: {
   action: (formData: FormData) => void | Promise<void>;
-  product?: Product;
+  /** The book being edited, with its editions (one per format it's sold in). */
+  product?: Product & { editions?: BookEdition[] };
   /** The already-stored e-book PDF for this product, if one exists (edit form only). */
   ebookFile?: { path: string; fileName: string; sizeBytes: number } | null;
   error?: string;
@@ -76,8 +111,16 @@ export function ProductForm({
   // not state, purely so a pre-existing SERVICE_PACKAGE row opened directly
   // by id still renders its own fields instead of being mislabelled a book.
   const isService = product?.type === "SERVICE_PACKAGE";
-  const [hasPhysical, setHasPhysical] = useState(product?.bookFormats?.includes("PHYSICAL") ?? true);
-  const [hasEbook, setHasEbook] = useState(product?.bookFormats?.includes("EBOOK") ?? false);
+  const editionFor = (format: FormatValue) => product?.editions?.find((edition) => edition.format === format);
+  // Which formats are ticked. A new book starts as paperback-only — the
+  // commonest case — and any one, two or all three can be picked.
+  const [picked, setPicked] = useState<Record<FormatValue, boolean>>(() =>
+    product
+      ? { PAPERBACK: Boolean(editionFor("PAPERBACK")), HARDCOVER: Boolean(editionFor("HARDCOVER")), EBOOK: Boolean(editionFor("EBOOK")) }
+      : { PAPERBACK: true, HARDCOVER: false, EBOOK: false }
+  );
+  const pickedFormats = FORMATS.filter((format) => picked[format.value]);
+  const hasEbook = picked.EBOOK;
   const [title, setTitle] = useState(product?.title ?? "");
   const [slug, setSlug] = useState(product?.slug ?? "");
   // Once a record is live its web address is a published link, and changing
@@ -151,8 +194,18 @@ export function ProductForm({
                 </option>
               ))}
             </SelectField>
-            <TextField label="ISBN" name="isbn" defaultValue={product?.isbn ?? ""} placeholder="978-81-XXXXX-XX-X" />
+            <TextField
+              label="Language"
+              help="The language the book is written in. Shown on the book's page."
+              name="language"
+              defaultValue={product?.language ?? ""}
+              placeholder="English"
+            />
           </FieldRow>
+        )}
+
+        {!isService && (
+          <TextField label="ISBN" name="isbn" defaultValue={product?.isbn ?? ""} placeholder="978-81-XXXXX-XX-X" />
         )}
 
         {isService && (
@@ -167,50 +220,36 @@ export function ProductForm({
       </Section>
 
       {!isService && (
-        <Section title="Select format" description="A book can be sold as a printed copy, an e-book, or both.">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label
-              className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-btn border p-3.5 transition-colors",
-                hasPhysical ? "border-brand bg-brand-soft ring-1 ring-brand" : "border-line bg-tile-3 hover:border-brand/50"
-              )}
-            >
-              <input
-                type="checkbox"
-                name="formatPhysical"
-                checked={hasPhysical}
-                onChange={(event) => setHasPhysical(event.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-brand)]"
-              />
-              <span>
-                <span className="block text-sm font-bold text-ink">Physical book</span>
-                <span className="mt-0.5 block text-[12px] leading-snug text-ink-muted">
-                  A paperback or hardback you post to the customer.
+        <Section
+          title="Select format"
+          description="Tick every format this book is sold in — one, two, or all three. Each gets its own price below."
+        >
+          <div className="grid gap-3 sm:grid-cols-3">
+            {FORMATS.map((format) => (
+              <label
+                key={format.value}
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-btn border p-3.5 transition-colors",
+                  picked[format.value]
+                    ? "border-brand bg-brand-soft ring-1 ring-brand"
+                    : "border-line bg-tile-3 hover:border-brand/50"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  name={`format${format.field}`}
+                  checked={picked[format.value]}
+                  onChange={(event) => setPicked((current) => ({ ...current, [format.value]: event.target.checked }))}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-brand)]"
+                />
+                <span>
+                  <span className="block text-sm font-bold text-ink">{format.label}</span>
+                  <span className="mt-0.5 block text-[12px] leading-snug text-ink-muted">{format.blurb}</span>
                 </span>
-              </span>
-            </label>
-            <label
-              className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-btn border p-3.5 transition-colors",
-                hasEbook ? "border-brand bg-brand-soft ring-1 ring-brand" : "border-line bg-tile-3 hover:border-brand/50"
-              )}
-            >
-              <input
-                type="checkbox"
-                name="formatEbook"
-                checked={hasEbook}
-                onChange={(event) => setHasEbook(event.target.checked)}
-                className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-brand)]"
-              />
-              <span>
-                <span className="block text-sm font-bold text-ink">E-book</span>
-                <span className="mt-0.5 block text-[12px] leading-snug text-ink-muted">
-                  A file the customer downloads straight away.
-                </span>
-              </span>
-            </label>
+              </label>
+            ))}
           </div>
-          {!hasPhysical && !hasEbook && <p className="mt-2 text-[12px] text-warn">Pick at least one format.</p>}
+          {pickedFormats.length === 0 && <p className="mt-2 text-[12px] text-warn">Pick at least one format.</p>}
         </Section>
       )}
 
@@ -247,38 +286,55 @@ export function ProductForm({
         </Section>
       )}
 
-      <Section title="Pricing" description="Prices include GST, the way Indian shops quote them.">
-        <FieldRow>
+      {isService ? (
+        <Section title="Pricing" description="Prices include GST, the way Indian shops quote them.">
           <MoneyField
-            label={hasPhysical && hasEbook ? "Price per stock (In Rupees) Physical Book" : "Price per stock (In Rupees)"}
+            label="Price (In Rupees)"
             help="What the customer pays."
             name="price"
             required
-            defaultValue={product ? (product.priceCents / 100).toFixed(2) : ""}
-          />
-          {hasPhysical && hasEbook && (
-            <MoneyField
-              label="Price per stock (In Rupees) E-book"
-              help="E-books are usually priced lower than the printed copy."
-              name="ebookPrice"
-              required
-              defaultValue={product?.ebookPriceCents != null ? (product.ebookPriceCents / 100).toFixed(2) : ""}
-            />
-          )}
-        </FieldRow>
-      </Section>
-
-      {!isService && hasPhysical && (
-        <Section title="Stocks" description="How many printed copies you currently have on hand.">
-          <TextField
-            label="Total copies"
-            help="Leave empty if you aren't counting stock."
-            name="stockQty"
-            type="number"
-            min={0}
-            defaultValue={product?.stockQty ?? ""}
+            defaultValue={rupees(product?.priceCents)}
           />
         </Section>
+      ) : (
+        pickedFormats.length > 0 && (
+          <Section
+            title="Price and stock"
+            description="Each format is priced on its own. Prices include GST, the way Indian shops quote them."
+          >
+            {pickedFormats.map((format) => {
+              const edition = editionFor(format.value);
+              return (
+                <div key={format.value} className="rounded-btn border border-line bg-tile-3 p-3.5">
+                  <p className="mb-3 text-sm font-bold text-ink">{format.label}</p>
+                  <FieldRow>
+                    <MoneyField
+                      label="Price per copy (In Rupees)"
+                      help={
+                        format.value === "EBOOK"
+                          ? "E-books are usually priced lower than a printed copy."
+                          : "What the customer pays for one copy."
+                      }
+                      name={`${format.field.toLowerCase()}Price`}
+                      required
+                      defaultValue={rupees(edition?.priceCents)}
+                    />
+                    {format.isPrint && (
+                      <TextField
+                        label="Copies in stock"
+                        help="Leave empty if you aren't counting stock."
+                        name={`${format.field.toLowerCase()}Stock`}
+                        type="number"
+                        min={0}
+                        defaultValue={edition?.stockQty ?? ""}
+                      />
+                    )}
+                  </FieldRow>
+                </div>
+              );
+            })}
+          </Section>
+        )
       )}
 
       {hasEbook && (

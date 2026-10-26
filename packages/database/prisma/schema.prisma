@@ -31,8 +31,12 @@ enum ProductType {
   SERVICE_PACKAGE
 }
 
+/// The formats a book is sold in. A title can be any one, any two, or all
+/// three — each format it's sold in is its own BookEdition row, with its
+/// own price (and, for the two printed formats, its own stock).
 enum BookFormat {
-  PHYSICAL
+  PAPERBACK
+  HARDCOVER
   EBOOK
 }
 
@@ -116,6 +120,9 @@ enum PaymentMethod {
   UPI
   NETBANKING
   WALLET
+  // Cash on delivery: no gateway involved, collected by the courier, so the
+  // Payment row stays CREATED until staff mark it collected.
+  COD
   OTHER
 }
 
@@ -169,6 +176,7 @@ model User {
   reviews           Review[]
   notifications     Notification[]
   wishlists         Wishlist[]
+  libraryDownloads  LibraryDownload[]
 
   @@map("users")
 }
@@ -195,6 +203,9 @@ model Address {
   label      String? // "Home", "Office", ...
   line1      String
   line2      String?
+  // Nullable only so addresses saved before the field existed stay valid;
+  // both the account form and checkout require it for new ones.
+  district   String?
   city       String
   state      String
   postalCode String
@@ -218,12 +229,12 @@ model Product {
   author      String
   slug        String      @unique
   description String?
+  // For a book (productLine BOOK) this is a denormalised copy of its
+  // cheapest edition's price — the "from" price the storefront listing
+  // sorts and filters on — written by the admin catalogue form alongside
+  // `editions`. What a customer is charged always comes from the edition
+  // itself. For every other product it's simply the price.
   priceCents  Int
-  // Set only when bookFormats includes both PHYSICAL and EBOOK — the two
-  // formats of the same title are priced separately (e-books undercut
-  // print). priceCents alone is still the whole story for a single-format
-  // book, so this stays null for everything else.
-  ebookPriceCents Int?
   currency    String      @default("INR")
   coverImageUrl String?
   // The three below are books only, and optional — a scan of the back
@@ -234,11 +245,13 @@ model Product {
   prefaceImageUrl   String?
   indexPageImageUrl String?
 
-  // Books only — which format(s) this book is sold in. A book can be
-  // physical-only, e-book-only, or both at once; [] for service packages.
-  bookFormats BookFormat[] @default([])
+  // Books only — one row per format (Paperback / Hardcover / E-book) the
+  // title is sold in, each with its own price and printed-copy stock.
+  // Empty for every non-book product.
+  editions    BookEdition[]
 
-  // Books only
+  // Stock for a non-book shippable product (charts, worksheets, …). Always
+  // null on a book: a book's stock is per printed edition, on BookEdition.
   stockQty    Int?
   isbn        String?
   weightGrams Int?
@@ -256,6 +269,11 @@ model Product {
   genre       String?
   ratingAvg   Float    @default(0)
   reviewCount Int      @default(0)
+  // Books only — the language the book is written in ("English",
+  // "Bengali", ...), free text from the admin catalogue form. Null when the
+  // operator hasn't set it; the product page hides the line rather than
+  // guessing.
+  language    String?
 
   // E-books only
   formats     String[]    @default([]) // EPUB, MOBI, PDF
@@ -294,6 +312,27 @@ model Product {
   @@map("products")
 }
 
+/// One format of a book — Paperback, Hardcover or E-book — and what it
+/// sells for. A book has between one and three of these (never two of the
+/// same format). Priced separately because the formats are: a hardcover
+/// costs more to print, an e-book undercuts both.
+model BookEdition {
+  id         String     @id @default(cuid())
+  productId  String
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  format     BookFormat
+  priceCents Int
+  /// Printed copies on hand, for PAPERBACK / HARDCOVER. Null = not tracked
+  /// (always orderable). Always null for EBOOK.
+  stockQty   Int?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([productId, format])
+  @@index([format])
+  @@map("book_editions")
+}
+
 model Order {
   id             String      @id @default(cuid())
   userId         String?     @db.Uuid // null for guest checkout
@@ -304,10 +343,27 @@ model Order {
   subtotalCents  Int
   taxCents       Int         @default(0)
   shippingCents  Int         @default(0)
+  /// Taken off the item subtotal by a discount code: total = subtotal − discount + shipping.
+  discountCents  Int         @default(0)
   totalCents     Int
+
+  /// The code used, kept as text too so the order still says which code it
+  /// was after the DiscountCode row is deleted.
+  discountCodeId String?
+  discountCodeRef DiscountCode? @relation(fields: [discountCodeId], references: [id], onDelete: SetNull)
+  discountCode   String?
 
   shippingAddressId String?
   billingAddressId  String?
+  // What the customer entered at checkout, copied at the time of ordering
+  // (`OrderShippingAddress` in apps/web/lib/india-address.ts) — a saved Address can be edited
+  // or deleted later, and the courier needs what was asked for, not that.
+  shippingAddress   Json?
+  // The address the invoice is made out to, same shape and same snapshot
+  // rule. A copy of `shippingAddress` when the shopper ticked "same as
+  // delivery"; null on orders placed before billing addresses existed.
+  billingAddress    Json?
+  gstNumber         String?
 
   trackingNumber String?
   carrier        String?
@@ -320,6 +376,7 @@ model Order {
 
   @@index([userId])
   @@index([status])
+  @@index([discountCodeId])
   @@map("orders")
 }
 
@@ -332,6 +389,16 @@ model OrderItem {
   quantity        Int             @default(1)
   unitPriceCents  Int
   fulfillmentType FulfillmentType
+  /// True when this line entitles the buyer to the product's e-book file:
+  /// an e-book-only line, or a print + e-book bundle. A print-only line of a
+  /// title that also sells as an e-book is false — buying the paperback must
+  /// not unlock the PDF. Set once at checkout; the library and
+  /// /api/library/[assetId] only grant downloads through lines where it's true.
+  includesEbook   Boolean         @default(false)
+  /// Which edition of a book this line bought. Null for non-book products.
+  /// Stored as the format rather than a BookEdition id so an order line
+  /// outlives the admin dropping that format from the title later.
+  bookFormat      BookFormat?
 
   @@index([orderId])
   @@index([productId])
@@ -425,7 +492,10 @@ model Payment {
   project           SelfPublishingProject? @relation(fields: [projectId], references: [id])
 
   gatewayOrderId    String?       // Razorpay order_id
-  gatewayPaymentId  String?       // Razorpay payment_id
+  // Razorpay payment_id. Unique: one captured payment can settle exactly
+  // one order, which is what stops a single receipt being replayed against
+  // several orders.
+  gatewayPaymentId  String?       @unique
   gatewaySignature  String?
 
   amountCents       Int
@@ -461,12 +531,33 @@ model FileAsset {
   serviceRequestId  String?
   serviceRequest    ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
 
+  libraryDownloads  LibraryDownload[]
+
   createdAt         DateTime      @default(now())
 
   @@index([productId])
   @@index([selfPubProjectId])
   @@index([serviceRequestId])
   @@map("file_assets")
+}
+
+/// FR-9.2: how many times one customer has downloaded one e-book file.
+/// Per (user, file) — `FileAsset.maxDownloads` is the per-customer allowance,
+/// so one reader using up their downloads never locks out another. The
+/// legacy `FileAsset.downloadCount` is kept only as an all-customers total.
+model LibraryDownload {
+  id               String    @id @default(cuid())
+  userId           String    @db.Uuid
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileAssetId      String
+  fileAsset        FileAsset @relation(fields: [fileAssetId], references: [id], onDelete: Cascade)
+  count            Int       @default(0)
+  lastDownloadedAt DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@unique([userId, fileAssetId])
+  @@index([fileAssetId])
+  @@map("library_downloads")
 }
 
 /// FR-12: order/shipping/project-status/submission notifications, fanned out
@@ -590,7 +681,10 @@ model PurchaseOrder {
 }
 
 /// A line item on a PurchaseOrder. Restricted to PHYSICAL_BOOK products —
-/// the only product type with a real stockQty to receive against today.
+/// the only product type with a real stock count to receive against. For a
+/// book, `bookFormat` says which printed edition (PAPERBACK / HARDCOVER) the
+/// copies are, and receiving adds to that BookEdition's stockQty; for any
+/// other product it's null and receiving adds to Product.stockQty.
 model PurchaseOrderItem {
   id               String        @id @default(cuid())
   purchaseOrderId  String
@@ -600,6 +694,7 @@ model PurchaseOrderItem {
   quantityOrdered  Int
   quantityReceived Int           @default(0)
   unitCostCents    Int
+  bookFormat       BookFormat?
 
   @@index([purchaseOrderId])
   @@index([productId])
@@ -805,17 +900,42 @@ model ClassSetTier {
   @@map("class_set_tiers")
 }
 
-/// Checkout discount codes. Matched case-insensitively by storing `code`
-/// already upper-cased at write time.
+enum DiscountType {
+  PERCENT
+  FLAT
+}
+
+/// Checkout discount codes, managed from apps/admin's Discount page and
+/// applied by apps/web's checkout. Matched case-insensitively by storing
+/// `code` already upper-cased at write time. The rules for whether a code
+/// applies and how much it takes off live in
+/// `packages/database/src/discounts.ts`, shared by both apps.
 model DiscountCode {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  /// Fraction off the order, in basis points (500 = 5% off).
-  rateBps   Int
-  blurb     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String       @id @default(cuid())
+  code             String       @unique
+  type             DiscountType @default(PERCENT)
+  /// PERCENT codes: fraction off the item subtotal, in basis points (500 = 5% off).
+  rateBps          Int          @default(0)
+  /// FLAT codes: fixed amount off the item subtotal, in paise.
+  amountOffCents   Int          @default(0)
+  /// PERCENT codes only: the most a single order can save. Null = no cap.
+  maxDiscountCents Int?
+  /// Item subtotal the cart must reach before the code applies. 0 = any order.
+  minOrderCents    Int          @default(0)
+  /// The code works from/until these instants. Null = open-ended.
+  startsAt         DateTime?
+  expiresAt        DateTime?
+  /// Orders that may use the code in total, and per customer. Null = unlimited.
+  usageLimit       Int?
+  perCustomerLimit Int?
+  /// Shown to the shopper when the code is applied.
+  blurb            String?
+  /// Staff-only note (campaign, who it was issued to). Never sent to the storefront.
+  internalNote     String?
+  isActive         Boolean      @default(true)
+  orders           Order[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@map("discount_codes")
 }

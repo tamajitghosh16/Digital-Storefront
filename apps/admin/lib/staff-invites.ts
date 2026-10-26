@@ -24,13 +24,18 @@ export function hashInviteToken(token: string): string {
 }
 
 /**
- * Absolute origin for building the emailed link. Prefers an explicit
- * `NEXT_PUBLIC_ADMIN_URL`; otherwise reconstructs it from the request that
- * triggered the invite (works on Vercel preview/prod without extra config).
+ * Absolute origin for building the emailed link. Uses `NEXT_PUBLIC_ADMIN_URL`.
+ * In production that variable is required: rebuilding the origin from
+ * `Host`/`X-Forwarded-Host` would let a spoofed header put an attacker's
+ * domain in front of a live invite token. Outside production the request
+ * host is still accepted, for local/preview convenience.
  */
 export async function adminOrigin(): Promise<string> {
   const configured = process.env.NEXT_PUBLIC_ADMIN_URL?.replace(/\/$/, "");
   if (configured) return configured;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("NEXT_PUBLIC_ADMIN_URL must be set to send staff invites.");
+  }
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");

@@ -67,14 +67,17 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
       toggleWishlist(productId)
         .then((result) => {
           if (!result.ok) {
-            // Session expired between mount and click.
             setIds((prev) => {
               const next = new Set(prev);
               if (wasWishlisted) next.add(productId);
               else next.delete(productId);
               return next;
             });
-            router.push(`/sign-in?next=${encodeURIComponent(pathname || "/")}`);
+            // Session expired between mount and click. (Rate-limited or
+            // unknown products just roll back the optimistic toggle.)
+            if (result.error === "SIGN_IN_REQUIRED") {
+              router.push(`/sign-in?next=${encodeURIComponent(pathname || "/")}`);
+            }
           }
         })
         .catch(() => {

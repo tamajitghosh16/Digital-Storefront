@@ -4,9 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import type { Product } from "@repo/database";
 import {
-  CheckboxField,
   ErrorBanner,
-  Field,
   FieldRow,
   MoneyField,
   Section,
@@ -27,10 +25,11 @@ import { MAKER_INPUT_PLACEHOLDER, type ProductLineConfig, lineBasePath } from ".
  * comes from `config.copy`, which is the only thing that differs between
  * the three lines.
  *
- * The two operator conveniences it keeps from the Books form: the web
- * address is written from the title while creating (and stops the moment
- * it's edited by hand), and the cover comes from a file picker with a live
- * preview rather than a URL field.
+ * It behaves like the Books form: opened in a modal from the list page when
+ * creating (`add-line-product-dialog.tsx`), the web address is written from
+ * the title with no field to hand-edit, a new item publishes straight away,
+ * and the cover comes from a file picker with a live preview rather than a
+ * URL field.
  */
 
 /** Title → web address, matching the pattern the Zod schema enforces. */
@@ -48,19 +47,23 @@ export function SimpleProductForm({
   config,
   product,
   error,
+  onCancel,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   config: ProductLineConfig;
   product?: Product;
   error?: string;
+  /** When set, "Cancel" closes the surrounding modal instead of linking back to the list. */
+  onCancel?: () => void;
 }) {
   const { copy, noun } = config;
   const isEdit = Boolean(product);
   const [title, setTitle] = useState(product?.title ?? "");
   const [slug, setSlug] = useState(product?.slug ?? "");
-  // Auto-fill the web address only while creating, and stop as soon as it's
-  // typed by hand — once a record is live its address is a published link.
-  const [slugTouched, setSlugTouched] = useState(isEdit);
+  // Once a record is live its web address is a published link, and changing
+  // it silently would break anyone's bookmark — so it tracks the title only
+  // while creating and stays frozen when editing, same as the Books form.
+  const [slugTouched] = useState(isEdit);
 
   return (
     <form action={action} className="max-w-3xl space-y-5">
@@ -107,7 +110,7 @@ export function SimpleProductForm({
         />
       </Section>
 
-      <Section title="Price and availability" description="Prices include GST, the way Indian shops quote them.">
+      <Section title="Price and stock" description="Prices include GST, the way Indian shops quote them.">
         <FieldRow>
           <MoneyField
             label="Price"
@@ -125,13 +128,6 @@ export function SimpleProductForm({
             defaultValue={product?.stockQty ?? ""}
           />
         </FieldRow>
-
-        <CheckboxField
-          label={`Show this ${noun} in the shop`}
-          help="Untick to keep working on it privately. Nobody outside the back office can see it while it's unticked."
-          name="isPublished"
-          defaultChecked={product?.isPublished ?? true}
-        />
       </Section>
 
       <Section title={copy.detailsTitle} description={copy.detailsDescription}>
@@ -154,83 +150,42 @@ export function SimpleProductForm({
         </FieldRow>
       </Section>
 
-      <details className="group rounded-tile border border-line bg-ground">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-6 [&::-webkit-details-marker]:hidden">
-          <span>
-            <span className="block text-base font-bold tracking-[-0.01em] text-ink">Web address and Google listing</span>
-            <span className="mt-1 block text-sm text-ink-muted">
-              Filled in for you. Open this only if you want to change how it looks in search results.
-            </span>
-          </span>
-          <span aria-hidden className="text-xl text-ink-muted">
-            <span className="group-open:hidden">+</span>
-            <span className="hidden group-open:inline">−</span>
-          </span>
-        </summary>
+      {/*
+        No visible "Availability" or "Web address / Google listing" controls,
+        matching the Books form — a new item publishes immediately and picks
+        up its web address from the title. These hidden inputs keep that data
+        flowing to the Server Action: `slug` tracks `title` live (see the
+        Title field's onChange above), and the SEO fields carry forward
+        whatever an existing product already had rather than wiping it out.
+        Publish/unpublish for an existing item still works from its row on
+        the list (`toggleLineProductPublished`).
+      */}
+      <input type="hidden" name="slug" value={slug} />
+      <input type="hidden" name="isPublished" value={isEdit ? (product?.isPublished ? "true" : "false") : "true"} />
+      <input type="hidden" name="metaTitle" value={product?.metaTitle ?? ""} />
+      <input type="hidden" name="metaDescription" value={product?.metaDescription ?? ""} />
+      <input type="hidden" name="ogImageUrl" value={product?.ogImageUrl ?? ""} />
 
-        <div className="space-y-5 px-6 pb-6">
-          <Field
-            label="Web address"
-            help="The last part of the link to this page. Lowercase letters, numbers and hyphens."
-            htmlFor="slug"
-            required
-          >
-            <div className="flex items-center rounded-btn border border-line bg-ground focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/30">
-              <span className="whitespace-nowrap pl-3 text-sm text-ink-subtle" aria-hidden>
-                /{config.slug}/
-              </span>
-              <input
-                id="slug"
-                name="slug"
-                required
-                value={slug}
-                onChange={(event) => {
-                  setSlugTouched(true);
-                  setSlug(event.target.value);
-                }}
-                className="w-full bg-transparent px-1.5 py-2.5 text-sm text-ink focus:outline-none"
-              />
-            </div>
-            {isEdit && (
-              <p className="mt-1 text-[12px] text-warn">
-                Changing this breaks any existing link to this {noun}.
-              </p>
-            )}
-          </Field>
-
-          <TextField
-            label="Title in Google results"
-            help="Leave empty to use the title above."
-            name="metaTitle"
-            defaultValue={product?.metaTitle ?? ""}
-          />
-          <TextAreaField
-            label="Description in Google results"
-            help="Around 150 characters. Leave empty to use the description above."
-            name="metaDescription"
-            rows={2}
-            defaultValue={product?.metaDescription ?? ""}
-          />
-          <ImageField
-            name="ogImageUrl"
-            label="Picture when shared on social media"
-            help="Optional. Leave empty and the main image is used. Wide images (about 1200×630) work best."
-            defaultValue={product?.ogImageUrl}
-            shape="wide"
-          />
-        </div>
-      </details>
-
-      <div className="sticky bottom-4 flex flex-wrap items-center gap-3 rounded-tile border border-line bg-ground/95 p-4 backdrop-blur">
+      <div className="flex flex-wrap items-center gap-3 rounded-tile border border-line bg-ground p-4">
         <SaveButton pendingLabel={isEdit ? "Saving…" : "Adding…"}>
           {isEdit ? "Save changes" : `Add this ${noun}`}
         </SaveButton>
-        <Link
-          href={lineBasePath(config.slug)}
-          className="text-sm font-semibold text-ink-muted hover:text-ink hover:underline"
-        >
-          Cancel
-        </Link>
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm font-semibold text-ink-muted hover:text-ink hover:underline"
+          >
+            Cancel
+          </button>
+        ) : (
+          <Link
+            href={lineBasePath(config.slug)}
+            className="text-sm font-semibold text-ink-muted hover:text-ink hover:underline"
+          >
+            Cancel
+          </Link>
+        )}
       </div>
     </form>
   );

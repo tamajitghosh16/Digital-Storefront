@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/storefront-cache";
 import { CONTENT_ENTRIES, prisma, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CONTENT_WRITE_ROLES } from "@repo/auth/roles";
@@ -58,6 +59,7 @@ export async function updateHomepageContent(formData: FormData) {
     },
   });
 
+  revalidateStorefront();
   revalidatePath("/content/homepage");
   redirect("/content/homepage?saved=1");
 }

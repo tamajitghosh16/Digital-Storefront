@@ -1,0 +1,81 @@
+# Security checks on every push and pull request (docs/security-roadmap.md, Phase 2.3).
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1" # weekly, to catch newly published advisories
+
+permissions:
+  contents: read
+
+# `prisma generate` (npm postinstall) needs a datasource URL to be *set*;
+# it never connects. Placeholders only — no secrets in CI.
+env:
+  DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+  DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test
+
+  dependencies:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      # Fails on any critical advisory in production dependencies.
+      - run: npm audit --omit=dev --audit-level=critical
+      # High advisories are reported but don't block yet: today they're all
+      # in the Prisma CLI's transitive deps (deepmerge-ts, mysql2) and in
+      # @react-email/components (prismjs), which need a major upgrade. Tighten
+      # to --audit-level=high once those are upgraded.
+      - run: npm audit --omit=dev --audit-level=high
+        continue-on-error: true
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3

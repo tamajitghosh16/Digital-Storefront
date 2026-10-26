@@ -1,0 +1,21 @@
+# Weekly dependency updates (docs/security-roadmap.md, Phase 2.3). Security
+# updates are raised immediately regardless of this schedule once
+# "Dependabot security updates" is enabled in the repo settings.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      next-react:
+        patterns: ["next", "react", "react-dom", "eslint-config-next", "@types/react*"]
+      supabase:
+        patterns: ["@supabase/*"]
+      prisma:
+        patterns: ["prisma", "@prisma/*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

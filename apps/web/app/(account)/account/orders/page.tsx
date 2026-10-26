@@ -1,47 +1,53 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentUser } from "@repo/auth/server";
-import { prisma } from "@repo/database";
-import { withFallback } from "@/lib/safe-fetch";
-import { SAMPLE_ORDERS } from "@/lib/sample-data";
-import { formatINRWhole } from "@/lib/format";
-import {
-  Callout,
-  SectionHead,
-  TABLE_CLASS,
-  TD_CLASS,
-  TH_CLASS,
-  TableWrap,
-  buttonClass,
-} from "@/components/primitives";
+import { bookFormatLabel, prisma, type Prisma } from "@repo/database";
+import { isHttpsUrl } from "@repo/security/href";
+import { OrdersTable } from "@/components/account/orders-table";
+import { SectionHead, buttonClass } from "@/components/primitives";
+import { getCachedPricingConfig } from "@/lib/cms";
+import type { OrderShippingAddress } from "@/lib/india-address";
+import type { OrderDetail } from "@/lib/order-tracking";
+import { lineProductHref } from "@/lib/product-lines";
 
 export const metadata: Metadata = { title: "Orders" };
 
-// FR-5.2/FR-8.3: order history with status tracking.
-const STATUS: Record<string, { label: string; tone: "ok" | "tile" | "brand" }> = {
-  PENDING: { label: "Pending payment", tone: "tile" },
-  PAID: { label: "Paid", tone: "brand" },
-  PROCESSING: { label: "Processing", tone: "brand" },
-  SHIPPED: { label: "Dispatched", tone: "ok" },
-  DELIVERED: { label: "Delivered", tone: "ok" },
-  READY_FOR_DOWNLOAD: { label: "Ready for download", tone: "ok" },
-  CANCELLED: { label: "Cancelled", tone: "tile" },
-  REFUNDED: { label: "Refunded", tone: "tile" },
-};
+// FR-5.2/FR-8.3: order history with status tracking. Each row opens a
+// detail pop-up (components/account/order-detail-dialog.tsx); everything
+// it shows is loaded here in the one query, since a customer's history is
+// small and it saves a round trip per click.
+const ORDER_INCLUDE = {
+  items: {
+    include: {
+      product: {
+        select: { title: true, author: true, slug: true, type: true, productLine: true, coverImageUrl: true },
+      },
+    },
+  },
+  payment: { select: { method: true, status: true, updatedAt: true } },
+} satisfies Prisma.OrderInclude;
 
-export default async function OrderHistoryPage() {
-  const user = await getCurrentUser();
-  const orders = user
-    ? await withFallback(
-        () =>
-          prisma.order.findMany({
-            where: { userId: user.id },
-            orderBy: { createdAt: "desc" },
-            include: { items: true },
-          }),
-        SAMPLE_ORDERS
-      )
+type OrderRow = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
+
+export default async function OrderHistoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ placed?: string | string[] }>;
+}) {
+  const [user, { placed }, pricing] = await Promise.all([getCurrentUser(), searchParams, getCachedPricingConfig()]);
+  // Real data only — never sample rows: a customer must see their own
+  // orders or none, not someone else's (fake) history.
+  const rows = user
+    ? await prisma.order.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        include: ORDER_INCLUDE,
+      })
     : [];
+  const orders = rows.map(toOrderDetail);
+  // Set by the payment page after a cash-on-delivery order; only ever
+  // matched against this customer's own orders.
+  const justPlacedId = typeof placed === "string" ? placed : undefined;
 
   return (
     <section>
@@ -58,49 +64,77 @@ export default async function OrderHistoryPage() {
           </Link>
         </div>
       ) : (
-        <TableWrap>
-          <table className={TABLE_CLASS}>
-            <thead>
-              <tr>
-                <th className={TH_CLASS}>Order</th>
-                <th className={TH_CLASS}>Placed</th>
-                <th className={TH_CLASS}>Items</th>
-                <th className={TH_CLASS}>Total</th>
-                <th className={TH_CLASS}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => {
-                const status = STATUS[order.status] ?? { label: order.status, tone: "tile" as const };
-                return (
-                  <tr key={order.id}>
-                    <td className={`${TD_CLASS} tabular-nums`}>#{order.id.slice(-5)}</td>
-                    <td className={TD_CLASS}>
-                      {new Date(order.createdAt).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className={TD_CLASS}>
-                      {order.items.length} item{order.items.length === 1 ? "" : "s"}
-                      {order.trackingNumber && (
-                        <span className="block text-xs text-ink-muted">
-                          {order.carrier} {order.trackingNumber}
-                        </span>
-                      )}
-                    </td>
-                    <td className={`${TD_CLASS} tabular-nums`}>{formatINRWhole(order.totalCents)}</td>
-                    <td className={TD_CLASS}>
-                      <Callout tone={status.tone}>{status.label}</Callout>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </TableWrap>
+        <OrdersTable orders={orders} justPlacedId={justPlacedId} standardEta={pricing.delivery.standardEta} />
       )}
     </section>
   );
+}
+
+function toOrderDetail(order: OrderRow): OrderDetail {
+  return {
+    id: order.id,
+    ref: `#${order.id.slice(-5)}`,
+    status: order.status,
+    createdAt: order.createdAt.toISOString(),
+    updatedAt: order.updatedAt.toISOString(),
+    subtotalCents: order.subtotalCents,
+    discountCents: order.discountCents,
+    discountCode: order.discountCode,
+    shippingCents: order.shippingCents,
+    taxCents: order.taxCents,
+    totalCents: order.totalCents,
+    shippingAddress: parseOrderAddress(order.shippingAddress),
+    billingAddress: parseOrderAddress(order.billingAddress),
+    gstNumber: order.gstNumber,
+    carrier: order.carrier,
+    trackingNumber: order.trackingNumber,
+    payment: order.payment
+      ? { method: order.payment.method, status: order.payment.status, updatedAt: order.payment.updatedAt.toISOString() }
+      : null,
+    items: order.items.map((item) => {
+      const { product } = item;
+      const format = item.bookFormat ? bookFormatLabel(item.bookFormat) : null;
+      return {
+        id: item.id,
+        title: product.title,
+        author: product.author,
+        href:
+          product.type === "SERVICE_PACKAGE"
+            ? `/services/${product.slug}`
+            : product.productLine === "BOOK" || product.type === "EBOOK"
+              ? `/educational-material/books/${product.slug}`
+              : (lineProductHref(product.productLine, product.slug) ?? null),
+        // Only an https URL reaches next/image — a relative or http value
+        // (legacy/seed rows) would make it throw and take the dialog down.
+        coverImageUrl: isHttpsUrl(product.coverImageUrl) ? product.coverImageUrl : null,
+        fulfillmentType: item.fulfillmentType,
+        formatLabel: format && item.includesEbook && item.bookFormat !== "EBOOK" ? `${format} + E-book` : format,
+        includesEbook: item.includesEbook,
+        quantity: item.quantity,
+        unitPriceCents: item.unitPriceCents,
+      };
+    }),
+  };
+}
+
+/**
+ * `Order.shippingAddress` / `billingAddress` are untyped JSON; anything not
+ * shaped like the checkout snapshot is dropped.
+ */
+function parseOrderAddress(value: Prisma.JsonValue): OrderShippingAddress | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const text = (key: string) => (typeof record[key] === "string" ? (record[key] as string) : "");
+  if (!text("line1") || !text("postalCode")) return null;
+  return {
+    name: text("name"),
+    email: text("email"),
+    line1: text("line1"),
+    line2: text("line2") || null,
+    district: text("district"),
+    city: text("city"),
+    state: text("state"),
+    postalCode: text("postalCode"),
+    country: "IN",
+  };
 }

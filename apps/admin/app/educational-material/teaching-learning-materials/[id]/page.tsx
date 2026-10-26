@@ -4,6 +4,7 @@ import { PageHeader, Pill } from "@/components/ui";
 import { getProductLineConfig, lineBasePath } from "../../_shared/product-line-config";
 import { updateLineProduct } from "../../_shared/actions";
 import { SimpleProductForm } from "../../_shared/simple-product-form";
+import { requireStaffPage } from "@/lib/guard";
 
 const config = getProductLineConfig("teaching-learning-materials");
 
@@ -14,6 +15,7 @@ export default async function EditTeachingLearningMaterialPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireStaffPage();
   const { id } = await params;
   const { error } = await searchParams;
   const product = await prisma.product.findUnique({ where: { id } });

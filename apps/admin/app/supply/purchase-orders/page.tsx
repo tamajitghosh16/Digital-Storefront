@@ -1,8 +1,10 @@
 import { prisma } from "@repo/database";
 import { ButtonLink, PageHeader } from "@/components/ui";
 import { PurchaseOrdersList } from "./purchase-orders-list";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function PurchaseOrdersPage() {
+  await requireStaffPage();
   const purchaseOrders = await prisma.purchaseOrder.findMany({
     include: { vendor: true, items: true },
     orderBy: { createdAt: "desc" },

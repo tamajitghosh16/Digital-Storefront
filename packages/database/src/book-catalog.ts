@@ -20,7 +20,10 @@ export interface BookSeed {
   author: string;
   genre: string;
   description: string;
+  /** The paperback edition's price. */
   physicalPriceCents: number;
+  /** Set to also seed a hardcover edition at this price. */
+  hardcoverPriceCents?: number;
   ebookPriceCents: number;
   rating: number;
   reviewCount: number;

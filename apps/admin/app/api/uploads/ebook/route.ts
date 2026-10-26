@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentStaff } from "@repo/auth/server";
 import { CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
 import { createEbookUploadUrl, isEbookStorageConfigured } from "@repo/storage";
+import { RATE_LIMITS, rateLimit } from "@repo/security/rate-limit";
 
 /**
  * Signs a one-time upload URL for an e-book PDF.
@@ -14,7 +15,11 @@ import { createEbookUploadUrl, isEbookStorageConfigured } from "@repo/storage";
  * Same trust model as the image route (`../route.ts`): a signed-in
  * EDITOR/OWNER, so there's no malware scan. The magic-byte check images get
  * isn't possible here because the bytes don't come through, but the file
- * type is constrained client-side and by the `.pdf` name check below.
+ * type is constrained client-side and by the `.pdf` name check below —
+ * and, after upload, server-side: the `ebooks` bucket only accepts
+ * application/pdf up to 100 MB (packages/storage harden-buckets), and the
+ * Books actions refuse to attach an object whose first bytes aren't `%PDF-`
+ * (`isStoredEbookPdf`).
  */
 const MAX_BYTES = 100 * 1024 * 1024; // generous ceiling; a book PDF that big is almost certainly a mistake
 
@@ -26,6 +31,9 @@ export async function POST(request: Request) {
   const user = await getCurrentStaff();
   if (!user?.role || !CATALOGUE_WRITE_ROLES.includes(user.role)) {
     return fail("You don't have permission to upload e-book files.", 403);
+  }
+  if (!(await rateLimit(RATE_LIMITS.adminUpload, user.id)).ok) {
+    return fail("Too many uploads in a short time. Please wait a few minutes.", 429);
   }
 
   if (!isEbookStorageConfigured()) {
@@ -45,7 +53,7 @@ export async function POST(request: Request) {
     return fail("That request didn't arrive in one piece. Please try again.", 400);
   }
 
-  if (typeof fileName !== "string" || !/\.pdf$/i.test(fileName.trim())) {
+  if (typeof fileName !== "string" || fileName.length > 255 || !/\.pdf$/i.test(fileName.trim())) {
     return fail("Please choose a PDF file.", 415);
   }
   if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes) || sizeBytes <= 0) {

@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { prisma, getSiteSettings } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
+import { getCachedFooterLinks, getCachedSiteSettings } from "@/lib/cms";
 import { SAMPLE_FOOTER_NAV, SAMPLE_SITE_SETTINGS } from "@/lib/sample-data";
 import { groupCatalogItemsByCategory } from "@/lib/catalog";
 import { FOOTER_COLUMNS } from "@/lib/navigation";
 import { Wrap } from "@/components/primitives";
+import { isHttpsUrl, isSafeHref } from "@repo/security/href";
 
 // Admin-controlled (Settings > Site Settings and Settings > Navigation in
 // apps/admin), falling back to sample settings and nav in preview mode.
@@ -15,16 +16,18 @@ const PAYMENT_MARKS = ["UPI", "VISA", "MASTERCARD", "RUPAY", "NETBANKING"];
 
 export async function SiteFooter() {
   const [settings, links] = await Promise.all([
-    withFallback(() => getSiteSettings(), SAMPLE_SITE_SETTINGS),
-    withFallback(
-      () => prisma.navLink.findMany({ where: { location: "FOOTER", isActive: true }, orderBy: { order: "asc" } }),
-      SAMPLE_FOOTER_NAV
-    ),
+    withFallback(() => getCachedSiteSettings(), SAMPLE_SITE_SETTINGS),
+    withFallback(() => getCachedFooterLinks(), SAMPLE_FOOTER_NAV),
   ]);
 
   const socialLinks =
     settings.socialLinks && typeof settings.socialLinks === "object"
-      ? (settings.socialLinks as Record<string, string>)
+      ? Object.fromEntries(
+          // CMS-supplied: only ever render real https profile links.
+          Object.entries(settings.socialLinks as Record<string, unknown>).filter(
+            (entry): entry is [string, string] => typeof entry[1] === "string" && isHttpsUrl(entry[1])
+          )
+        )
       : null;
 
   const departments = groupCatalogItemsByCategory();
@@ -33,7 +36,7 @@ export async function SiteFooter() {
     {
       title: "Shop",
       items: [
-        ...links.map((link) => ({ label: link.label, href: link.href })),
+        ...links.filter((link) => isSafeHref(link.href)).map((link) => ({ label: link.label, href: link.href })),
         ...FOOTER_COLUMNS[0]!.items.filter(
           (item) => !links.some((link) => link.href === item.href)
         ),

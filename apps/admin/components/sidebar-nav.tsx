@@ -107,6 +107,7 @@ const NAV_GROUPS_AFTER_INVENTORY: NavGroup[] = [
     items: [
       { href: "/users", label: "All Users" },
       { href: "/settings/roles", label: "Staffs and Roles" },
+      { href: "/discounts", label: "Discount" },
     ],
   },
 ];

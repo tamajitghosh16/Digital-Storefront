@@ -1,15 +1,14 @@
 /**
- * Collapsing a title's editions into one listing.
+ * A book's editions, summarised into one catalogue listing.
  *
- * A book is published as up to two `Product` rows that share a base slug —
- * a `PHYSICAL_BOOK` at `the-salt-road` and an `EBOOK` at
- * `the-salt-road-ebook`. The catalogue shows one card per *title*: it
- * never names the format, leads with the lower of the two prices, and
- * links to the detail page where the reader picks an edition. A title sold
- * in only one format is simply a group of one.
+ * A book is one `Product` row with a `BookEdition` per format it's sold in
+ * — Paperback, Hardcover, E-book: any one, two or all three. The catalogue
+ * shows one card per *title*: it never names the format, leads with the
+ * cheapest edition's price, and links to the detail page where the reader
+ * picks one.
  */
 
-import type { Product } from "@repo/database";
+import type { BookEdition, Product } from "@repo/database";
 
 /**
  * A Product row plus the display-only fields the sample data carries.
@@ -18,6 +17,16 @@ import type { Product } from "@repo/database";
  * same number under `ratingAvg` instead — see {@link productRating}.
  */
 type BookRow = Product & Partial<{ rating: number; coverFrom: string; coverTo: string }>;
+
+type EditionSummary = Pick<BookEdition, "format" | "priceCents" | "stockQty">;
+
+/**
+ * A catalogue row with the editions it's sold in. A book has one to three;
+ * the other Educational Materials lines (charts, worksheets, …) share this
+ * listing and have none — they're one shipped product, priced and stocked
+ * on the row itself.
+ */
+export type BookWithEditions = BookRow & { editions: EditionSummary[] };
 
 /**
  * A title's rating, whichever key the row carries it under — `rating` on
@@ -35,18 +44,26 @@ export function productRating(row: BookRow | null | undefined): number | undefin
 
 export interface BookListing {
   id: string;
-  /** Where the detail page lives — the printed slug, or the e-book's own slug when that's the only edition. */
   slug: string;
   title: string;
   author: string;
   genre?: string;
   rating?: number;
   reviewCount?: number;
-  /** Lower of the printed and e-book price — what the card shows. */
+  /** The cheapest edition's price — what the card shows. */
   fromPriceCents: number;
+  /** True when the editions aren't all one price, so the card says "from". */
+  priceVaries: boolean;
+  /** Every format the title is sold in, in Paperback → Hardcover → E-book order. */
+  formats: BookEdition["format"][];
+  /** Sold as a paperback and/or hardcover. */
   hasPrint: boolean;
   hasEbook: boolean;
-  /** Printed-copy stock, when there is a printed edition. */
+  /**
+   * Printed copies on hand across the paperback + hardcover editions.
+   * `null` when there's a printed edition whose stock isn't tracked (always
+   * orderable) or no printed edition at all.
+   */
   stockQty: number | null;
   coverImageUrl?: string | null;
   coverFrom?: string;
@@ -55,45 +72,38 @@ export interface BookListing {
   createdAt: Date;
 }
 
-export function groupBookEditions(rows: BookRow[]): BookListing[] {
-  const groups = new Map<string, { print?: BookRow; ebook?: BookRow }>();
+const FORMAT_ORDER: BookEdition["format"][] = ["PAPERBACK", "HARDCOVER", "EBOOK"];
 
-  for (const row of rows) {
-    const base = row.slug.replace(/-ebook$/, "");
-    const group = groups.get(base) ?? {};
-    if (row.type === "EBOOK") group.ebook = row;
-    else group.print = row;
-    groups.set(base, group);
-  }
+export function bookToListing(row: BookWithEditions): BookListing {
+  // No editions: a non-book line's single shipped product, read as one
+  // untiered "print" edition from the row's own price and stock.
+  const editions: EditionSummary[] = row.editions.length
+    ? row.editions
+    : row.type === "PHYSICAL_BOOK"
+      ? [{ format: "PAPERBACK", priceCents: row.priceCents, stockQty: row.stockQty }]
+      : [];
+  const print = editions.filter((edition) => edition.format !== "EBOOK");
+  const prices = editions.map((edition) => edition.priceCents);
+  const untracked = print.some((edition) => edition.stockQty === null);
 
-  const listings: BookListing[] = [];
-  for (const { print, ebook } of groups.values()) {
-    const lead = print ?? ebook;
-    if (!lead) continue;
-
-    const prices = [print?.priceCents, ebook?.priceCents].filter(
-      (cents): cents is number => typeof cents === "number"
-    );
-
-    listings.push({
-      id: lead.id,
-      slug: print ? print.slug : lead.slug,
-      title: lead.title,
-      author: lead.author,
-      genre: lead.genre ?? undefined,
-      rating: productRating(lead),
-      reviewCount: print?.reviewCount ?? ebook?.reviewCount,
-      fromPriceCents: prices.length ? Math.min(...prices) : lead.priceCents,
-      hasPrint: Boolean(print),
-      hasEbook: Boolean(ebook),
-      stockQty: print?.stockQty ?? null,
-      coverImageUrl: lead.coverImageUrl,
-      coverFrom: lead.coverFrom,
-      coverTo: lead.coverTo,
-      publishedAt: lead.publishedAt ?? null,
-      createdAt: lead.createdAt,
-    });
-  }
-
-  return listings;
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    author: row.author,
+    genre: row.genre ?? undefined,
+    rating: productRating(row),
+    reviewCount: row.reviewCount,
+    fromPriceCents: prices.length ? Math.min(...prices) : row.priceCents,
+    priceVaries: new Set(prices).size > 1,
+    formats: FORMAT_ORDER.filter((format) => row.editions.some((edition) => edition.format === format)),
+    hasPrint: print.length > 0,
+    hasEbook: editions.some((edition) => edition.format === "EBOOK"),
+    stockQty: print.length && !untracked ? print.reduce((sum, edition) => sum + (edition.stockQty ?? 0), 0) : null,
+    coverImageUrl: row.coverImageUrl,
+    coverFrom: row.coverFrom,
+    coverTo: row.coverTo,
+    publishedAt: row.publishedAt ?? null,
+    createdAt: row.createdAt,
+  };
 }

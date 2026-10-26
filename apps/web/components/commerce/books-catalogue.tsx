@@ -2,9 +2,9 @@ import Link from "next/link";
 import { Breadcrumb, Wrap, buttonClass } from "@/components/primitives";
 import { ReturnsBand } from "@/components/marketing";
 import type { BookListing } from "@/lib/books";
+import type { ListingLine } from "@/lib/product-lines";
 import {
   AVAILABILITY_OPTIONS,
-  BOOKS_BASE,
   FORMAT_OPTIONS,
   PRICE_BANDS,
   RATING_OPTIONS,
@@ -22,63 +22,69 @@ import { BooksGrid } from "./books-grid";
  * every matching title server-side but only sends the first screenful;
  * `BooksGrid` streams the rest in as the reader scrolls. Replaces the old
  * split `/books` + `/ebooks` catalogues.
+ *
+ * `line` makes the same listing serve every Educational Materials product
+ * line — Educational Charts, Worksheets and Activity Puzzles, Teaching and
+ * Learning Materials — each reading its own `Product.productLine`.
  */
 
 /** The removable pills for what's currently narrowing the list. */
-function activeChips(query: BookQuery): { label: string; href: string }[] {
+function activeChips(query: BookQuery, base: string): { label: string; href: string }[] {
   const params = queryToParams(query);
   const chips: { label: string; href: string }[] = [];
 
   for (const genre of query.genres) {
     const rest = query.genres.filter((entry) => entry !== genre);
-    chips.push({ label: genre, href: booksHref({ ...params, genre: rest.join(",") || undefined, page: undefined }) });
+    chips.push({ label: genre, href: booksHref({ ...params, genre: rest.join(",") || undefined, page: undefined }, base) });
   }
   const single = (key: keyof BookQuery, label: string | undefined) => {
-    if (label) chips.push({ label, href: booksHref({ ...params, [key]: undefined, page: undefined }) });
+    if (label) chips.push({ label, href: booksHref({ ...params, [key]: undefined, page: undefined }, base) });
   };
   single("format", FORMAT_OPTIONS.find((entry) => entry.value === query.format)?.label);
   single("avail", AVAILABILITY_OPTIONS.find((entry) => entry.value === query.avail)?.label);
   single("rating", RATING_OPTIONS.find((entry) => entry.value === query.rating)?.label);
   single("price", PRICE_BANDS.find((entry) => entry.value === query.price)?.label);
   if (query.classSet) {
-    chips.push({ label: "Class set", href: booksHref({ ...params, classset: undefined, page: undefined }) });
+    chips.push({ label: "Class set", href: booksHref({ ...params, classset: undefined, page: undefined }, base) });
   }
   if (query.q) {
-    chips.push({ label: `“${query.q}”`, href: booksHref({ ...params, q: undefined, page: undefined }) });
+    chips.push({ label: `“${query.q}”`, href: booksHref({ ...params, q: undefined, page: undefined }, base) });
   }
   return chips;
 }
 
 export function BooksCatalogue({
+  line,
   initialItems,
   initialCursor,
   total,
   availableGenres,
   query,
 }: {
+  line: ListingLine;
   initialItems: BookListing[];
   initialCursor: string | null;
   total: number;
   availableGenres: string[];
   query: BookQuery;
 }) {
-  const chips = activeChips(query);
+  const chips = activeChips(query, line.base);
   const params = queryToParams(query);
 
   return (
     <>
       <Wrap>
-        <Breadcrumb trail={[{ label: "Home", href: "/" }, { label: "Educational Materials" }, { label: "Books" }]} />
+        <Breadcrumb trail={[{ label: "Home", href: "/" }, { label: "Educational Materials" }, { label: line.label }]} />
       </Wrap>
 
       <Wrap as="section" className="pb-14 pt-2">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <h1>All Books</h1>
-          <BooksToolbar availableGenres={availableGenres} />
+          <h1>All {line.label}</h1>
+          <BooksToolbar availableGenres={availableGenres} line={line} />
         </div>
 
         <p className="mt-6 text-sm tabular-nums text-ink-muted">
-          {total} {total === 1 ? "title" : "titles"}
+          {total} {total === 1 ? line.noun.one : line.noun.many}
         </p>
 
         <div className="mt-3">
@@ -95,7 +101,7 @@ export function BooksCatalogue({
                 </Link>
               ))}
               <Link
-                href={booksHref({ sort: params.sort, view: params.view })}
+                href={booksHref({ sort: params.sort, view: params.view }, line.base)}
                 className="text-[13px] font-bold underline underline-offset-2"
               >
                 Clear all
@@ -105,19 +111,32 @@ export function BooksCatalogue({
 
           {initialItems.length > 0 ? (
             <BooksGrid
-              key={booksHref(params)}
+              key={booksHref(params, line.base)}
               initialItems={initialItems}
               initialCursor={initialCursor}
               query={query}
+              line={line}
             />
+          ) : chips.length === 0 && !line.isBook ? (
+            <div className="rounded-tile bg-tile px-6 py-16 text-center inset-ring inset-ring-card-edge">
+              <h3>Nothing here yet.</h3>
+              <p className="mx-auto mt-2 max-w-[46ch] text-sm text-ink-muted">
+                {`${line.label} aren’t in the catalogue yet.`} Browse the full book list in the meantime.
+              </p>
+              <Link href="/educational-material/books" className={buttonClass("secondary", "md", "mt-5")}>
+                Browse books
+              </Link>
+            </div>
           ) : (
             <div className="rounded-tile bg-tile px-6 py-16 text-center inset-ring inset-ring-card-edge">
               <h3>Nothing matched that.</h3>
               <p className="mx-auto mt-2 max-w-[46ch] text-sm text-ink-muted">
-                Try a different genre, widen the price, or clear the filters to see every title.
+                {line.isBook
+                  ? "Try a different genre, widen the price, or clear the filters to see every title."
+                  : `Try a different search, widen the price, or clear the filters to see every ${line.noun.one}.`}
               </p>
-              <Link href={BOOKS_BASE} className={buttonClass("secondary", "md", "mt-5")}>
-                Show all books
+              <Link href={line.base} className={buttonClass("secondary", "md", "mt-5")}>
+                Show all {line.label.toLowerCase()}
               </Link>
             </div>
           )}

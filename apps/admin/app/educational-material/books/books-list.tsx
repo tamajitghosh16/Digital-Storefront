@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Product } from "@repo/database";
+import type { BookEdition, Product } from "@repo/database";
 
-/** A Product row plus the drawn-jacket gradient the Server Component adds. */
-type BookRow = Product & { coverFrom: string; coverTo: string };
+/** A Product row with its editions, plus the drawn-jacket gradient the Server Component adds. */
+type BookRow = Product & { editions: BookEdition[]; coverFrom: string; coverTo: string };
 import { LayoutGrid, List, Search } from "lucide-react";
 import { cn } from "@repo/ui/utils";
 import { EmptyState, Pill, Thumb, controlClass } from "@/components/ui";
@@ -21,19 +21,27 @@ import { toggleProductPublished } from "./actions";
 
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
+/** Printed copies on hand across a book's paperback + hardcover editions; -1 when none is counted. */
+function printStock(book: BookRow): number {
+  const counted = book.editions.filter((edition) => edition.format !== "EBOOK" && edition.stockQty != null);
+  return counted.length ? counted.reduce((sum, edition) => sum + (edition.stockQty ?? 0), 0) : -1;
+}
+
+// `priceCents` on a book is its cheapest edition (see the schema), so the
+// price sorts order by "from" price.
 const SORTS = {
-  title: { label: "Title (A–Z)", compare: (a: Product, b: Product) => a.title.localeCompare(b.title) },
-  "price-asc": { label: "Price (low to high)", compare: (a: Product, b: Product) => a.priceCents - b.priceCents },
-  "price-desc": { label: "Price (high to low)", compare: (a: Product, b: Product) => b.priceCents - a.priceCents },
+  title: { label: "Title (A–Z)", compare: (a: BookRow, b: BookRow) => a.title.localeCompare(b.title) },
+  "price-asc": { label: "Price (low to high)", compare: (a: BookRow, b: BookRow) => a.priceCents - b.priceCents },
+  "price-desc": { label: "Price (high to low)", compare: (a: BookRow, b: BookRow) => b.priceCents - a.priceCents },
   "stock-asc": {
     label: "Stock (low to high)",
-    compare: (a: Product, b: Product) => (a.stockQty ?? -1) - (b.stockQty ?? -1),
+    compare: (a: BookRow, b: BookRow) => printStock(a) - printStock(b),
   },
   "stock-desc": {
     label: "Stock (high to low)",
-    compare: (a: Product, b: Product) => (b.stockQty ?? -1) - (a.stockQty ?? -1),
+    compare: (a: BookRow, b: BookRow) => printStock(b) - printStock(a),
   },
-} as const satisfies Record<string, { label: string; compare: (a: Product, b: Product) => number }>;
+} as const satisfies Record<string, { label: string; compare: (a: BookRow, b: BookRow) => number }>;
 
 type SortKey = keyof typeof SORTS;
 
@@ -56,12 +64,12 @@ function InventoryStatusCell({ status }: { status: Product["inventoryStatus"] })
 }
 
 /**
- * One line per format the book is sold in — physical and e-book are priced
- * (and stocked) separately, so a dual-format book renders as two stacked
- * lines rather than one row averaging the two together. Physical reads in
- * brand blue, e-book in sale red — the one deliberate splash of colour in
- * an otherwise monochrome admin, because the two prices need to read apart
- * at a glance.
+ * One line per format the book is sold in — paperback, hardcover and e-book
+ * are priced (and the two printed ones stocked) separately, so a
+ * multi-format book renders as stacked lines rather than one row averaging
+ * them together. Print reads in brand blue, e-book in sale red — the one
+ * deliberate splash of colour in an otherwise monochrome admin, because the
+ * prices need to read apart at a glance.
  */
 interface FormatLine {
   label: string;
@@ -70,26 +78,26 @@ interface FormatLine {
   priceCents: number;
 }
 
-function formatLines(product: Product): FormatLine[] {
-  const hasPhysical = product.bookFormats.includes("PHYSICAL");
-  const hasEbook = product.bookFormats.includes("EBOOK");
-  const lines: FormatLine[] = [];
-  if (hasPhysical) {
-    lines.push({
-      label: "Physical book",
-      colorClass: "text-brand",
-      stock: product.stockQty != null ? String(product.stockQty) : "—",
-      priceCents: product.priceCents,
-    });
-  }
-  if (hasEbook) {
-    lines.push({
-      label: "E-book",
-      colorClass: "text-sale",
-      stock: "—",
-      priceCents: hasPhysical ? (product.ebookPriceCents ?? product.priceCents) : product.priceCents,
-    });
-  }
+const FORMAT_LINE = {
+  PAPERBACK: { label: "Paperback", colorClass: "text-brand" },
+  HARDCOVER: { label: "Hardcover", colorClass: "text-brand" },
+  EBOOK: { label: "E-book", colorClass: "text-sale" },
+} as const;
+
+const FORMAT_ORDER = ["PAPERBACK", "HARDCOVER", "EBOOK"] as const;
+
+function formatLines(product: BookRow): FormatLine[] {
+  const lines: FormatLine[] = FORMAT_ORDER.flatMap((format) => {
+    const edition = product.editions.find((candidate) => candidate.format === format);
+    if (!edition) return [];
+    return [
+      {
+        ...FORMAT_LINE[format],
+        stock: edition.stockQty != null ? String(edition.stockQty) : "—",
+        priceCents: edition.priceCents,
+      },
+    ];
+  });
   if (lines.length === 0) {
     lines.push({ label: "—", colorClass: "text-ink-muted", stock: "—", priceCents: product.priceCents });
   }

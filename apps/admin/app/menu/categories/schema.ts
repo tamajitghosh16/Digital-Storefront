@@ -2,7 +2,7 @@ import { z } from "zod";
 import { RESERVED_SLUGS } from "../reserved-slugs";
 
 export const categoryFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(1, "Name is required").max(200, "That's too long"),
   slug: z
     .string()
     .min(1, "Web address is required")

@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { getPricingConfig, getSiteSettings } from "@repo/database";
 import { getCurrentUser } from "@repo/auth/server";
 import { withFallback } from "@/lib/safe-fetch";
+import { getCachedPricingConfig, getCachedSiteSettings } from "@/lib/cms";
 import { SAMPLE_SITE_SETTINGS } from "@/lib/sample-data";
 import { buildDepartments } from "@/lib/navigation";
 import { Wrap } from "@/components/primitives";
@@ -22,9 +22,9 @@ import { ThemeToggle } from "./theme-toggle";
  */
 export async function SiteHeader() {
   const [settings, user, pricing, departments] = await Promise.all([
-    withFallback(() => getSiteSettings(), SAMPLE_SITE_SETTINGS),
+    withFallback(() => getCachedSiteSettings(), SAMPLE_SITE_SETTINGS),
     withFallback(() => getCurrentUser(), null),
-    getPricingConfig(),
+    getCachedPricingConfig(),
     buildDepartments(),
   ]);
 

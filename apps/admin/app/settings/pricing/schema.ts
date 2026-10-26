@@ -28,9 +28,9 @@ export const pricingSettingsFormSchema = z.object({
   freeDeliveryOver: rupees("Free delivery threshold"),
   expressFee: rupees("Express delivery fee"),
   sameDayFee: rupees("Same-day delivery fee"),
-  standardEta: z.string().min(1, "Standard delivery needs an arrival estimate"),
-  expressEta: z.string().min(1, "Express delivery needs an arrival estimate"),
-  sameDayEta: z.string().min(1, "Same-day delivery needs an arrival estimate"),
+  standardEta: z.string().min(1, "Standard delivery needs an arrival estimate").max(100, "That's too long"),
+  expressEta: z.string().min(1, "Express delivery needs an arrival estimate").max(100, "That's too long"),
+  sameDayEta: z.string().min(1, "Same-day delivery needs an arrival estimate").max(100, "That's too long"),
   bundleEbookAdd: rupees("E-book bundle price"),
   ebookGst: percent("GST on e-books"),
   serviceGst: percent("GST on services"),
@@ -48,16 +48,5 @@ export const classSetTierFormSchema = z.object({
   discount: percent("Discount"),
 });
 
-export const discountCodeFormSchema = z.object({
-  code: z
-    .string()
-    .min(2, "A code needs at least 2 characters")
-    .max(24, "Keep codes under 24 characters")
-    .regex(/^[A-Za-z0-9-]+$/, "Use letters, numbers and hyphens only — no spaces"),
-  rate: percent("Discount").min(0.01, "A code has to take something off"),
-  blurb: z.preprocess((v) => (v === "" || v == null ? undefined : v), z.string().optional()),
-});
-
 export type PricingSettingsFormValues = z.infer<typeof pricingSettingsFormSchema>;
 export type ClassSetTierFormValues = z.infer<typeof classSetTierFormSchema>;
-export type DiscountCodeFormValues = z.infer<typeof discountCodeFormSchema>;

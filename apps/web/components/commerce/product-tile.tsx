@@ -20,6 +20,8 @@ export interface ProductTileData {
   title: string;
   author: string;
   slug: string;
+  /** Detail-page path, when it isn't the one `type` implies — e.g. an educational chart. */
+  href?: string;
   priceCents: number;
   coverImageUrl?: string | null;
   stockQty?: number | null;
@@ -41,6 +43,8 @@ function fulfilment(product: ProductTileData): { text: string; tone: string } {
   if (product.type === "EBOOK") return { text: "Instant download", tone: "text-ok" };
   if (product.type === "SERVICE_PACKAGE") return { text: "Starts on upload", tone: "text-ok" };
 
+  // null = stock not tracked, which `BuyBox` treats as always orderable.
+  if (product.stockQty === null) return { text: "Ships in 2 days", tone: "text-ok" };
   const stock = product.stockQty ?? 0;
   if (stock <= 0) return { text: "Out of stock", tone: "text-sale" };
   if (stock < 10) return { text: `Only ${stock} left`, tone: "text-warn" };
@@ -62,7 +66,7 @@ export function ProductTile({
   bundleCents?: number;
   className?: string;
 }) {
-  const href = `/${TYPE_PATH[product.type]}/${product.slug}`;
+  const href = product.href ?? `/${TYPE_PATH[product.type]}/${product.slug}`;
   const ship = fulfilment(product);
 
   const alternates = [

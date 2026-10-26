@@ -1,13 +1,11 @@
-import { prisma } from "@repo/database";
 import { withFallback } from "./safe-fetch";
-import { groupCatalogItemsByCategory } from "./catalog";
+import { getCachedHiddenDepartmentKeys, getCachedMenuCategories } from "./cms";
 
 /**
  * The department bar and its hover panels.
  *
  * Five business-line departments, each with a single-column panel that
- * opens on hover, plus an "All Products" catch-all pinned to the far
- * right. The model is plain serialisable data so the bar can stay a
+ * opens on hover. The model is plain serialisable data so the bar can stay a
  * Server Component — the panels are CSS-driven, not stateful.
  */
 
@@ -120,31 +118,18 @@ export async function buildDepartments(): Promise<Department[]> {
     ],
   };
 
-  const allProducts: Department = {
-    label: "All Products",
-    href: "/educational-material/books",
-    columns: groupCatalogItemsByCategory().map((group) => ({
-      title: group.category,
-      items: group.items.map((item) => ({
-        label: item.title,
-        href: `/catalog/${item.slug}`,
-        note: item.subBrand,
-      })),
-    })),
-  };
-
   // Admin-created categories (apps/admin's "Products Menu") — each becomes
   // its own department with a single dropdown column of the products
-  // created under it. Inserted ahead of "All Products", which stays last.
-  const menuCategories = await withFallback(
-    () =>
-      prisma.menuCategory.findMany({
-        where: { isActive: true },
-        orderBy: { order: "asc" },
-        include: { products: { where: { isActive: true }, orderBy: { order: "asc" } } },
-      }),
-    []
-  );
+  // created under it, after the fixed departments.
+  //
+  // An operator can also hide a built-in department from apps/admin's Menu →
+  // Categories screen; each hidden one has a `DepartmentVisibility` row.
+  // Keys must match `FIXED_DEPARTMENTS` in apps/admin/app/menu/fixed-departments.ts.
+  // Both reads are cached (lib/cms.ts) and fetched together.
+  const [menuCategories, hiddenKeyList] = await Promise.all([
+    withFallback(() => getCachedMenuCategories(), []),
+    withFallback(() => getCachedHiddenDepartmentKeys(), []),
+  ]);
 
   const adminDepartments: Department[] = menuCategories.map((category) => ({
     label: category.name,
@@ -157,14 +142,7 @@ export async function buildDepartments(): Promise<Department[]> {
     ],
   }));
 
-  // An operator can hide a built-in department from apps/admin's Menu →
-  // Categories screen; each hidden one has a `DepartmentVisibility` row.
-  // Keys must match `FIXED_DEPARTMENTS` in apps/admin/app/menu/fixed-departments.ts.
-  const hiddenKeys = new Set(
-    (await withFallback(() => prisma.departmentVisibility.findMany({ where: { hidden: true } }), [])).map(
-      (row) => row.key
-    )
-  );
+  const hiddenKeys = new Set(hiddenKeyList);
 
   const fixedDepartments: { key: string; department: Department }[] = [
     { key: "educational-materials", department: educationalMaterials },
@@ -174,11 +152,23 @@ export async function buildDepartments(): Promise<Department[]> {
     { key: "lifestyle", department: lifestyle },
   ];
 
-  return [
+  const shownDepartments = [
     ...fixedDepartments.filter(({ key }) => !hiddenKeys.has(key)).map(({ department }) => department),
     ...adminDepartments,
-    allProducts,
   ];
+
+  // With exactly one category shown, a one-item bar whose only job is to
+  // open a dropdown is a wasted click — promote that category's products to
+  // the bar itself, each a plain link. A category with no products keeps its
+  // own entry so the bar never goes empty.
+  if (shownDepartments.length === 1) {
+    const products = shownDepartments[0]!.columns?.flatMap((column) => column.items) ?? [];
+    if (products.length > 0) {
+      return products.map(({ label, href }) => ({ label, href }));
+    }
+  }
+
+  return shownDepartments;
 }
 
 /** Footer sitemap — grouped the way the approved design lays it out. */

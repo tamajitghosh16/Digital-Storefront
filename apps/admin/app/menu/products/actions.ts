@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/storefront-cache";
 import { prisma, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
@@ -40,6 +41,7 @@ export async function createMenuProduct(formData: FormData) {
     },
   });
 
+  revalidateStorefront();
   revalidatePath("/menu/products");
   revalidatePath("/", "layout");
   redirect("/menu/products?created=1");
@@ -68,6 +70,7 @@ export async function toggleMenuProduct(id: string) {
     },
   });
 
+  revalidateStorefront();
   revalidatePath("/menu/products");
   revalidatePath("/", "layout");
 }

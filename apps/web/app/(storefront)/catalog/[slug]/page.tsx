@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getContent, getSiteSettings } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
+import { getCachedContent, getCachedSiteSettings } from "@/lib/cms";
 import { SAMPLE_SITE_SETTINGS } from "@/lib/sample-data";
 import { CATALOG_ITEMS, findCatalogItem } from "@/lib/catalog";
 import { Breadcrumb, Callout, PageHeader, SectionHead, Standfirst, Wrap, buttonClass } from "@/components/primitives";
@@ -44,8 +44,8 @@ export default async function CatalogItemPage({ params }: { params: Promise<{ sl
   // The promises band shares its wording with the homepage — the Publisher
   // edits it once, under Homepage text, and both pages follow.
   const [settings, content] = await Promise.all([
-    withFallback(() => getSiteSettings(), SAMPLE_SITE_SETTINGS),
-    getContent(),
+    withFallback(() => getCachedSiteSettings(), SAMPLE_SITE_SETTINGS),
+    getCachedContent(),
   ]);
   const flow = FLOW_COPY[item.flow];
   const siblings = CATALOG_ITEMS.filter(

@@ -14,8 +14,10 @@ import {
 } from "@/components/primitives";
 import { buildEditions, type PricingConfig } from "@/lib/pricing";
 import { formatINRWhole } from "@/lib/format";
+import { BOOKS_LINE, type ListingLine } from "@/lib/product-lines";
 import { BuyBox } from "./buy-box";
 import { JacketGallery } from "./jacket-gallery";
+import { ReviewSummary } from "./review-summary";
 import { ProductScroller, ProductTile, type ProductTileData } from "./product-tile";
 
 /**
@@ -28,6 +30,11 @@ import { ProductScroller, ProductTile, type ProductTileData } from "./product-ti
  * keep a comfortable reading measure. Which editions are offered depends
  * on whether the title exists in both forms; a digital-only title simply
  * gets one option.
+ *
+ * The other Educational Materials lines (charts, worksheets, teaching
+ * materials) render here too, at `/educational-material/<line>/[slug]`:
+ * `line` swaps the breadcrumb and drops the book-only parts — editions,
+ * pages, binding, e-book formats, the publishing-services pitch.
  */
 
 export interface ProductPageData {
@@ -58,8 +65,11 @@ export function ProductPage({
   companionPriceCents,
   related,
   pricing,
+  line = BOOKS_LINE,
 }: {
   product: ProductPageData;
+  /** Which product line this belongs to — Books unless a line's own route says otherwise. */
+  line?: ListingLine;
   /** The other edition's price, when this title is published both ways. */
   companionPriceCents?: number;
   related: ProductTileData[];
@@ -67,7 +77,9 @@ export function ProductPage({
   pricing: PricingConfig;
 }) {
   const isEbook = product.type === "EBOOK";
-  const section = { label: "Books", href: "/educational-material/books" };
+  const isBook = line.isBook;
+  const noun = isBook ? (isEbook ? "e-book" : "book") : line.noun.one;
+  const section = { label: line.label, href: line.base };
 
   const printCents = isEbook ? companionPriceCents : product.priceCents;
   const ebookCents = isEbook ? product.priceCents : companionPriceCents;
@@ -79,16 +91,24 @@ export function ProductPage({
     pages: product.pages,
     formats: ebookFormats,
     bundleAddCents: pricing.bundleEbookAddCents,
-  });
+  }).map((edition) =>
+    // A non-book item is only ever the one shipped product, never a paperback.
+    isBook ? edition : { ...edition, label: "Standard", detail: "Shipped to your door", note: "Ships from Kolkata" }
+  );
 
   const fromCents = Math.min(
     ...[printCents, ebookCents].filter((cents): cents is number => typeof cents === "number")
   );
   const inStock = (product.stockQty ?? 0) > 0;
-  const distribution = reviewDistribution(product.rating ?? 4.5);
 
   const availability: { label: string; detail: string }[] = [];
-  if (printCents !== undefined) {
+  if (!isBook) {
+    const tracked = typeof product.stockQty === "number";
+    availability.push({
+      label: !tracked || inStock ? "Available" : "Out of stock",
+      detail: !tracked || inStock ? "Ships from Kolkata" : "Currently out of stock",
+    });
+  } else if (printCents !== undefined) {
     availability.push({
       label: "Printed edition",
       detail: inStock ? "Paperback · ships from Kolkata" : "Paperback · currently out of stock",
@@ -98,12 +118,17 @@ export function ProductPage({
     availability.push({ label: "E-book", detail: `${ebookFormats.join(" · ")} · instant download` });
   }
 
-  const facts: { term: string; detail: string }[] = [
-    { term: "Pages", detail: product.pages ? String(product.pages) : "—" },
-    { term: "ISBN", detail: product.isbn ?? "—" },
-    { term: "Language", detail: "English" },
-    { term: "Genre", detail: product.genre ?? "General" },
-  ];
+  const facts: { term: string; detail: string }[] = isBook
+    ? [
+        { term: "Pages", detail: product.pages ? String(product.pages) : "—" },
+        { term: "ISBN", detail: product.isbn ?? "—" },
+        { term: "Language", detail: "English" },
+        { term: "Genre", detail: product.genre ?? "General" },
+      ]
+    : [
+        { term: "Product code", detail: product.isbn ?? "—" },
+        { term: "Range", detail: line.label },
+      ];
 
   return (
     <>
@@ -207,7 +232,7 @@ export function ProductPage({
 
           <Rule className="my-9" />
 
-          <h2>About this {isEbook ? "e-book" : "book"}</h2>
+          <h2>About this {noun}</h2>
           {product.description && (
             <p className="mt-3.5 max-w-[66ch] whitespace-pre-line text-base leading-[1.65] text-ink-muted">
               {product.description}
@@ -218,100 +243,69 @@ export function ProductPage({
             contributed to the Sashibhusan Book Press Memorial Trust.
           </p>
 
-          <Rule />
+          {isBook && (
+            <>
+              <Rule />
 
-          <h2 className="mb-4">Specifications</h2>
-          <TableWrap>
-            <table className={TABLE_CLASS}>
-              <tbody>
-                <tr>
-                  <th scope="row" className={ROW_TH_CLASS}>
-                    ISBN
-                  </th>
-                  <td className={`${TD_CLASS} tabular-nums`}>{product.isbn ?? "—"}</td>
-                  <th scope="row" className={ROW_TH_CLASS}>
-                    Pages
-                  </th>
-                  <td className={`${TD_CLASS} tabular-nums`}>{product.pages ?? "—"}</td>
-                </tr>
-                <tr>
-                  <th scope="row" className={ROW_TH_CLASS}>
-                    Binding
-                  </th>
-                  <td className={TD_CLASS}>{isEbook ? "Digital" : "Paperback, sewn"}</td>
-                  <th scope="row" className={ROW_TH_CLASS}>
-                    Dimensions
-                  </th>
-                  <td className={`${TD_CLASS} tabular-nums`}>{isEbook ? "—" : "198 × 129 mm"}</td>
-                </tr>
-                <tr>
-                  <th scope="row" className={ROW_TH_CLASS}>
-                    Language
-                  </th>
-                  <td className={TD_CLASS}>English</td>
-                  <th scope="row" className={ROW_TH_CLASS}>
-                    Genre
-                  </th>
-                  <td className={TD_CLASS}>{product.genre ?? "General"}</td>
-                </tr>
-                <tr>
-                  <th scope="row" className={ROW_TH_CLASS}>
-                    Imprint
-                  </th>
-                  <td className={TD_CLASS}>New School Book Press</td>
-                  <th scope="row" className={ROW_TH_CLASS}>
-                    E-book formats
-                  </th>
-                  <td className={TD_CLASS}>{ebookFormats.join(", ")}</td>
-                </tr>
-              </tbody>
-            </table>
-          </TableWrap>
+              <h2 className="mb-4">Specifications</h2>
+              <TableWrap>
+                <table className={TABLE_CLASS}>
+                  <tbody>
+                    <tr>
+                      <th scope="row" className={ROW_TH_CLASS}>
+                        ISBN
+                      </th>
+                      <td className={`${TD_CLASS} tabular-nums`}>{product.isbn ?? "—"}</td>
+                      <th scope="row" className={ROW_TH_CLASS}>
+                        Pages
+                      </th>
+                      <td className={`${TD_CLASS} tabular-nums`}>{product.pages ?? "—"}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row" className={ROW_TH_CLASS}>
+                        Binding
+                      </th>
+                      <td className={TD_CLASS}>{isEbook ? "Digital" : "Paperback, sewn"}</td>
+                      <th scope="row" className={ROW_TH_CLASS}>
+                        Dimensions
+                      </th>
+                      <td className={`${TD_CLASS} tabular-nums`}>{isEbook ? "—" : "198 × 129 mm"}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row" className={ROW_TH_CLASS}>
+                        Language
+                      </th>
+                      <td className={TD_CLASS}>English</td>
+                      <th scope="row" className={ROW_TH_CLASS}>
+                        Genre
+                      </th>
+                      <td className={TD_CLASS}>{product.genre ?? "General"}</td>
+                    </tr>
+                    <tr>
+                      <th scope="row" className={ROW_TH_CLASS}>
+                        Imprint
+                      </th>
+                      <td className={TD_CLASS}>New School Book Press</td>
+                      <th scope="row" className={ROW_TH_CLASS}>
+                        E-book formats
+                      </th>
+                      <td className={TD_CLASS}>{ebookFormats.join(", ")}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </TableWrap>
+            </>
+          )}
 
           <Rule />
 
           <section id="reviews" className="scroll-mt-8">
-            <h2>Reader reviews</h2>
-            {typeof product.rating === "number" ? (
-              <>
-                <div className="mt-4 flex flex-wrap items-start gap-9">
-                  <div className="shrink-0">
-                    <p className="text-[52px] font-bold leading-none tracking-[-0.04em] tabular-nums">
-                      {product.rating.toFixed(1)}
-                    </p>
-                    <Stars rating={product.rating} className="mt-2 block text-[15px]" />
-                    <p className="mt-1.5 text-sm tabular-nums text-ink-muted">{product.reviewCount ?? 0} reviews</p>
-                  </div>
-
-                  <div className="flex min-w-[250px] flex-1 flex-col gap-2">
-                    {distribution.map((share, index) => (
-                      <div
-                        key={index}
-                        className="grid grid-cols-[46px_1fr_42px] items-center gap-3 text-[13px] text-ink-muted"
-                      >
-                        <span>{5 - index} star</span>
-                        <span className="h-2 overflow-hidden rounded-full bg-tile-2">
-                          <span className="block h-full rounded-full bg-ink" style={{ width: `${share}%` }} />
-                        </span>
-                        <span className="tabular-nums">{share}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-[22px] rounded-tile bg-tile p-6 inset-ring inset-ring-card-edge">
-                  <Callout tone="tile">What reviewers keep saying</Callout>
-                  <p className="mt-3 text-[15px] leading-[1.6] text-ink-muted">
-                    Review capture is a Phase 0 stub — the{" "}
-                    <code className="rounded bg-ground px-1.5 py-0.5 font-mono text-[0.88em]">Review</code> model exists,
-                    the submission flow doesn&rsquo;t yet. The distribution above is derived from the title&rsquo;s
-                    average rating.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <p className="mt-3 text-[15px] text-ink-muted">No reviews for this title yet.</p>
-            )}
+            <h2>{isBook ? "Reader reviews" : "Reviews"}</h2>
+            <ReviewSummary
+              rating={product.rating}
+              reviewCount={product.reviewCount}
+              emptyLabel={`No reviews for this ${isBook ? "title" : noun} yet.`}
+            />
           </section>
         </div>
 
@@ -329,25 +323,28 @@ export function ProductPage({
               stockQty={product.stockQty}
               supportsClassSets={printCents !== undefined}
               pricing={pricing}
+              isBook={isBook}
             />
 
-            <div className="rounded-tile bg-tile p-6 inset-ring inset-ring-card-edge">
-              <Callout>Written something yourself?</Callout>
-              <p className="mt-3 text-[15px] leading-[1.55] text-ink-muted">
-                We set and print books like this one for other authors too — conversion from ₹7,900, full
-                self-publishing from ₹9,999.
-              </p>
-              <Link href="/services" className={buttonClass("secondary", "md", "mt-4")}>
-                See publishing services
-              </Link>
-            </div>
+            {isBook && (
+              <div className="rounded-tile bg-tile p-6 inset-ring inset-ring-card-edge">
+                <Callout>Written something yourself?</Callout>
+                <p className="mt-3 text-[15px] leading-[1.55] text-ink-muted">
+                  We set and print books like this one for other authors too — conversion from ₹7,900, full
+                  self-publishing from ₹9,999.
+                </p>
+                <Link href="/services" className={buttonClass("secondary", "md", "mt-4")}>
+                  See publishing services
+                </Link>
+              </div>
+            )}
           </div>
         </aside>
       </Wrap>
 
       {related.length > 0 && (
         <Wrap as="section" className="pb-12">
-          <SectionHead title="Readers also bought" href={section.href} />
+          <SectionHead title={isBook ? "Readers also bought" : "You may also like"} href={section.href} />
           <ProductScroller>
             {related.map((item) => (
               <ProductTile key={item.id} product={item} />
@@ -357,20 +354,4 @@ export function ProductPage({
       )}
     </>
   );
-}
-
-/**
- * Star distribution implied by an average rating — an exponential decay
- * either side of the mean, normalised to 100. A 4.8 lands on roughly
- * 83/11/4/1/1, which is what a real long-tail distribution looks like.
- */
-function reviewDistribution(rating: number): number[] {
-  const raw = [5, 4, 3, 2, 1].map((star) => Math.exp(-2.2 * Math.abs(star - rating)));
-  const total = raw.reduce((sum, value) => sum + value, 0);
-  const shares = raw.map((value) => Math.max(1, Math.round((value / total) * 100)));
-
-  // Rounding up to a 1% floor can overshoot; take the excess off the top bar.
-  const drift = shares.reduce((sum, value) => sum + value, 0) - 100;
-  shares[0] = Math.max(1, shares[0]! - drift);
-  return shares;
 }

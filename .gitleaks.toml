@@ -1,0 +1,8 @@
+# gitleaks config — default rules, plus allowlisting the placeholder values
+# in committed .env.example files.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Example env files hold placeholders only"
+paths = ['''(^|/)\.env\.example$''']

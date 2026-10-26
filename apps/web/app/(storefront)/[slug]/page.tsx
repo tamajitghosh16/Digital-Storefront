@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@repo/database";
@@ -12,11 +13,26 @@ import { DummyPage } from "@/components/marketing/dummy-page";
  * falling into this dynamic one, so it only ever catches slugs the admin
  * created.
  */
+
+/**
+ * The product or category at this slug, looked up together rather than
+ * product-then-category, and `cache()`d so generateMetadata and the page
+ * share the one pair of queries.
+ */
+const loadMenuEntry = cache((slug: string) =>
+  Promise.all([
+    withFallback(
+      () => prisma.menuProduct.findFirst({ where: { slug, isActive: true }, include: { category: true } }),
+      null
+    ),
+    withFallback(() => prisma.menuCategory.findFirst({ where: { slug, isActive: true } }), null),
+  ])
+);
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const product = await withFallback(() => prisma.menuProduct.findFirst({ where: { slug, isActive: true } }), null);
+  const [product, category] = await loadMenuEntry(slug);
   if (product) return { title: product.name };
-  const category = await withFallback(() => prisma.menuCategory.findFirst({ where: { slug, isActive: true } }), null);
   if (category) return { title: category.name };
   return {};
 }
@@ -24,10 +40,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function MenuPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  const product = await withFallback(
-    () => prisma.menuProduct.findFirst({ where: { slug, isActive: true }, include: { category: true } }),
-    null
-  );
+  const [product, category] = await loadMenuEntry(slug);
   if (product) {
     return (
       <DummyPage
@@ -38,7 +51,6 @@ export default async function MenuPage({ params }: { params: Promise<{ slug: str
     );
   }
 
-  const category = await withFallback(() => prisma.menuCategory.findFirst({ where: { slug, isActive: true } }), null);
   if (category) {
     return (
       <DummyPage

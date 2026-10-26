@@ -1,3 +1,4 @@
+import "server-only";
 import { Resend } from "resend";
 import { OrderConfirmation } from "./templates/OrderConfirmation";
 import { ProjectStatusChanged } from "./templates/ProjectStatusChanged";
@@ -17,6 +18,17 @@ function getResendClient(): Resend {
 }
 const FROM = process.env.EMAIL_FROM ?? "Book Press <orders@example.com>";
 
+/**
+ * Subject lines interpolate data (a book title an author typed, an order
+ * id). Strip CR/LF and other control characters so nothing can smuggle a
+ * header or a misleading second line into a mail client, and cap the length.
+ */
+function subjectPart(value: string, max = 120): string {
+  // eslint-disable-next-line no-control-regex
+  const cleaned = value.replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
+  return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
+}
+
 export async function sendOrderConfirmation(params: {
   to: string;
   orderId: string;
@@ -26,7 +38,7 @@ export async function sendOrderConfirmation(params: {
   return getResendClient().emails.send({
     from: FROM,
     to: params.to,
-    subject: `Order confirmed — #${params.orderId}`,
+    subject: `Order confirmed — #${subjectPart(params.orderId, 40)}`,
     react: OrderConfirmation(params),
   });
 }
@@ -35,7 +47,7 @@ export async function sendProjectStatusChanged(params: { to: string; bookTitle: 
   return getResendClient().emails.send({
     from: FROM,
     to: params.to,
-    subject: `Your project "${params.bookTitle}" is now ${params.status}`,
+    subject: `Your project "${subjectPart(params.bookTitle)}" is now ${subjectPart(params.status, 40)}`,
     react: ProjectStatusChanged(params),
   });
 }

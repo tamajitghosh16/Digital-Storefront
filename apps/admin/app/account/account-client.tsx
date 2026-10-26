@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import type { Role } from "@repo/database";
 import { createClient } from "@repo/auth/client";
+import { verifyCurrentPassword } from "./actions";
 import { buttonClass, ErrorBanner, Field, Pill, Section, SavedBanner, TextField } from "@/components/ui";
+import { STAFF_PASSWORD_MIN } from "@/lib/passwords";
 
 export function AccountClient({ email, role }: { email: string; role: Role }) {
   return (
@@ -18,7 +20,7 @@ export function AccountClient({ email, role }: { email: string; role: Role }) {
       </Section>
 
       <Section title="Password" description="Change the password you sign in with.">
-        <PasswordChange email={email} />
+        <PasswordChange />
       </Section>
     </div>
   );
@@ -155,7 +157,7 @@ function EmailField({ initialEmail }: { initialEmail: string }) {
 
 // ── Password ────────────────────────────────────────────────────────
 
-function PasswordChange({ email }: { email: string }) {
+function PasswordChange() {
   const [editing, setEditing] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -176,8 +178,8 @@ function PasswordChange({ email }: { email: string }) {
     event.preventDefault();
     setError(null);
 
-    if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters.");
+    if (newPassword.length < STAFF_PASSWORD_MIN) {
+      setError(`New password must be at least ${STAFF_PASSWORD_MIN} characters.`);
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -188,20 +190,29 @@ function PasswordChange({ email }: { email: string }) {
     setLoading(true);
     const supabase = createClient();
 
-    // Re-verify the current password before allowing the change.
-    const { error: reauthError } = await supabase.auth.signInWithPassword({ email, password: currentPassword });
-    if (reauthError) {
+    // Re-verify the current password server-side (see ./actions.ts), without
+    // replacing this browser's session.
+    const check = await verifyCurrentPassword(currentPassword).catch(() => ({ ok: false, error: "Couldn't verify your current password." }));
+    if (!check.ok) {
       setLoading(false);
-      setError("Current password is incorrect.");
+      setError(check.error ?? "Current password is incorrect.");
       return;
     }
 
     const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
     setLoading(false);
     if (authError) {
-      setError(authError.message);
+      setError(
+        authError.code === "weak_password"
+          ? "That password is too common or has appeared in a data breach. Choose another."
+          : authError.code === "same_password"
+            ? "Choose a password you haven't used before."
+            : "Couldn't change your password. Please try again."
+      );
       return;
     }
+    // Anyone else signed in as you (old password) is signed out.
+    await supabase.auth.signOut({ scope: "others" }).catch(() => {});
 
     setSaved(true);
     reset();
@@ -241,7 +252,7 @@ function PasswordChange({ email }: { email: string }) {
         name="newPassword"
         type="password"
         required
-        minLength={6}
+        minLength={STAFF_PASSWORD_MIN}
         value={newPassword}
         onChange={(event) => setNewPassword(event.target.value)}
         placeholder="••••••••"
@@ -251,7 +262,7 @@ function PasswordChange({ email }: { email: string }) {
         name="confirmPassword"
         type="password"
         required
-        minLength={6}
+        minLength={STAFF_PASSWORD_MIN}
         value={confirmPassword}
         onChange={(event) => setConfirmPassword(event.target.value)}
         placeholder="••••••••"

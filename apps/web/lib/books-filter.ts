@@ -1,7 +1,7 @@
 /**
  * The books listing's filter + sort rules.
  *
- * Pure functions over already-grouped `BookListing`s — no server imports —
+ * Pure functions over `BookListing`s — no server imports —
  * so the Server Component page, the `GET /api/books` route that feeds
  * infinite scroll, and any test all narrow and order a result set the same
  * way.
@@ -18,8 +18,12 @@ export function applyFilters(listings: BookListing[], query: BookQuery): BookLis
     if (query.genres.length && (!book.genre || !query.genres.includes(book.genre))) return false;
     if (term && !`${book.title} ${book.author} ${book.genre ?? ""}`.toLowerCase().includes(term)) return false;
     if (query.format === "print" && !book.hasPrint) return false;
+    if (query.format === "paperback" && !book.formats.includes("PAPERBACK")) return false;
+    if (query.format === "hardcover" && !book.formats.includes("HARDCOVER")) return false;
     if (query.format === "ebook" && !book.hasEbook) return false;
-    if (query.avail === "in-stock" && !(book.hasEbook || (book.stockQty ?? 0) > 0)) return false;
+    if (query.avail === "in-stock" && !(book.hasEbook || (book.hasPrint && book.stockQty === null) || (book.stockQty ?? 0) > 0)) {
+      return false;
+    }
     if (query.avail === "same-day" && (book.stockQty ?? 0) < 30) return false;
     if (query.rating && (book.rating ?? 0) < Number(query.rating)) return false;
     if (band && !band.test(book.fromPriceCents)) return false;

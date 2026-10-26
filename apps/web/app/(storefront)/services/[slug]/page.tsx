@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -19,10 +20,16 @@ import {
 } from "@/components/primitives";
 import { AddToCartButton } from "@/components/commerce/add-to-cart-button";
 
+/** `cache()`d so generateMetadata and the page share one lookup per request. */
+const loadProduct = cache(
+  async (slug: string) =>
+    (await withFallback(() => prisma.product.findUnique({ where: { slug } }), null)) ?? findSampleProduct(slug)
+);
+
 // Admin-controlled per-product SEO — see the apps/admin catalogue form.
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const product = (await withFallback(() => prisma.product.findUnique({ where: { slug } }), null)) ?? findSampleProduct(slug);
+  const product = await loadProduct(slug);
   if (!product) return {};
   return {
     title: product.metaTitle || product.title,
@@ -41,7 +48,7 @@ const PROCESS = [
 // FR-2.3: service package detail — features, price, turnaround.
 export default async function ServiceDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const product = (await withFallback(() => prisma.product.findUnique({ where: { slug } }), null)) ?? findSampleProduct(slug);
+  const product = await loadProduct(slug);
   if (!product || product.type !== "SERVICE_PACKAGE") notFound();
 
   const features = (product.description ?? "").split("\n").filter(Boolean);

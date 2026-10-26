@@ -3,6 +3,7 @@ import { prisma } from "@repo/database";
 import { PageHeader, Pill } from "@/components/ui";
 import { updateProduct } from "../actions";
 import { ProductForm } from "../product-form";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function EditProductPage({
   params,
@@ -11,9 +12,10 @@ export default async function EditProductPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireStaffPage();
   const { id } = await params;
   const { error } = await searchParams;
-  const product = await prisma.product.findUnique({ where: { id } });
+  const product = await prisma.product.findUnique({ where: { id }, include: { editions: true } });
   if (!product) notFound();
 
   const ebookAsset = await prisma.fileAsset.findFirst({

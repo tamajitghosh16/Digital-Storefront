@@ -4,6 +4,7 @@ import { prisma } from "@repo/database";
 import { PageHeader, Pill, Section } from "@/components/ui";
 import { updateVendor } from "../actions";
 import { VendorForm } from "../vendor-form";
+import { requireStaffPage } from "@/lib/guard";
 
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
@@ -14,6 +15,7 @@ export default async function EditVendorPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireStaffPage();
   const { id } = await params;
   const { error } = await searchParams;
   const vendor = await prisma.vendor.findUnique({

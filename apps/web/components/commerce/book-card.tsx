@@ -10,18 +10,21 @@ import { WishlistButton } from "./wishlist-button";
 /**
  * One title in the books catalogue, in either a grid tile or a list row.
  *
- * The card is edition-agnostic by design: it shows the lower of the
- * printed and e-book price (prefixed "from" when both exist) and one
+ * The card is edition-agnostic by design: it shows the cheapest edition's
+ * price (prefixed "from" when the editions differ in price) and one
  * fulfilment line — the printed promise while stock lasts, otherwise the
  * digital one. Which edition to buy is chosen on the detail page.
  */
 
 function priceLabel(listing: BookListing): string {
   const price = formatINRWhole(listing.fromPriceCents);
-  return listing.hasPrint && listing.hasEbook ? `from ${price}` : price;
+  return listing.priceVaries ? `from ${price}` : price;
 }
 
 function fulfilment(listing: BookListing): { text: string; tone: string } {
+  // A null `stockQty` means "not tracked", which `BuyBox` treats as always
+  // orderable — say so here too rather than "unavailable".
+  if (listing.hasPrint && listing.stockQty === null) return { text: "Ships in 2 days", tone: "text-ok" };
   const stock = listing.stockQty ?? 0;
   if (listing.hasPrint && stock > 0) {
     if (stock < 10) return { text: `Only ${stock} left`, tone: "text-warn" };
@@ -32,8 +35,20 @@ function fulfilment(listing: BookListing): { text: string; tone: string } {
   return { text: "Currently unavailable", tone: "text-sale" };
 }
 
-export function BookCard({ listing, view }: { listing: BookListing; view: BookView }) {
-  const href = `${BOOKS_BASE}/${listing.slug}`;
+export function BookCard({
+  listing,
+  view,
+  base = BOOKS_BASE,
+  priority = false,
+}: {
+  listing: BookListing;
+  view: BookView;
+  /** The product line's listing path; its detail pages live under it. */
+  base?: string;
+  /** First row on screen: fetch the cover eagerly instead of lazily. */
+  priority?: boolean;
+}) {
+  const href = `${base}/${listing.slug}`;
   const ship = fulfilment(listing);
 
   const rating = typeof listing.rating === "number" && (
@@ -57,6 +72,7 @@ export function BookCard({ listing, view }: { listing: BookListing; view: BookVi
             from={listing.coverFrom}
             to={listing.coverTo}
             sizes="70px"
+            priority={priority}
           />
         </span>
 
@@ -88,6 +104,9 @@ export function BookCard({ listing, view }: { listing: BookListing; view: BookVi
           from={listing.coverFrom}
           to={listing.coverTo}
           className="w-[86%]"
+          // The jacket is ~80% of a grid column: 5 columns at lg, 3–4 at sm/md, 2 below.
+          sizes="(min-width: 1024px) 240px, (min-width: 640px) 26vw, 42vw"
+          priority={priority}
         />
       </ProductShot>
 

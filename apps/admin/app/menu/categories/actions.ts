@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/storefront-cache";
 import { prisma, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
@@ -35,6 +36,7 @@ export async function createMenuCategory(formData: FormData) {
     },
   });
 
+  revalidateStorefront();
   revalidatePath("/menu/categories");
   revalidatePath("/", "layout");
   redirect("/menu/categories?created=1");
@@ -69,6 +71,7 @@ export async function setMenuCategoryVisibility(id: string, formData: FormData) 
     },
   });
 
+  revalidateStorefront();
   revalidatePath("/menu/categories");
   revalidatePath("/", "layout");
   redirect("/menu/categories?visibility=1");
@@ -97,6 +100,7 @@ export async function setDepartmentVisibility(key: string, formData: FormData) {
     },
   });
 
+  revalidateStorefront();
   revalidatePath("/menu/categories");
   revalidatePath("/", "layout");
   redirect("/menu/categories?visibility=1");

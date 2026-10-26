@@ -5,6 +5,7 @@ import { getSiteSettings, prisma } from "@repo/database";
 import { AppShell } from "@/components/app-shell";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
+import { headers } from "next/headers";
 
 // Space Grotesk announces a screen or a number; Manrope does the actual
 // work of labels, body copy and buttons; Plex Mono gives table figures and
@@ -35,6 +36,9 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Per-request CSP nonce from proxy.ts, for next-themes' inline script.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   // All three reads are best-effort: this shell also wraps /sign-in,
   // /forgot-password, /reset-password and /unauthorized, which are
   // reachable with no session and, in the case of a cold environment, no
@@ -54,7 +58,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-page font-sans text-ink antialiased">
-        <ThemeProvider>
+        <ThemeProvider nonce={nonce}>
           <AppShell
             siteName={settings?.siteName}
             userName={user?.name ?? user?.email ?? null}

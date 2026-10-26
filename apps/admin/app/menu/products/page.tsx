@@ -3,12 +3,14 @@ import { PageHeader, SavedBanner, Table } from "@/components/ui";
 import { FIXED_DEPARTMENTS } from "../fixed-departments";
 import { AddProductDialog } from "./add-product-dialog";
 import { BuiltInSwitch, VisibilityToggle } from "./visibility-toggle";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function MenuProductsPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string; created?: string }>;
 }) {
+  await requireStaffPage();
   const { error, created } = await searchParams;
   const [categories, products] = await Promise.all([
     prisma.menuCategory.findMany({ where: { isActive: true }, orderBy: { order: "asc" } }),

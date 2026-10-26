@@ -1,8 +1,12 @@
-import { getContent, prisma } from "@repo/database";
+import { prisma } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
-import { SAMPLE_BANNERS, SAMPLE_BOOKS, SAMPLE_EBOOKS, SAMPLE_FAQS, SAMPLE_TESTIMONIALS } from "@/lib/sample-data";
+import { productsCache, reviveDates } from "@/lib/products-cache";
+import { bookToListing, type BookWithEditions } from "@/lib/books";
+import { getCachedBanners, getCachedContent, getCachedFaqs, getCachedTestimonials } from "@/lib/cms";
+import { SAMPLE_BANNERS, SAMPLE_BOOKS, SAMPLE_FAQS, SAMPLE_TESTIMONIALS } from "@/lib/sample-data";
 import { SectionHead, Stars, Wrap } from "@/components/primitives";
 import { ProductScroller, ProductTile, type ProductTileData } from "@/components/commerce/product-tile";
+import { safeHrefOr } from "@repo/security/href";
 import {
   DigitalTechBand,
   EducationalLearningBand,
@@ -62,34 +66,58 @@ const PUBLISHING_ITEMS: ProductLineItem[] = [
 const LIFESTYLE_ITEM: ProductLineItem = { label: "Indoor Plants (Chatterjee's Green Veranda)", href: "/indoor-plants" };
 const LIFESTYLE_IMAGE = "/images/indoor-plants.png";
 
+// The newest published books with their editions, cached under the
+// `products` tag (`lib/products-cache`). `productLine` keeps charts /
+// worksheets / teaching materials — PHYSICAL_BOOK for fulfilment — out.
+const cachedLatestBooks = productsCache("home-latest", () =>
+  prisma.product.findMany({
+    where: { productLine: "BOOK", isPublished: true },
+    include: { editions: { select: { format: true, priceCents: true, stockQty: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 24,
+  })
+);
+
 export default async function HomePage() {
-  const [books, ebooks, banners, testimonials, faqs, content] = await Promise.all([
+  const [bookRows, banners, testimonials, faqs, content] = await Promise.all([
     withFallback(
-      () =>
-        prisma.product.findMany({
-          where: { type: "PHYSICAL_BOOK", isPublished: true },
-          orderBy: { createdAt: "desc" },
-          take: 24,
-        }),
-      SAMPLE_BOOKS
+      async () => (await cachedLatestBooks()).map((row): BookWithEditions => reviveDates(row)),
+      SAMPLE_BOOKS as BookWithEditions[]
     ),
-    withFallback(
-      () =>
-        prisma.product.findMany({ where: { type: "EBOOK", isPublished: true }, orderBy: { createdAt: "desc" }, take: 24 }),
-      SAMPLE_EBOOKS
-    ),
-    withFallback(() => prisma.banner.findMany({ where: { isActive: true }, orderBy: { order: "asc" } }), SAMPLE_BANNERS),
-    withFallback(
-      () => prisma.testimonial.findMany({ where: { isActive: true }, orderBy: { order: "asc" } }),
-      SAMPLE_TESTIMONIALS
-    ),
-    withFallback(() => prisma.faq.findMany({ where: { isActive: true }, orderBy: { order: "asc" } }), SAMPLE_FAQS),
-    getContent(),
+    withFallback(() => getCachedBanners(), SAMPLE_BANNERS),
+    withFallback(() => getCachedTestimonials(), SAMPLE_TESTIMONIALS),
+    withFallback(() => getCachedFaqs(), SAMPLE_FAQS),
+    getCachedContent(),
   ]);
 
-  const allBooks = books as ProductTileData[];
+  // One tile per title, led by its cheapest printed edition (or the e-book
+  // when that's all there is); the e-book's own price rides along as the
+  // tile's second line when there's print too.
+  const allBooks: ProductTileData[] = bookRows.map((row) => {
+    const listing = bookToListing(row);
+    const printPrices = row.editions.filter((edition) => edition.format !== "EBOOK").map((edition) => edition.priceCents);
+    return {
+      id: listing.id,
+      type: listing.hasPrint ? "PHYSICAL_BOOK" : "EBOOK",
+      title: listing.title,
+      author: listing.author,
+      slug: listing.slug,
+      priceCents: printPrices.length ? Math.min(...printPrices) : listing.fromPriceCents,
+      coverImageUrl: listing.coverImageUrl ?? null,
+      stockQty: listing.stockQty,
+      genre: listing.genre,
+      rating: listing.rating,
+      reviewCount: listing.reviewCount,
+      coverFrom: listing.coverFrom,
+      coverTo: listing.coverTo,
+    };
+  });
   const ebookPrice = new Map(
-    (ebooks as ProductTileData[]).map((ebook) => [ebook.slug.replace(/-ebook$/, ""), ebook.priceCents])
+    bookRows.flatMap((row) => {
+      const ebook = row.editions.find((edition) => edition.format === "EBOOK");
+      const hasPrint = row.editions.some((edition) => edition.format !== "EBOOK");
+      return ebook && hasPrint ? [[row.slug, ebook.priceCents] as const] : [];
+    })
   );
 
   const popular = [...allBooks].sort((a, b) => (b.reviewCount ?? 0) - (a.reviewCount ?? 0)).slice(0, 8);
@@ -104,10 +132,10 @@ export default async function HomePage() {
           banner?.subtitle ??
           "Shop the catalogue, commission an e-book conversion, or launch your own title — manuscript to storefront listing in as little as three weeks."
         }
-        primary={banner?.ctaText ? { label: banner.ctaText, href: banner.ctaHref ?? "/self-publishing" } : undefined}
+        primary={banner?.ctaText ? { label: banner.ctaText, href: safeHrefOr(banner.ctaHref, "/self-publishing") } : undefined}
         secondary={
           banner?.secondaryCtaText
-            ? { label: banner.secondaryCtaText, href: banner.secondaryCtaHref ?? "/educational-material/books" }
+            ? { label: banner.secondaryCtaText, href: safeHrefOr(banner.secondaryCtaHref, "/educational-material/books") }
             : undefined
         }
         jackets={allBooks.slice(0, 4).map((book) => ({

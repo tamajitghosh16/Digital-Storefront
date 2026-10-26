@@ -4,8 +4,10 @@ import { prisma } from "@repo/database";
 import { ButtonLink, EmptyState, PageHeader, Pill, Table } from "@/components/ui";
 import { ConfirmButton, LinkButton } from "@/components/form-controls";
 import { deleteNavLink, toggleNavLinkActive } from "./actions";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function NavigationPage() {
+  await requireStaffPage();
   const links = await prisma.navLink.findMany({ orderBy: [{ location: "asc" }, { order: "asc" }] });
   const header = links.filter((link) => link.location === "HEADER");
   const footer = links.filter((link) => link.location === "FOOTER");

@@ -2,6 +2,7 @@ import { CONTENT_GROUP_LIST, prisma } from "@repo/database";
 import { ButtonLink, Field, PageHeader, SavedBanner, Section, controlClass } from "@/components/ui";
 import { SaveButton } from "@/components/form-controls";
 import { updateHomepageContent } from "./actions";
+import { requireStaffPage } from "@/lib/guard";
 
 // FR-11.1-adjacent: the screen that owns every heading, description and
 // button label on the storefront homepage. The list of fields is generated
@@ -13,6 +14,7 @@ export default async function HomepageContentPage({
 }: {
   searchParams: Promise<{ saved?: string }>;
 }) {
+  await requireStaffPage();
   const { saved } = await searchParams;
 
   // Raw rows, not getContent(): the form has to distinguish "the Publisher

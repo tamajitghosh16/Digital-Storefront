@@ -3,8 +3,10 @@ import { prisma } from "@repo/database";
 import { ButtonLink, EmptyState, PageHeader, Pill, Table } from "@/components/ui";
 import { ConfirmButton, LinkButton } from "@/components/form-controls";
 import { deleteFaq, toggleFaqActive } from "./actions";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function FaqsPage() {
+  await requireStaffPage();
   const faqs = await prisma.faq.findMany({ orderBy: { order: "asc" } });
 
   return (

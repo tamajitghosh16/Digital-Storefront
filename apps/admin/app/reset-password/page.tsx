@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@repo/auth/client";
 import { buttonClass, ErrorBanner, TextField } from "@/components/ui";
+import { STAFF_PASSWORD_MIN } from "@/lib/passwords";
 
 /**
  * Landing page for the link sent by app/forgot-password/page.tsx. Supabase's
@@ -54,8 +55,8 @@ export default function ResetPasswordPage() {
     event.preventDefault();
     setError(null);
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    if (password.length < STAFF_PASSWORD_MIN) {
+      setError(`Password must be at least ${STAFF_PASSWORD_MIN} characters.`);
       return;
     }
     if (password !== confirmPassword) {
@@ -69,11 +70,18 @@ export default function ResetPasswordPage() {
     setLoading(false);
 
     if (authError) {
-      setError(authError.message);
+      setError(
+        authError.code === "weak_password"
+          ? "That password is too common or has appeared in a data breach. Choose another."
+          : authError.code === "same_password"
+            ? "Choose a password you haven't used before."
+            : "Couldn't update your password. Request a new link and try again."
+      );
       return;
     }
 
-    await supabase.auth.signOut();
+    // Sign out everywhere: whoever held the old password loses their sessions.
+    await supabase.auth.signOut({ scope: "global" });
     setStatus("success");
     setTimeout(() => router.push("/sign-in"), 2000);
   }
@@ -109,7 +117,7 @@ export default function ResetPasswordPage() {
               name="password"
               type="password"
               required
-              minLength={6}
+              minLength={STAFF_PASSWORD_MIN}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="••••••••"
@@ -119,7 +127,7 @@ export default function ResetPasswordPage() {
               name="confirmPassword"
               type="password"
               required
-              minLength={6}
+              minLength={STAFF_PASSWORD_MIN}
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               placeholder="••••••••"

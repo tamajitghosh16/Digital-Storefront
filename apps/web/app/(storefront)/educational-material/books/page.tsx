@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { countBookListings, fetchBookPage } from "@/lib/books-data";
 import { BOOK_GENRES } from "@/lib/navigation";
 import { BOOKS_PAGE_SIZE, parseBookQuery } from "@/lib/books-query";
+import { BOOKS_LINE } from "@/lib/product-lines";
 import { BooksCatalogue } from "@/components/commerce/books-catalogue";
 
 export const metadata: Metadata = { title: "Books" };
@@ -11,9 +12,9 @@ export const metadata: Metadata = { title: "Books" };
 // Only the first `BOOKS_PAGE_SIZE` titles are sent with the document; the
 // rest stream in from `/api/books` as the reader scrolls, one keyset page
 // at a time (see `BooksGrid` and `lib/books-data`), so nothing here scales
-// with catalogue size. `type` still stands in for the going-forward
-// `productLine: "BOOK"` filter while only Books writes that column (see
-// root CLAUDE.md).
+// with catalogue size. Only `productLine: "BOOK"` rows are listed; the other
+// Educational Materials lines reuse this listing from their own routes (see
+// `../_shared/line-pages`).
 export default async function BooksPage({
   searchParams,
 }: {
@@ -28,6 +29,7 @@ export default async function BooksPage({
 
   return (
     <BooksCatalogue
+      line={BOOKS_LINE}
       initialItems={items}
       initialCursor={nextCursor}
       total={total}

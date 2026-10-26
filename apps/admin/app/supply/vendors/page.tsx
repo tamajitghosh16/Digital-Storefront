@@ -1,8 +1,10 @@
 import { prisma } from "@repo/database";
 import { ButtonLink, PageHeader } from "@/components/ui";
 import { VendorsList } from "./vendors-list";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function VendorsPage() {
+  await requireStaffPage();
   const vendors = await prisma.vendor.findMany({ orderBy: { name: "asc" } });
 
   return (

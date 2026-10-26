@@ -21,12 +21,6 @@ export interface ClassSetTierConfig {
   discount: number;
 }
 
-export interface DiscountCodeConfig {
-  code: string;
-  rate: number;
-  blurb: string;
-}
-
 export interface PricingConfig {
   delivery: {
     freeOverCents: number;
@@ -45,7 +39,9 @@ export interface PricingConfig {
   };
   classSetBaseCents: number;
   classSetTiers: ClassSetTierConfig[];
-  discountCodes: DiscountCodeConfig[];
+  // Discount codes are deliberately not part of this config: it's sent to
+  // the browser as a prop, and the code list must never be. They're looked
+  // up one at a time on the server — apps/web's lib/discounts.ts.
 }
 
 export const DEFAULT_PRICING_CONFIG: PricingConfig = {
@@ -66,7 +62,6 @@ export const DEFAULT_PRICING_CONFIG: PricingConfig = {
     { quantity: 30, discount: 0.18 },
     { quantity: 100, discount: 0.24 },
   ],
-  discountCodes: [{ code: "SCHOOL5", rate: 0.05, blurb: "5% off this order." }],
 };
 
 /** Basis points → fraction. 1800 → 0.18. */

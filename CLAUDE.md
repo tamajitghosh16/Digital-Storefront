@@ -32,9 +32,10 @@ npm run lint                             # turbo lint, both apps
 npm run typecheck                        # turbo typecheck, both apps
 ```
 
-There is no test suite yet — `turbo.json` has a `test` task wired up but no
-package defines a `test` script. The Technical Design Document specifies
-Vitest + Playwright for when tests are added.
+Tests: `npm run test` runs Vitest in `packages/security` and
+`packages/payments` (security helpers and Razorpay signature checks). The
+apps have no tests yet; the Technical Design Document specifies Vitest +
+Playwright for them.
 
 Database (all proxy into `packages/database`'s Prisma scripts):
 
@@ -142,6 +143,17 @@ remaining four product-line pages and both service pages are still
 real inventory now only needs a route folder like the three simple lines'
 — read/write `Product` filtered by its `ProductLine` value.
 
+**A book's formats are `BookEdition` rows, not columns.** A title is sold
+in any one, two or all three of Paperback / Hardcover / E-book — one
+`BookEdition` (format, price, printed-copy stock) per format, unique per
+`(productId, format)`. `Product.priceCents` on a book is a denormalised
+copy of its cheapest edition (the storefront listing sorts on it);
+`Product.stockQty` is null on a book. Cart/checkout line ids are
+`<productId>:paperback|hardcover|ebook` (`bookLineId`/`parseLineId` in
+`packages/database/src/book-formats.ts`), checkout prices each line from
+its edition, and `OrderItem.bookFormat` / `PurchaseOrderItem.bookFormat`
+record which edition a line was for. Non-book products have no editions.
+
 **Auth is Supabase Auth, wrapped by `packages/auth`.** `src/server.ts`
 (Server Components/Actions), `src/client.ts` (Client Components), and
 `src/middleware.ts` (a middleware *factory* — each app's `proxy.ts`
@@ -150,7 +162,11 @@ calls `createAuthMiddleware()` with its own options; `apps/admin` passes
 Role authorization is checked twice by design: loosely in proxy (a UX
 redirect, not a security boundary) and again inside every Server Action via
 `assertRole()` from `packages/auth/src/roles.ts`. Never rely on proxy
-alone to protect a mutation.
+alone to protect a mutation. Sessions are verified with `getClaims()`, not
+`getUser()` — both auth projects sign with ES256, so that's a local JWKS
+check instead of an HTTP round trip per call — and `getCurrentUser()` /
+`getCurrentStaff()` are React-`cache()`d per request; see
+`getSessionIdentity()` in `packages/auth/src/server.ts` for the trade-off.
 
 **The two apps authenticate against two separate Supabase projects.** A
 storefront customer signs up worldwide and self-service; a staff account
@@ -209,6 +225,26 @@ Admin image uploads (book covers, banner art) take a separate,
 deliberately simpler path — `uploadImage()` straight to a public `images/`
 prefix — because they come from a signed-in EDITOR/OWNER and are
 type-checked by magic bytes at the route; see `apps/admin/CLAUDE.md`.
+
+**Security rules live in `packages/security` and `docs/security-roadmap.md`.**
+`@repo/security` holds the pure helpers both apps use: `safeNextPath`
+(post-sign-in redirects), `isSafeHref`/`isHttpsUrl` (every CMS link/image
+field, validated in admin schemas via `apps/admin/lib/schema-fields.ts` and
+re-checked at render), the CSP/header builders used by each `proxy.ts` and
+`next.config.ts`, `rateLimit` (Upstash Redis when configured), and
+`securityEvent` (structured security logs). When adding code:
+- a new `public` table is locked by the `lock_down_data_api` migration's
+  default privileges and by `prisma/sql/auto_enable_rls.sql` — never grant
+  `anon`/`authenticated` access; both apps use Prisma, not the Data API
+  (`npm run check:data-api --workspace=@repo/database` verifies this);
+- every Server Action / Route Handler validates input (zod) and re-checks
+  auth itself; public or expensive endpoints get a `rateLimit`;
+- anything that marks an order paid goes through
+  `apps/web/lib/orders.ts`'s `settleOrderPayment`;
+- no secret in a `NEXT_PUBLIC_*` variable — both apps' `instrumentation.ts`
+  refuse to boot in production if one appears;
+- `server-only` guards `@repo/auth/server`, `@repo/storage`,
+  `@repo/payments` and `@repo/email`; keep them out of Client Components.
 
 **Shared UI/config:** `packages/ui` holds the *behavioural* primitives
 both apps share (Button, Sheet, DropdownMenu, Accordion + `cn()`);

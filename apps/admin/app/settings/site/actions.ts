@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/storefront-cache";
 import { prisma, SITE_SETTINGS_ID, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CONTENT_WRITE_ROLES } from "@repo/auth/roles";
@@ -50,12 +51,10 @@ export async function updateSiteSettings(formData: FormData) {
   });
 
   // apps/web and apps/admin are separate deployed Next.js apps — a
-  // revalidatePath() call here only affects admin's own cache, not web's.
-  // That's fine: web's product/content pages do plain Prisma reads in
-  // Server Components with no fetch cache/ISR configured (see its
-  // CLAUDE.md), so they're dynamically rendered per request and will
-  // pick up this change on the very next page load with no invalidation
-  // needed on that side.
+  // revalidatePath() call here only affects admin's own cache. apps/web
+  // caches site settings (apps/web/lib/cms.ts), so it's told to drop that
+  // cache explicitly.
+  revalidateStorefront();
   revalidatePath("/settings/site");
   redirect("/settings/site?saved=1");
 }

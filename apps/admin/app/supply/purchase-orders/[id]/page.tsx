@@ -3,6 +3,7 @@ import { prisma, type PurchaseOrderStatus } from "@repo/database";
 import { PageHeader, Pill, Section, Table } from "@/components/ui";
 import { ConfirmButton, SaveButton } from "@/components/form-controls";
 import { cancelPurchaseOrder, receivePurchaseOrderItems } from "../actions";
+import { requireStaffPage } from "@/lib/guard";
 
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
@@ -29,6 +30,7 @@ export default async function PurchaseOrderDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireStaffPage();
   const { id } = await params;
   const { error } = await searchParams;
   const po = await prisma.purchaseOrder.findUnique({
@@ -65,7 +67,14 @@ export default async function PurchaseOrderDetailPage({
           >
             {po.items.map((item) => (
               <tr key={item.id}>
-                <td className="font-medium text-ink">{item.product.title}</td>
+                <td className="font-medium text-ink">
+                  {item.product.title}
+                  {item.bookFormat && (
+                    <span className="ml-1.5 font-normal text-ink-muted">
+                      — {item.bookFormat === "HARDCOVER" ? "Hardcover" : "Paperback"}
+                    </span>
+                  )}
+                </td>
                 <td className="tabular-nums text-ink-muted">{item.quantityOrdered}</td>
                 <td className="tabular-nums text-ink-muted">{money.format(item.unitCostCents / 100)}</td>
                 <td className="tabular-nums">

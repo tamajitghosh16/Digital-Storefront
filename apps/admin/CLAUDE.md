@@ -46,10 +46,30 @@ npm run typecheck
 ## Architecture
 
 **Audience: Publisher (Owner) and Staff only — the whole app is gated.**
-Unlike `apps/web`, `proxy.ts` here locks every route to
+Unlike `apps/web`, `proxy.ts` here locks every route (API routes included) to
 `ADMIN_ROLES` (`SUPPORT`, `EDITOR`, `OWNER` — from `packages/auth/src/roles.ts`)
-by default; the `matcher` excludes only `/sign-in`, `/unauthorized`, and
-static assets. There's no "public" area in this app.
+by default. Only the anchored `PUBLIC_PATHS` regex skips auth: `/sign-in`,
+`/forgot-password`, `/reset-password`, `/unauthorized`, `/join/*` (exact
+segments — `/joinx` is *not* public). Every response also gets a
+per-request nonce CSP from the proxy and the static security headers from
+`next.config.ts` (see `packages/security`).
+
+**Staff sign-in is email + password (or Google) — no second factor.** The
+staff password minimum is `STAFF_PASSWORD_MIN` in `lib/passwords.ts` (12).
+Changing a password re-checks the current one server-side
+(`app/account/actions.ts`) so the browser's own session isn't replaced.
+
+**Three layers of auth, each required:** the proxy (UX redirect),
+`await requireStaffPage()` (`lib/guard.ts`) at the top of every page that
+reads data, and `getCurrentStaff()` + `assertRole()` (or `requireStaff()`)
+at the top of every Server Action / Route Handler. A new page or action
+without its check is a bug even though the proxy "already" covers it.
+
+**Production refuses to boot misconfigured.** `instrumentation.ts` checks
+that the dedicated auth project, its service-role key and
+`NEXT_PUBLIC_ADMIN_URL` are set (and that no secret is exposed as
+`NEXT_PUBLIC_*`); the proxy also returns 503 if the dedicated auth project
+is missing, so the app can never fall back to the public storefront project.
 
 **This app authenticates against its own Supabase project, not the
 storefront's** (`NEXT_PUBLIC_AUTH_SUPABASE_*` — see the root `CLAUDE.md` auth
@@ -80,12 +100,14 @@ invited it. `app/settings/roles` is the UI:
   (`packages/database`, storefront DB) is created with a SHA-256 of a random
   token and a 1-hour `expiresAt`, and `@repo/email`'s `sendStaffInvite()`
   emails the `/join/<token>` link.
-- **`/join/[token]`** (`app/join/[token]`, excluded from `proxy.ts`'s auth
-  matcher and from the app-shell chrome): the only route the sign-up form
-  lives at — no `/sign-up` exists. Validates the token hash + expiry + unused
-  flag, then `acceptStaffInvite` creates the auth identity in the admin auth
-  project via `createStaffAuthUser()` (`packages/auth/src/server.ts`), burns
-  the invite, and redirects to `/sign-in`. New accounts land as `READER`.
+- **`/join/[token]`** (`app/join/[token]`, one of `proxy.ts`'s public paths
+  and excluded from the app-shell chrome): the only route the sign-up form
+  lives at — no `/sign-up` exists. `acceptStaffInvite` is rate-limited per
+  IP, *claims* the invite with a conditional update (token hash + unexpired
+  + unused) before creating the auth identity via `createStaffAuthUser()`
+  (`packages/auth/src/server.ts`) — releasing the claim if that fails — and
+  redirects to `/sign-in`. New accounts land as `READER`. Served with
+  `Referrer-Policy: no-referrer` so the token never leaks.
 - **Role change** (`changeStaffRole`, `OWNER_ONLY_ROLES`): the per-row
   dropdown on `app/settings/roles`. Service-role write to the admin auth
   project's `users.role` via `setStaffRole()`; refuses a change that would
@@ -115,15 +137,16 @@ on conflict, so a later `auth.users` sync won't clobber it.
 **Route map (all under `app/`):** `educational-material/books`
 (product/inventory CMS — despite the path, this manages every product type,
 not just books; see "The catalogue CMS lives under Books" below — with
-`educational-material/books/new` and `educational-material/books/[id]`
-create/edit forms), `orders`, `submissions` (self-publishing +
+an "Add new book" modal on the list page and an
+`educational-material/books/[id]` edit form), `orders`, `submissions` (self-publishing +
 service-request queues in one view), `royalties`, `reviews` (moderation
 queue), `analytics`, `settings/roles`, the three sibling
 Educational-Materials inventory CMSs
 (`educational-material/educational-charts`,
 `educational-material/worksheets-activity-puzzles`,
-`educational-material/teaching-learning-materials` — each with its own
-`new`/`[id]` forms, all sharing `educational-material/_shared/`), the
+`educational-material/teaching-learning-materials` — each with an
+"Add new …" modal on its list page like Books' and its own `[id]` edit
+form, all sharing `educational-material/_shared/`), the
 placeholder Inventory-sidebar stubs
 (`professional-materials/advocate-diary`, `publishing/self-publishing`,
 `publishing/bulk-publishing`, `lifestyle`), plus the storefront-CMS routes:
@@ -131,7 +154,8 @@ placeholder Inventory-sidebar stubs
 (header/footer links), `content/banners` (homepage hero/promo),
 `content/homepage` (every other heading and description on the homepage),
 `content/faqs`, `content/testimonials`, `settings/pricing` (delivery,
-bundle, GST, class-set tiers, discount codes), and the `api/uploads` Route
+bundle, GST, class-set tiers), `discounts` (checkout coupon codes — the
+"Discount" item under Users and Staffs, with an "Add new Coupon" modal), and the `api/uploads` Route
 Handler behind the image fields.
 
 **The catalogue CMS lives under Books, not `/catalogue`.** The product
@@ -148,7 +172,7 @@ Materials share one CMS.** These three lines are all plain shippable
 physical products, so instead of a Books-sized form each they share a
 trimmed list, form, schema and Server Actions in
 `educational-material/_shared/` (a `_`-prefixed, non-routable folder). Each
-route folder (`educational-material/<slug>/{page,new/page,[id]/page}.tsx`)
+route folder (`educational-material/<slug>/{page,[id]/page}.tsx`)
 is a thin wrapper that looks up its `ProductLineConfig` by slug from
 `_shared/product-line-config.ts` — the one place the per-line wording
 lives — and passes it down. The Server Actions
@@ -156,8 +180,9 @@ lives — and passes it down. The Server Actions
 the route slug as a bound first argument, which resolves to the
 `ProductLine` enum value written to `Product.productLine` and to the
 redirect/`revalidatePath` target. The rows are `type: "PHYSICAL_BOOK"`
-(fulfilment mechanics only) with `bookFormats: []`; `productLine` is what
-classifies them. `_shared/product-line-config.ts` mirrors
+(fulfilment mechanics only) with no `BookEdition` rows, priced and stocked
+on the `Product` row itself; `productLine` is what classifies them.
+`_shared/product-line-config.ts` mirrors
 `PRODUCT_LINE_CATALOG` in `@repo/database`'s `taxonomy.ts` by hand, same as
 `FIXED_DEPARTMENTS`.
 
@@ -178,10 +203,18 @@ and `content/testimonials` all have real create/update (and, for the
 CMS-only ones, delete) Server Actions — each validates with Zod, calls
 `assertRole()` (`CATALOGUE_WRITE_ROLES` for catalogue and pricing,
 `CONTENT_WRITE_ROLES` for the rest, both `EDITOR`/`OWNER` today), writes an
-`AuditLog` row, and `revalidatePath()`s its own list page. There's no
-cross-app cache to invalidate: `apps/web` reads these models with plain
-Prisma calls and no fetch cache/ISR, so it picks up changes on the next
-request automatically.
+`AuditLog` row, and `revalidatePath()`s its own list page. `apps/web` caches
+the CMS data it renders on every page (`apps/web/lib/cms.ts`), which this
+app's `revalidatePath()` can't reach, so every CMS action (site, navigation,
+pricing, homepage, banners, FAQs, testimonials, Products Menu) also calls
+`revalidateStorefront()` (`lib/storefront-cache.ts`) before redirecting: it
+POSTs to the storefront's `/api/revalidate` with the shared
+`STOREFRONT_REVALIDATE_SECRET`, from `after()` so a slow or down storefront
+never holds up or fails the save. A new action that changes
+storefront-visible CMS data needs that call too — and so does any action
+that writes a `Product` row (the Books and three-line catalogue actions,
+receiving purchase-order stock): the storefront caches catalogue reads too
+(`apps/web/lib/products-cache.ts`), and the same ping expires them.
 
 **Homepage copy is a registry, not a table of columns.**
 `content/homepage` renders its fields from `CONTENT_GROUPS` in
@@ -207,6 +240,17 @@ split into titled sections; colour from the shared tokens in
 product type is picked first and only the fields that apply to it render,
 and the web address is generated from the title.
 
+**Book formats are `BookEdition` rows.** A book is sold in any one, two or
+all three of Paperback, Hardcover and E-book; the Books form ticks formats
+and asks for a price per ticked format (plus copies in stock for the two
+printed ones). `createProduct`/`updateProduct` write one `BookEdition` per
+ticked format (update drops unticked ones and upserts the rest, so an
+edition's id is stable) and keep `Product.priceCents` = the cheapest
+edition, which the storefront listing sorts on. A book's stock lives only
+on its printed editions — `Product.stockQty` stays null — so a purchase
+order line for a book names the edition (`PurchaseOrderItem.bookFormat`)
+and receiving adds to that edition's stock.
+
 **E-book PDF upload (`components/pdf-field.tsx` + `app/api/uploads/ebook`).**
 The catalogue form's "Upload .pdf file" field renders only when "E-book" is
 ticked. The PDF never passes through the app server: `api/uploads/ebook`
@@ -218,8 +262,14 @@ single `FileAsset` (`kind EBOOK_FILE`, `malwareScanStatus "CLEAN"`,
 `maxDownloads 5`) for the product via the local `syncEbookFileAsset()`
 helper, deleting the old object best-effort when the PDF is replaced or the
 e-book format is turned off. Like image uploads, it skips the malware scan
-(trusted signed-in EDITOR/OWNER). `apps/web`'s `api/library/[assetId]` route
-mints the signed download URL from the stored path.
+(trusted signed-in EDITOR/OWNER), but before a *new* object is attached the
+actions verify it server-side (`isStoredEbookPdf` in `@repo/storage`): the
+path must be one `createEbookUploadUrl` minted and the stored bytes must
+start with `%PDF-`, otherwise the object is deleted and the save refused.
+The bucket itself only accepts `application/pdf` up to 100 MB once
+`npm run harden-buckets --workspace=@repo/storage` has been run.
+`apps/web`'s `api/library/[assetId]` route mints the signed download URL
+from the stored path.
 
 **Image uploads skip the malware-scan pipeline on purpose.**
 `api/uploads/route.ts` checks the caller's role, caps size at 4 MB (under
@@ -230,9 +280,9 @@ calls `uploadImage()` in `packages/storage`, which writes straight to the
 public `images` **Supabase Storage** bucket (service-role client, so it
 bypasses Storage RLS — safe because the role + magic-byte checks already
 ran) instead of going through `uploadToStaging`/`promoteFromStaging`: that
-pipeline exists for untrusted customer manuscripts, still runs on Vercel
-Blob, and the scan behind it is still a stub that always returns
-`"CLEAN"`. Needs `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
+pipeline exists for untrusted customer manuscripts, runs on private Vercel
+Blob objects, and its Cloudmersive scan fails closed (files stay `PENDING`
+without `CLOUDMERSIVE_API_KEY`). Needs `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`
 (both already required by this app); `isImageUploadConfigured()` gates the
 route so a missing config falls back to "paste a URL" instead of throwing.
 

@@ -7,14 +7,18 @@
     "./server": "./src/server.ts",
     "./client": "./src/client.ts",
     "./roles": "./src/roles.ts",
-    "./middleware": "./src/middleware.ts"
+    "./middleware": "./src/middleware.ts",
+    "./env": "./src/env.ts"
   },
   "dependencies": {
     "@repo/database": "*",
+    "@repo/security": "*",
     "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.47.0"
+    "@supabase/supabase-js": "^2.47.0",
+    "server-only": "^0.0.1"
   },
   "peerDependencies": {
-    "next": "^16.0.0"
+    "next": "^16.0.0",
+    "react": "^19.0.0"
   }
 }

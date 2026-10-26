@@ -33,6 +33,10 @@ import {
  * the low-stock nudge (< 10 left), and — at zero — disables ordering
  * entirely. A null/undefined `stockQty` means "not tracked", so nothing
  * is blocked (e-books, service rows, un-migrated catalogue rows).
+ *
+ * `isBook` is false for the other Educational Materials lines (charts,
+ * worksheets, teaching materials): they're one shipped product, so there's
+ * no edition to choose and no e-book download promise.
  */
 const LOW_STOCK_THRESHOLD = 10;
 const MAX_QTY = 99;
@@ -49,6 +53,7 @@ export function BuyBox({
   stockQty,
   supportsClassSets,
   pricing,
+  isBook = true,
 }: {
   productId: string;
   title: string;
@@ -64,6 +69,8 @@ export function BuyBox({
   supportsClassSets: boolean;
   /** Admin-managed delivery, bundle and class-set rules, loaded by the page. */
   pricing: PricingConfig;
+  /** False for non-book product lines — hides the edition picker and e-book copy. */
+  isBook?: boolean;
 }) {
   const router = useRouter();
   const addItem = useCartStore((state) => state.addItem);
@@ -164,38 +171,42 @@ export function BuyBox({
         </p>
       )}
 
-      <Rule />
+      {isBook && (
+        <>
+          <Rule />
 
-      <p className="caps mb-2.5 text-ink-muted">Choose an edition</p>
-      <div className="grid gap-2.5">
-        {editions.map((option) => {
-          const selected = option.kind === editionKind;
-          return (
-            <button
-              key={option.kind}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => setEditionKind(option.kind)}
-              className={cn(
-                "flex w-full items-center justify-between gap-3.5 rounded-btn px-4 py-3.5 text-left transition",
-                selected
-                  ? "bg-brand text-on-brand inset-ring-[3px] inset-ring-ink"
-                  : "bg-ground inset-ring-2 inset-ring-line-strong hover:inset-ring-ink"
-              )}
-            >
-              <span>
-                <strong className="text-[15px]">{option.label}</strong>
-                <small className={cn("mt-0.5 block text-xs", selected ? "opacity-[0.78]" : "text-ink-muted")}>
-                  {option.detail}
-                </small>
-              </span>
-              <span className="whitespace-nowrap text-base font-bold tabular-nums">
-                {formatINRWhole(option.priceCents)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+          <p className="caps mb-2.5 text-ink-muted">Choose an edition</p>
+          <div className="grid gap-2.5">
+            {editions.map((option) => {
+              const selected = option.kind === editionKind;
+              return (
+                <button
+                  key={option.kind}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setEditionKind(option.kind)}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-3.5 rounded-btn px-4 py-3.5 text-left transition",
+                    selected
+                      ? "bg-brand text-on-brand inset-ring-[3px] inset-ring-ink"
+                      : "bg-ground inset-ring-2 inset-ring-line-strong hover:inset-ring-ink"
+                  )}
+                >
+                  <span>
+                    <strong className="text-[15px]">{option.label}</strong>
+                    <small className={cn("mt-0.5 block text-xs", selected ? "opacity-[0.78]" : "text-ink-muted")}>
+                      {option.detail}
+                    </small>
+                  </span>
+                  <span className="whitespace-nowrap text-base font-bold tabular-nums">
+                    {formatINRWhole(option.priceCents)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {!digitalOnly && (
         <>
@@ -343,7 +354,7 @@ export function BuyBox({
         items={[
           freeDeliveryCopy(pricing),
           "Easy returns — free replacement or full refund",
-          "Five downloads per e-book format",
+          ...(isBook ? ["Five downloads per e-book format"] : []),
           "25% of this sale funds the Sashibhusan Book Press Memorial Trust",
         ]}
       />

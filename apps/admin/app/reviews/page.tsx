@@ -1,9 +1,11 @@
 import { prisma } from "@repo/database";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { requireStaffPage } from "@/lib/guard";
 
 // FR-10.2: moderate/respond to reviews.
 // Read-only for now — approve/reject actions are still to be built.
 export default async function ReviewsPage() {
+  await requireStaffPage();
   const reviews = await prisma.review.findMany({
     where: { moderationStatus: "PENDING" },
     orderBy: { createdAt: "desc" },

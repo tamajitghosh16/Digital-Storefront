@@ -2,19 +2,20 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/storefront-cache";
 import { PRICING_SETTINGS_ID, prisma, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
 import {
   classSetTierFormSchema,
-  discountCodeFormSchema,
   pricingSettingsFormSchema,
   toBps,
   toCents,
 } from "./schema";
 
 // FR-11.1: pricing rules that aren't per-product — delivery, the print +
-// e-book bundle, GST, class-set quantity breaks, and discount codes. Gated on
+// e-book bundle, GST and class-set quantity breaks (discount codes have their
+// own page, app/discounts). Gated on
 // CATALOGUE_WRITE_ROLES rather than CONTENT_WRITE_ROLES because these change
 // what customers are charged, not what they read.
 
@@ -68,6 +69,7 @@ export async function updatePricingSettings(formData: FormData) {
 
   await audit(user, "pricing.settings_updated", PRICING_SETTINGS_ID, data);
 
+  revalidateStorefront();
   revalidatePath("/settings/pricing");
   back();
 }
@@ -92,6 +94,7 @@ export async function saveClassSetTier(formData: FormData) {
 
   await audit(user, "pricing.tier_saved", String(quantity), { quantity, discountBps });
 
+  revalidateStorefront();
   revalidatePath("/settings/pricing");
   back();
 }
@@ -102,49 +105,6 @@ export async function deleteClassSetTier(id: string) {
   const tier = await prisma.classSetTier.delete({ where: { id } });
   await audit(user, "pricing.tier_deleted", String(tier.quantity), { quantity: tier.quantity });
 
-  revalidatePath("/settings/pricing");
-}
-
-export async function createDiscountCode(formData: FormData) {
-  const user = await requirePricingWriter();
-
-  const parsed = discountCodeFormSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) back(parsed.error.issues[0]?.message ?? "Invalid input");
-
-  const { code, rate, blurb } = parsed.data;
-  // Stored upper-cased so the cart's lookup can upper-case what the shopper
-  // types and match exactly, rather than needing a case-insensitive query.
-  const normalised = code.trim().toUpperCase();
-
-  const existing = await prisma.discountCode.findUnique({ where: { code: normalised } });
-  if (existing) back(`The code ${normalised} already exists.`);
-
-  await prisma.discountCode.create({
-    data: { code: normalised, rateBps: toBps(rate), blurb: blurb ?? null },
-  });
-
-  await audit(user, "pricing.code_created", normalised, { code: normalised, rateBps: toBps(rate) });
-
-  revalidatePath("/settings/pricing");
-  back();
-}
-
-export async function toggleDiscountCode(id: string) {
-  const user = await requirePricingWriter();
-
-  const existing = await prisma.discountCode.findUniqueOrThrow({ where: { id } });
-  await prisma.discountCode.update({ where: { id }, data: { isActive: !existing.isActive } });
-
-  await audit(user, "pricing.code_toggled", existing.code, { isActive: !existing.isActive });
-
-  revalidatePath("/settings/pricing");
-}
-
-export async function deleteDiscountCode(id: string) {
-  const user = await requirePricingWriter();
-
-  const code = await prisma.discountCode.delete({ where: { id } });
-  await audit(user, "pricing.code_deleted", code.code, { code: code.code });
-
+  revalidateStorefront();
   revalidatePath("/settings/pricing");
 }

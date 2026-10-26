@@ -3,6 +3,7 @@ import { ErrorBanner, FieldRow, PageHeader, SavedBanner, Section, TextAreaField,
 import { ImageField } from "@/components/image-field";
 import { SaveButton } from "@/components/form-controls";
 import { updateSiteSettings } from "./actions";
+import { requireStaffPage } from "@/lib/guard";
 
 // The screen behind apps/web's root layout: name and logo in the header,
 // contact details and social links in the footer, and the default title and
@@ -12,6 +13,7 @@ export default async function SiteSettingsPage({
 }: {
   searchParams: Promise<{ error?: string; saved?: string }>;
 }) {
+  await requireStaffPage();
   const { error, saved } = await searchParams;
   const settings = await prisma.siteSettings.findUnique({ where: { id: SITE_SETTINGS_ID } });
   const social = (settings?.socialLinks as { twitter?: string; facebook?: string; instagram?: string } | null) ?? {};

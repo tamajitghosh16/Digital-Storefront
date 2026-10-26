@@ -1,0 +1,20 @@
+{
+  "name": "@repo/security",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./redirect": "./src/redirect.ts",
+    "./href": "./src/href.ts",
+    "./headers": "./src/headers.ts",
+    "./rate-limit": "./src/rate-limit.ts",
+    "./log": "./src/log.ts",
+    "./env": "./src/env.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.0"
+  }
+}

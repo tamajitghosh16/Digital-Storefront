@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getCurrentStaff } from "@repo/auth/server";
 import { CATALOGUE_WRITE_ROLES, CONTENT_WRITE_ROLES } from "@repo/auth/roles";
 import { uploadImage, isImageUploadConfigured } from "@repo/storage";
+import { securityEvent } from "@repo/security/log";
+import { RATE_LIMITS, rateLimit } from "@repo/security/rate-limit";
 
 /**
  * Image upload endpoint behind the admin's ImageField.
@@ -58,6 +60,9 @@ export async function POST(request: Request) {
   if (!user?.role || !allowed.includes(user.role)) {
     return fail("You don't have permission to upload images.", 403);
   }
+  if (!(await rateLimit(RATE_LIMITS.adminUpload, user.id)).ok) {
+    return fail("Too many uploads in a short time. Please wait a few minutes.", 429);
+  }
 
   if (!isImageUploadConfigured()) {
     return fail("Image storage isn't configured yet. Paste an image URL instead, or ask your developer to set the Supabase environment variables.", 503);
@@ -84,6 +89,7 @@ export async function POST(request: Request) {
   const buffer = await file.arrayBuffer();
   const actualType = sniff(new Uint8Array(buffer.slice(0, 16)));
   if (!actualType) {
+    securityEvent("upload.rejected", { userId: user.id, reason: "magic bytes", claimedType: file.type });
     return fail("That file doesn't look like an image. Please choose a JPG, PNG, WebP, GIF, or AVIF.", 415);
   }
 

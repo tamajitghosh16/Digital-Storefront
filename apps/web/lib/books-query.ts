@@ -13,8 +13,10 @@
 
 export const BOOKS_BASE = "/educational-material/books";
 /** Titles per keyset page — the first is server-rendered, the rest come in
- *  as the reader scrolls (see `BooksGrid` / `GET /api/books`). */
-export const BOOKS_PAGE_SIZE = 20;
+ *  as the reader scrolls (see `BooksGrid` / `GET /api/books`). Two rows of
+ *  the widest (5-column) grid: about one screenful, so the first paint only
+ *  carries what's visible and the next page is prefetched ~600px ahead. */
+export const BOOKS_PAGE_SIZE = 10;
 
 export const SORT_OPTIONS = [
   { value: "rating", label: "Best rated" },
@@ -37,9 +39,12 @@ export const AVAILABILITY_OPTIONS = [
   { value: "same-day", label: "Same-day Kolkata" },
 ] as const;
 
+// `format=print` (any printed edition) predates the paperback/hardcover
+// split; it's still honoured by the filters so old links keep working.
 export const FORMAT_OPTIONS = [
-  { value: "print", label: "Available in print" },
-  { value: "ebook", label: "Available as e-book" },
+  { value: "paperback", label: "Paperback" },
+  { value: "hardcover", label: "Hardcover" },
+  { value: "ebook", label: "E-book" },
 ] as const;
 
 export const RATING_OPTIONS = [
@@ -105,9 +110,10 @@ export function queryToParams(query: BookQuery): Record<string, string | undefin
 /**
  * Build a listing href from a flat param map. Empty values are dropped, and
  * so are the defaults (`sort=rating`, `view=grid`) so a pristine link
- * stays `/educational-material/books`.
+ * stays `/educational-material/books`. `base` is the listing being
+ * narrowed — another product line's path (`ListingLine.base`) for its page.
  */
-export function booksHref(params: Record<string, string | number | undefined | null>): string {
+export function booksHref(params: Record<string, string | number | undefined | null>, base: string = BOOKS_BASE): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null || value === "") continue;
@@ -116,5 +122,5 @@ export function booksHref(params: Record<string, string | number | undefined | n
   if (search.get("sort") === "rating") search.delete("sort");
   if (search.get("view") === "grid") search.delete("view");
   const suffix = search.toString();
-  return suffix ? `${BOOKS_BASE}?${suffix}` : BOOKS_BASE;
+  return suffix ? `${base}?${suffix}` : base;
 }

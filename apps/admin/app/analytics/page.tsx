@@ -1,11 +1,13 @@
 import { prisma } from "@repo/database";
 import { EmptyState, PageHeader } from "@/components/ui";
+import { requireStaffPage } from "@/lib/guard";
 
 // FR-11.5: sales and traffic analytics/reporting (revenue by category, top titles, conversion rate).
 
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
 
 export default async function AnalyticsPage() {
+  await requireStaffPage();
   const revenueByStatus = await prisma.order.groupBy({
     by: ["status"],
     _sum: { totalCents: true },

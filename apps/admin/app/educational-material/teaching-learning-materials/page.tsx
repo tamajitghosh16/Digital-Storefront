@@ -1,7 +1,9 @@
 import { prisma } from "@repo/database";
-import { ButtonLink, PageHeader } from "@/components/ui";
-import { getProductLineConfig, lineBasePath } from "../_shared/product-line-config";
+import { PageHeader, SavedBanner } from "@/components/ui";
+import { AddLineProductDialog } from "../_shared/add-line-product-dialog";
+import { getProductLineConfig } from "../_shared/product-line-config";
 import { SimpleProductsList } from "../_shared/simple-products-list";
+import { requireStaffPage } from "@/lib/guard";
 
 // The inventory CMS for the "Teaching and Learning Materials" product line — the same shape as
 // `../books`, sharing its list + form + Server Actions through `../_shared`.
@@ -9,7 +11,13 @@ import { SimpleProductsList } from "../_shared/simple-products-list";
 
 const config = getProductLineConfig("teaching-learning-materials");
 
-export default async function TeachingLearningMaterialsPage() {
+export default async function TeachingLearningMaterialsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; created?: string }>;
+}) {
+  await requireStaffPage();
+  const { error, created } = await searchParams;
   const products = await prisma.product.findMany({
     where: { productLine: config.productLine },
     orderBy: { createdAt: "desc" },
@@ -21,8 +29,13 @@ export default async function TeachingLearningMaterialsPage() {
       <PageHeader
         title={config.label}
         description={config.copy.listDescription}
-        action={<ButtonLink href={`${lineBasePath(config.slug)}/new`}>Add new {config.noun}</ButtonLink>}
+        action={<AddLineProductDialog config={config} error={error} />}
       />
+      {created && (
+        <div className="mb-6">
+          <SavedBanner message={config.copy.addedMessage} />
+        </div>
+      )}
       <SimpleProductsList products={products} config={config} />
     </div>
   );

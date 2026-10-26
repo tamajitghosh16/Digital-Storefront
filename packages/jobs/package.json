@@ -5,8 +5,9 @@
   "type": "module",
   "main": "./src/index.ts",
   "dependencies": {
-    "inngest": "^3.27.0",
     "@repo/database": "*",
-    "@repo/email": "*"
+    "@repo/email": "*",
+    "@repo/security": "*",
+    "inngest": "^3.27.0"
   }
 }

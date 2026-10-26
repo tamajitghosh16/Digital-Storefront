@@ -1,15 +1,30 @@
-import { prisma } from "@repo/database";
+import { prisma, type OrderStatus } from "@repo/database";
 import { EmptyState, PageHeader, Pill, Table } from "@/components/ui";
+import { requireStaffPage } from "@/lib/guard";
 
 // FR-11.2: order dashboard with filtering by status, type, and date.
 // Read-only for now — changing an order's status is still to be built.
 
+const ORDER_STATUSES: OrderStatus[] = [
+  "PENDING",
+  "PAID",
+  "PROCESSING",
+  "SHIPPED",
+  "DELIVERED",
+  "READY_FOR_DOWNLOAD",
+  "CANCELLED",
+  "REFUNDED",
+];
+
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  await requireStaffPage();
   const { status } = await searchParams;
+  // Only a real OrderStatus reaches the query; anything else means "all".
+  const filter = ORDER_STATUSES.find((value) => value === status);
   const orders = await prisma.order.findMany({
-    where: status ? { status: status as never } : {},
+    where: filter ? { status: filter } : {},
     orderBy: { createdAt: "desc" },
     take: 50,
     include: { items: true },

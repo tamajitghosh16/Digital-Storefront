@@ -4,12 +4,14 @@ import { FIXED_DEPARTMENTS } from "../fixed-departments";
 import { AddCategoryDialog } from "./add-category-dialog";
 import { setDepartmentVisibility, setMenuCategoryVisibility } from "./actions";
 import { VisibilitySwitch } from "./visibility-switch";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function MenuCategoriesPage({
   searchParams,
 }: {
   searchParams: Promise<{ error?: string; created?: string; visibility?: string }>;
 }) {
+  await requireStaffPage();
   const { error, created, visibility } = await searchParams;
   const [categories, hiddenDepartments] = await Promise.all([
     prisma.menuCategory.findMany({
@@ -24,7 +26,7 @@ export default async function MenuCategoriesPage({
     <div className="max-w-5xl space-y-8">
       <PageHeader
         title="Menu categories"
-        description="Every category on the storefront's top menu — the five built-in departments plus any you've added. Use the switch in the Status column to show or hide a category on the storefront. Editing and reordering existing categories isn't available yet."
+        description="Every category on the storefront's top menu — the five built-in departments plus any you've added. Use the switch in the Status column to show or hide a category on the storefront. When exactly one category is shown, the storefront menu lists that category's products directly instead of the category name. Editing and reordering existing categories isn't available yet."
         action={<AddCategoryDialog />}
       />
 

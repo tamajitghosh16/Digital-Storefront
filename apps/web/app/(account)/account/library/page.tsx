@@ -4,23 +4,23 @@ import { getCurrentUser } from "@repo/auth/server";
 import { prisma } from "@repo/database";
 import { SectionHead, buttonClass } from "@/components/primitives";
 import { BookJacket, ProductShot } from "@/components/commerce/book-jacket";
+import { entitledAssetsWhere } from "@/lib/library";
 
 export const metadata: Metadata = { title: "Digital library" };
 
 // FR-8.2 / FR-9.1 / FR-9.2: instant digital delivery. Every EBOOK_FILE asset
-// attached to a product this customer has a PAID order for shows here, with a
+// this customer bought as an e-book (or print + e-book bundle) shows here, with a
 // real download link served by GET /api/library/[assetId] (entitlement- and
 // download-count-checked, mints a short-lived signed Supabase URL).
 export default async function DigitalLibraryPage() {
   const user = await getCurrentUser();
 
+  // Same entitlement rule as GET /api/library/[assetId] (lib/library.ts);
+  // downloads are counted per customer, not per file.
   const assets = user
     ? await prisma.fileAsset.findMany({
-        where: {
-          kind: "EBOOK_FILE",
-          product: { orderItems: { some: { order: { userId: user.id, status: "PAID" } } } },
-        },
-        include: { product: true },
+        where: entitledAssetsWhere(user.id),
+        include: { product: true, libraryDownloads: { where: { userId: user.id }, select: { count: true } } },
         orderBy: { createdAt: "desc" },
       })
     : [];
@@ -42,8 +42,8 @@ export default async function DigitalLibraryPage() {
       ) : (
         <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
           {assets.map((asset) => {
-            const remaining =
-              asset.maxDownloads != null ? Math.max(0, asset.maxDownloads - asset.downloadCount) : null;
+            const used = asset.libraryDownloads[0]?.count ?? 0;
+            const remaining = asset.maxDownloads != null ? Math.max(0, asset.maxDownloads - used) : null;
             const exhausted = remaining === 0;
             return (
               <div key={asset.id} className="flex gap-4 rounded-tile bg-tile p-6 inset-ring inset-ring-card-edge">

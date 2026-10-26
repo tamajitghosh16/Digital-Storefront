@@ -8,20 +8,24 @@ import {
   RATING_OPTIONS,
   booksHref,
 } from "@/lib/books-query";
+import type { ListingLine } from "@/lib/product-lines";
 
 /**
  * The facet rail. Every control drives the query string — a persistent
  * sidebar on desktop, the body of a slide-over sheet on mobile (the
  * toolbar owns the sheet and passes `onNavigate` to close it after a tap).
  * Availability, format, rating and price are single-select: tapping the
- * active option clears it. Genre is multi-select.
+ * active option clears it. Genre is multi-select. Format, genre and class
+ * sets are book-only facets; the other product lines get the rest.
  */
 export function BooksFilters({
   availableGenres,
+  line,
   className,
   onNavigate,
 }: {
   availableGenres: readonly string[];
+  line: ListingLine;
   className?: string;
   onNavigate?: () => void;
 }) {
@@ -34,7 +38,7 @@ export function BooksFilters({
   );
 
   function go(next: Record<string, string | undefined>) {
-    router.push(booksHref({ ...current, page: undefined, ...next }));
+    router.push(booksHref({ ...current, page: undefined, ...next }, line.base));
     onNavigate?.();
   }
 
@@ -57,7 +61,7 @@ export function BooksFilters({
           <button
             type="button"
             onClick={() => {
-              router.push(booksHref({ sort: current.sort, view: current.view }));
+              router.push(booksHref({ sort: current.sort, view: current.view }, line.base));
               onNavigate?.();
             }}
             className="text-[13px] font-bold underline underline-offset-2"
@@ -79,19 +83,21 @@ export function BooksFilters({
         ))}
       </Group>
 
-      <Group title="Format">
-        {FORMAT_OPTIONS.map((option) => (
-          <Check
-            key={option.value}
-            active={current.format === option.value}
-            onClick={() => single("format", option.value)}
-          >
-            {option.label}
-          </Check>
-        ))}
-      </Group>
+      {line.isBook && (
+        <Group title="Format">
+          {FORMAT_OPTIONS.map((option) => (
+            <Check
+              key={option.value}
+              active={current.format === option.value}
+              onClick={() => single("format", option.value)}
+            >
+              {option.label}
+            </Check>
+          ))}
+        </Group>
+      )}
 
-      {availableGenres.length > 0 && (
+      {line.isBook && availableGenres.length > 0 && (
         <Group title="Genre">
           {availableGenres.map((genre) => (
             <Check key={genre} active={selectedGenres.has(genre)} onClick={() => toggleGenre(genre)}>
@@ -125,14 +131,16 @@ export function BooksFilters({
         ))}
       </Group>
 
-      <Group title="Class sets">
-        <Check
-          active={current.classset === "1"}
-          onClick={() => go({ classset: current.classset === "1" ? undefined : "1" })}
-        >
-          Available as a class set
-        </Check>
-      </Group>
+      {line.isBook && (
+        <Group title="Class sets">
+          <Check
+            active={current.classset === "1"}
+            onClick={() => go({ classset: current.classset === "1" ? undefined : "1" })}
+          >
+            Available as a class set
+          </Check>
+        </Group>
+      )}
     </aside>
   );
 }

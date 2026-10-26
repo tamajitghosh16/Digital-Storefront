@@ -1,7 +1,11 @@
+import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { prisma, type Role } from "@repo/database";
+import { securityEvent } from "@repo/security/log";
+import { assertRole } from "./roles";
 import { authSupabasePublishableKey, authSupabaseServiceRoleKey, authSupabaseUrl } from "./env";
 
 /**
@@ -31,21 +35,45 @@ export async function createClient() {
 }
 
 /**
+ * The signed-in identity (auth UID + email) from this request's session
+ * cookie, or null when signed out.
+ *
+ * Uses `getClaims()`, not `getUser()`: both auth projects sign sessions with
+ * an asymmetric (ES256) key, so the JWT's signature and expiry are verified
+ * locally against the project's JWKS (cached in-process by auth-js for 10
+ * minutes) instead of costing an HTTP round trip to Supabase Auth on every
+ * call. A legacy HS256 token automatically falls back to a `getUser()`
+ * round trip inside auth-js. An expiring session is refreshed first.
+ *
+ * Trade-off: a session signed out elsewhere stays valid until its access
+ * token expires (the project's JWT expiry, 1h by default). Roles are still
+ * read fresh from `public.users` on every request, so demoting or deleting
+ * a staff member takes effect immediately.
+ *
+ * `cache()`d so a layout, a page and its guard asking in the same render
+ * share one verification.
+ */
+const getSessionIdentity = cache(async (): Promise<{ id: string; email: string | null } | null> => {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (!claims?.sub) return null;
+  return { id: claims.sub, email: typeof claims.email === "string" ? claims.email : null };
+});
+
+/**
  * Storefront customer: the signed-in user's app-level role (READER,
  * SELF_PUB_AUTHOR, ...) plus profile, or null if signed out. Reads
  * `public.users` in the storefront Postgres via Prisma. `apps/web` only —
  * `apps/admin` authenticates against a different project whose auth UIDs
  * have no row in that table; it must use `getCurrentStaff()` instead.
  */
-export async function getCurrentUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+export const getCurrentUser = cache(async () => {
+  const identity = await getSessionIdentity();
+  if (!identity) return null;
 
-  return prisma.user.findUnique({ where: { id: user.id } });
-}
+  return prisma.user.findUnique({ where: { id: identity.id } });
+});
 
 export type StaffAccount = { id: string; email: string; name: string | null; role: Role };
 
@@ -55,29 +83,28 @@ export type StaffAccount = { id: string; email: string; name: string | null; rol
  * packages/database/prisma/sql/sync_staff.sql). Read over Supabase REST, not
  * Prisma, because `apps/admin`'s Prisma client points at the storefront DB,
  * which has no row for this UID. Returns null when signed out or when the
- * caller has no staff row. `apps/admin` only.
+ * caller has no staff row. `apps/admin` only. `cache()`d per request, like
+ * {@link getSessionIdentity}.
  */
-export async function getCurrentStaff(): Promise<StaffAccount | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+export const getCurrentStaff = cache(async (): Promise<StaffAccount | null> => {
+  const identity = await getSessionIdentity();
+  if (!identity) return null;
 
+  const supabase = await createClient();
   const { data: profile } = await supabase
     .from("users")
     .select("id,email,name,role")
-    .eq("id", user.id)
+    .eq("id", identity.id)
     .single();
   if (!profile) return null;
 
   return {
     id: profile.id as string,
-    email: (profile.email as string) ?? user.email ?? "",
+    email: (profile.email as string) ?? identity.email ?? "",
     name: (profile.name as string | null) ?? null,
     role: profile.role as Role,
   };
-}
+});
 
 /**
  * Service-role client for the auth project — bypasses Row-Level Security.
@@ -89,6 +116,22 @@ export function createServiceRoleClient() {
   return createSupabaseClient(authSupabaseUrl(), authSupabaseServiceRoleKey(), {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+}
+
+/**
+ * The one-line guard for every back-office Server Action and Route Handler:
+ * resolves the signed-in staff member (see `getCurrentStaff`) and throws
+ * unless their role is in `allowed`.
+ */
+export async function requireStaff(allowed: Role[]): Promise<StaffAccount> {
+  const staff = await getCurrentStaff();
+  try {
+    assertRole(staff?.role, allowed);
+  } catch (error) {
+    securityEvent("auth.forbidden", { userId: staff?.id ?? null, role: staff?.role ?? null, allowed });
+    throw error;
+  }
+  return staff!;
 }
 
 export type StaffListEntry = StaffAccount & { createdAt: string };
@@ -122,7 +165,9 @@ export async function getStaffByEmail(email: string): Promise<StaffListEntry | n
   const { data } = await supabase
     .from("users")
     .select("id,email,name,role,createdAt")
-    .ilike("email", email)
+    // Exact match. `ilike` would treat `_` and `%` in the address as
+    // wildcards; Supabase Auth stores emails lower-cased already.
+    .eq("email", email.trim().toLowerCase())
     .maybeSingle();
   if (!data) return null;
   return {

@@ -1,10 +1,12 @@
 import { prisma } from "@repo/database";
 import { EmptyState, PageHeader, Pill } from "@/components/ui";
+import { requireStaffPage } from "@/lib/guard";
 
 // FR-11.3: queue for incoming self-publishing submissions and service
 // requests with assignable status (Technical Design Document, Section 3.4).
 // Read-only for now — assigning and moving status is still to be built.
 export default async function SubmissionsQueuePage() {
+  await requireStaffPage();
   const [projects, serviceRequests] = await Promise.all([
     prisma.selfPublishingProject.findMany({ orderBy: { createdAt: "desc" }, take: 25, include: { author: true } }),
     prisma.serviceRequest.findMany({ orderBy: { createdAt: "desc" }, take: 25, include: { customer: true } }),

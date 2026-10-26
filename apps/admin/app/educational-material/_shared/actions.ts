@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/storefront-cache";
 import { prisma, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
@@ -21,8 +22,9 @@ import { simpleProductFormSchema, type SimpleProductFormValues } from "./schema"
  *
  * Same guarantees as the Books actions: `assertRole(CATALOGUE_WRITE_ROLES)`
  * (the middleware check is a UX redirect, not a security boundary — see the
- * root CLAUDE.md), a validated payload, an `AuditLog` row, and a
- * `revalidatePath` of the affected pages.
+ * root CLAUDE.md), a validated payload, an `AuditLog` row, a
+ * `revalidatePath` of the affected pages, and `revalidateStorefront()` so
+ * the storefront's cached product reads pick the change up at once.
  */
 
 function toProductData(slug: string, raw: SimpleProductFormValues) {
@@ -34,14 +36,12 @@ function toProductData(slug: string, raw: SimpleProductFormValues) {
     // ever encoded fulfilment mechanics (see schema.prisma).
     type: "PHYSICAL_BOOK" as const,
     productLine,
-    bookFormats: [],
     title: raw.title,
     author: raw.maker,
     slug: raw.slug,
     description: raw.description ?? null,
     genre: null,
     priceCents: Math.round(raw.price * 100),
-    ebookPriceCents: null,
     coverImageUrl: raw.coverImageUrl ?? null,
     stockQty: raw.stockQty ?? null,
     isbn: raw.code ?? null,
@@ -61,10 +61,13 @@ export async function createLineProduct(slug: string, formData: FormData) {
   const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
+  // The create form is a modal on the list page (see add-line-product-dialog.tsx),
+  // so both outcomes redirect back there: `?error=` reopens the dialog with the
+  // message, `?created=1` leaves it shut and shows the saved banner.
   const base = lineBasePath(slug);
   const parsed = simpleProductFormSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
-    redirect(`${base}/new?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid input")}`);
+    redirect(`${base}?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid input")}`);
   }
 
   const data = toProductData(slug, parsed.data);
@@ -81,8 +84,9 @@ export async function createLineProduct(slug: string, formData: FormData) {
     },
   });
 
+  revalidateStorefront();
   revalidatePath(base);
-  redirect(base);
+  redirect(`${base}?created=1`);
 }
 
 export async function updateLineProduct(slug: string, id: string, formData: FormData) {
@@ -113,6 +117,7 @@ export async function updateLineProduct(slug: string, id: string, formData: Form
     },
   });
 
+  revalidateStorefront();
   revalidatePath(base);
   revalidatePath(`${base}/${id}`);
   redirect(base);
@@ -141,5 +146,6 @@ export async function toggleLineProductPublished(slug: string, id: string) {
     },
   });
 
+  revalidateStorefront();
   revalidatePath(lineBasePath(slug));
 }

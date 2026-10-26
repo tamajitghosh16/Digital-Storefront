@@ -2,7 +2,7 @@
 // signed-in account area.
 
 import type { Order, OrderItem, Royalty, SelfPublishingProject } from "@repo/database";
-import { SAMPLE_EBOOKS } from "./books";
+import { SAMPLE_BOOKS, type DisplayBook } from "./books";
 import { NOW, type DisplayProduct } from "./shared";
 
 export type SampleOrder = Order & { items: OrderItem[] };
@@ -25,12 +25,18 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
     totalCents: 272383,
     shippingAddressId: null,
     billingAddressId: null,
+    shippingAddress: null,
+    billingAddress: null,
+    gstNumber: null,
+    discountCents: 0,
+    discountCodeId: null,
+    discountCode: null,
     trackingNumber: "IN482910422",
     carrier: "BlueDart",
     createdAt: day(12),
     updatedAt: day(9),
     items: [
-      { id: "item-1", orderId: "order-10482", productId: "book-1-physical", quantity: 1, unitPriceCents: 249900, fulfillmentType: "SHIP" },
+      { id: "item-1", orderId: "order-10482", productId: "book-1", quantity: 1, unitPriceCents: 249900, fulfillmentType: "SHIP", includesEbook: false, bookFormat: "PAPERBACK" },
     ],
   },
   {
@@ -44,12 +50,18 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
     totalCents: 96193,
     shippingAddressId: null,
     billingAddressId: null,
+    shippingAddress: null,
+    billingAddress: null,
+    gstNumber: null,
+    discountCents: 0,
+    discountCodeId: null,
+    discountCode: null,
     trackingNumber: null,
     carrier: null,
     createdAt: day(15),
     updatedAt: day(15),
     items: [
-      { id: "item-2", orderId: "order-10479", productId: "book-3-ebook", quantity: 1, unitPriceCents: 89900, fulfillmentType: "DIGITAL" },
+      { id: "item-2", orderId: "order-10479", productId: "book-3", quantity: 1, unitPriceCents: 89900, fulfillmentType: "DIGITAL", includesEbook: true, bookFormat: "EBOOK" },
     ],
   },
   {
@@ -63,18 +75,24 @@ export const SAMPLE_ORDERS: SampleOrder[] = [
     totalCents: 1915300,
     shippingAddressId: null,
     billingAddressId: null,
+    shippingAddress: null,
+    billingAddress: null,
+    gstNumber: null,
+    discountCents: 0,
+    discountCodeId: null,
+    discountCode: null,
     trackingNumber: null,
     carrier: null,
     createdAt: day(21),
     updatedAt: day(2),
     items: [
-      { id: "item-3", orderId: "order-10465", productId: "service-standard", quantity: 1, unitPriceCents: 1790000, fulfillmentType: "SERVICE" },
+      { id: "item-3", orderId: "order-10465", productId: "service-standard", quantity: 1, unitPriceCents: 1790000, fulfillmentType: "SERVICE", includesEbook: false, bookFormat: null },
     ],
   },
 ];
 
-export const SAMPLE_LIBRARY_ITEMS: DisplayProduct[] = [SAMPLE_EBOOKS[2], SAMPLE_EBOOKS[4], SAMPLE_EBOOKS[5]].filter(
-  (p): p is DisplayProduct => !!p
+export const SAMPLE_LIBRARY_ITEMS: DisplayProduct[] = [SAMPLE_BOOKS[2], SAMPLE_BOOKS[4], SAMPLE_BOOKS[5]].filter(
+  (p): p is DisplayBook => !!p
 );
 
 export type SampleProject = SelfPublishingProject & { royalties: Royalty[] };

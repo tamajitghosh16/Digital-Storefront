@@ -1,3 +1,4 @@
+import "server-only";
 import { put, del, head } from "@vercel/blob";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -9,8 +10,10 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * gate promotion to the permanent path (NFR-8).
  */
 export async function uploadToStaging(file: File | Blob, pathHint: string) {
-  const key = `staging/${crypto.randomUUID()}-${pathHint}`;
-  return put(key, file, { access: "public", addRandomSuffix: false });
+  // Private: an unscanned upload must not be fetchable by URL. Only the
+  // scan job (holding BLOB_READ_WRITE_TOKEN) reads it before promotion.
+  const key = `staging/${crypto.randomUUID()}-${safeObjectName(pathHint) || "upload"}`;
+  return put(key, file, { access: "private", addRandomSuffix: false });
 }
 
 export async function promoteFromStaging(stagingUrl: string, permanentPath: string, file: Blob) {
@@ -96,6 +99,36 @@ export async function createEbookUploadUrl(fileName: string): Promise<{ path: st
   return { path: data.path, uploadUrl };
 }
 
+/**
+ * Object names minted by {@link createEbookUploadUrl}: `<uuid>-<safe name>.pdf`.
+ * A form can only ever point a FileAsset at an object of this shape, never
+ * at an arbitrary path in the bucket.
+ */
+const EBOOK_PATH = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-[a-z0-9.-]{1,80}$/;
+
+export function isValidEbookPath(path: string): boolean {
+  return EBOOK_PATH.test(path) && /\.pdf$/.test(path);
+}
+
+/**
+ * Checks what was actually uploaded to a signed upload URL: the object must
+ * exist and start with the PDF magic bytes (`%PDF-`). The upload bypasses
+ * the app server, so this is the only point where its content is seen.
+ * Reads just the first bytes via an HTTP Range request.
+ */
+export async function isStoredEbookPdf(path: string): Promise<boolean> {
+  if (!isValidEbookPath(path)) return false;
+  const supabase = storageServiceClient();
+  const { data, error } = await supabase.storage.from(EBOOK_BUCKET).createSignedUrl(path, 60);
+  if (error || !data?.signedUrl) return false;
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const url = /^https?:\/\//.test(data.signedUrl) ? data.signedUrl : `${base}${data.signedUrl}`;
+  const response = await fetch(url, { headers: { Range: "bytes=0-7" }, cache: "no-store" });
+  if (!response.ok) return false;
+  const head = new Uint8Array(await response.arrayBuffer()).slice(0, 5);
+  return String.fromCharCode(...head) === "%PDF-";
+}
+
 /** Short-lived signed download URL for a stored e-book PDF (default 5 minutes). */
 export async function createEbookDownloadUrl(path: string, expiresInSeconds = 300): Promise<string> {
   const supabase = storageServiceClient();
@@ -152,9 +185,13 @@ export async function uploadImage(file: File | Blob, fileName: string): Promise<
   return { url: publicUrl, path };
 }
 
-export async function quarantine(stagingUrl: string) {
-  // In production, move to a `quarantine/` prefix instead of deleting
-  // outright, so infected uploads remain available for investigation.
+/**
+ * Moves an infected upload out of staging into a private `quarantine/`
+ * prefix (kept for investigation, never served), then deletes the original.
+ */
+export async function quarantine(stagingUrl: string, file: Blob) {
+  const name = stagingUrl.split("/").pop() ?? crypto.randomUUID();
+  await put(`quarantine/${name}`, file, { access: "private", addRandomSuffix: true });
   await del(stagingUrl);
 }
 

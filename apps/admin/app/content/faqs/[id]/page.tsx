@@ -3,6 +3,7 @@ import { prisma } from "@repo/database";
 import { PageHeader } from "@/components/ui";
 import { updateFaq } from "../actions";
 import { FaqForm } from "../faq-form";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function EditFaqPage({
   params,
@@ -11,6 +12,7 @@ export default async function EditFaqPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireStaffPage();
   const { id } = await params;
   const { error } = await searchParams;
   const faq = await prisma.faq.findUnique({ where: { id } });

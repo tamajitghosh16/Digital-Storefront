@@ -58,7 +58,9 @@ export function AddressBook({ initialAddresses }: { initialAddresses: Address[] 
                 {address.line1}
                 {address.line2 ? `, ${address.line2}` : ""}
                 <br />
-                {address.city}, {address.state} {address.postalCode}
+                {address.city}
+                {address.district && address.district !== address.city ? `, ${address.district}` : ""},{" "}
+                {address.state} {address.postalCode}
                 {address.phone ? (
                   <>
                     <br />

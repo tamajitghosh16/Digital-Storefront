@@ -3,8 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@repo/auth/server";
 import { prisma } from "@repo/database";
-import { withFallback } from "@/lib/safe-fetch";
-import { SAMPLE_PUBLISHING_PROJECTS } from "@/lib/sample-data";
 import { formatINRWhole } from "@/lib/format";
 import {
   Callout,
@@ -32,15 +30,12 @@ export default async function PublishingDashboardPage() {
   const user = await getCurrentUser();
   if (!user || user.role !== "SELF_PUB_AUTHOR") redirect("/unauthorized");
 
-  const projects = await withFallback(
-    () =>
-      prisma.selfPublishingProject.findMany({
-        where: { authorId: user.id },
-        include: { royalties: true },
-        orderBy: { createdAt: "desc" },
-      }),
-    SAMPLE_PUBLISHING_PROJECTS
-  );
+  // Real data only — never sample rows in a signed-in author's dashboard.
+  const projects = await prisma.selfPublishingProject.findMany({
+    where: { authorId: user.id },
+    include: { royalties: true },
+    orderBy: { createdAt: "desc" },
+  });
 
   const royalties = projects.flatMap((project) =>
     project.royalties.map((royalty) => ({ ...royalty, bookTitle: project.bookTitle }))

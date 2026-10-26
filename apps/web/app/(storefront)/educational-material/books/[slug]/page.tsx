@@ -1,26 +1,50 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getPricingConfig, prisma } from "@repo/database";
+import { prisma } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
-import { findSampleProduct, SAMPLE_BOOKS, SAMPLE_EBOOKS, type DisplayProduct } from "@/lib/sample-data";
-import { groupBookEditions, productRating } from "@/lib/books";
-import { ProductPage, type ProductPageData } from "@/components/commerce/product-page";
+import { productsCache, reviveDates } from "@/lib/products-cache";
+import { getCachedPricingConfig } from "@/lib/cms";
+import { SAMPLE_BOOKS, type DisplayBook } from "@/lib/sample-data";
+import { bookToListing, productRating, type BookWithEditions } from "@/lib/books";
+import { getCurrentUser } from "@repo/auth/server";
+import { BookPage, type BookEditionOffer } from "@/components/commerce/book-page";
+import { ownsEbook } from "@/lib/library";
 import type { ProductTileData } from "@/components/commerce/product-tile";
 
-/** A title is reachable at either edition's slug; both resolve here. */
-function baseSlug(slug: string): string {
-  return slug.replace(/-ebook$/, "");
+/**
+ * The book's row with its editions (one per format it's sold in). Scoped
+ * to `productLine: "BOOK"` so a chart or teaching aid's slug doesn't render
+ * as a book here — those have their own line's `[slug]` route. Cached under
+ * the `products` tag (`lib/products-cache`); generateMetadata and the page
+ * share one lookup per request through the cache.
+ */
+const cachedBook = productsCache("book-row", (slug: string) =>
+  prisma.product.findFirst({
+    where: { slug, productLine: "BOOK" },
+    include: { editions: { orderBy: { format: "asc" } } },
+  })
+);
+
+const cachedRelatedBooks = productsCache("book-related", (slug: string) =>
+  prisma.product.findMany({
+    where: { isPublished: true, type: { in: ["PHYSICAL_BOOK", "EBOOK"] }, productLine: "BOOK", NOT: { slug } },
+    include: { editions: { select: { format: true, priceCents: true, stockQty: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 8,
+  })
+);
+
+async function loadBook(slug: string): Promise<DisplayBook | BookWithEditions | null> {
+  const row = await withFallback(async () => {
+    const found = await cachedBook(slug);
+    return found ? { ...reviveDates(found), editions: found.editions.map(reviveDates) } : null;
+  }, null);
+  return row ?? SAMPLE_BOOKS.find((book) => book.slug === slug) ?? null;
 }
 
 // Admin-controlled per-product SEO — see the apps/admin catalogue form.
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const { slug } = await params;
-  const base = baseSlug(slug);
-  const product =
-    (await withFallback(() => prisma.product.findUnique({ where: { slug: base } }), null)) ??
-    (await withFallback(() => prisma.product.findUnique({ where: { slug: `${base}-ebook` } }), null)) ??
-    findSampleProduct(base) ??
-    findSampleProduct(`${base}-ebook`);
+  const product = await loadBook((await params).slug);
   if (!product) return {};
   return {
     title: product.metaTitle || product.title,
@@ -29,91 +53,92 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-// FR-2.1/FR-2.2: full title details with an edition switcher. A title
-// published in only one format simply offers that one edition.
+// FR-2.1/FR-2.2: full title details with a format picker offering each
+// edition the book is sold in — Paperback, Hardcover and/or E-book.
 export default async function BookDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const base = baseSlug(slug);
 
-  const [printRow, ebookRow, pricing] = await Promise.all([
-    withFallback(() => prisma.product.findUnique({ where: { slug: base } }), null),
-    withFallback(() => prisma.product.findUnique({ where: { slug: `${base}-ebook` } }), null),
-    getPricingConfig(),
+  const [book, pricing, relatedRows] = await Promise.all([
+    loadBook(slug),
+    getCachedPricingConfig(),
+    withFallback(
+      async () => (await cachedRelatedBooks(slug)).map((row) => ({ ...reviveDates(row) })),
+      SAMPLE_BOOKS.filter((entry) => entry.slug !== slug) as BookWithEditions[]
+    ),
   ]);
+  if (!book || !book.isPublished) notFound();
 
-  const print = printRow ?? findSampleProduct(base) ?? null;
-  const ebook = ebookRow ?? findSampleProduct(`${base}-ebook`) ?? null;
-  const primary = print ?? ebook;
-  if (!primary) notFound();
-
-  // Other titles, one card per title (not per edition), and never the one
-  // being viewed — take a wide slice so grouping still yields a full row.
-  const relatedRows = await withFallback(
-    () =>
-      prisma.product.findMany({
-        where: {
-          isPublished: true,
-          type: { in: ["PHYSICAL_BOOK", "EBOOK"] },
-          NOT: { slug: { in: [base, `${base}-ebook`] } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 24,
-      }),
-    [...SAMPLE_BOOKS, ...SAMPLE_EBOOKS].filter((book) => baseSlug(book.slug) !== base)
-  );
-
-  const related: ProductTileData[] = groupBookEditions(relatedRows)
+  const related: ProductTileData[] = relatedRows
     .slice(0, 8)
-    .map((book) => ({
-      id: book.id,
-      type: book.hasPrint ? "PHYSICAL_BOOK" : "EBOOK",
-      title: book.title,
-      author: book.author,
-      slug: book.slug,
-      priceCents: book.fromPriceCents,
-      coverImageUrl: book.coverImageUrl ?? null,
-      stockQty: book.stockQty,
-      genre: book.genre,
-      rating: book.rating,
-      reviewCount: book.reviewCount,
-      coverFrom: book.coverFrom,
-      coverTo: book.coverTo,
+    .map(bookToListing)
+    .map((listing) => ({
+      id: listing.id,
+      type: listing.hasPrint ? "PHYSICAL_BOOK" : "EBOOK",
+      title: listing.title,
+      author: listing.author,
+      slug: listing.slug,
+      priceCents: listing.fromPriceCents,
+      coverImageUrl: listing.coverImageUrl ?? null,
+      stockQty: listing.stockQty,
+      genre: listing.genre,
+      rating: listing.rating,
+      reviewCount: listing.reviewCount,
+      coverFrom: listing.coverFrom,
+      coverTo: listing.coverTo,
     }));
 
-  const isEbook = primary.type === "EBOOK";
-  const companion = isEbook ? print : ebook;
+  // Per-reader, so never cached: whether they already own the e-book.
+  const user = await withFallback(() => getCurrentUser(), null);
+  const sellsEbook = book.editions.some((edition) => edition.format === "EBOOK");
+  const ebookOwned = user && sellsEbook ? await withFallback(() => ownsEbook(user.id, [book.id]), false) : false;
 
-  // The admin catalogue form and prisma/seed.ts write one row per title —
-  // `bookFormats: [PHYSICAL, EBOOK]` with both `priceCents` and
-  // `ebookPriceCents` on it — not a separate `${base}-ebook` row. (The
-  // bundled sample catalogue still uses two rows, so a real companion row
-  // is honoured too.) When the primary row carries both formats itself, the
-  // other edition's price is its own second price, not a sibling row's.
-  const carriesBothFormats =
-    Boolean(primary.bookFormats?.includes("PHYSICAL")) && Boolean(primary.bookFormats?.includes("EBOOK"));
-  const companionPriceCents =
-    companion?.priceCents ??
-    (carriesBothFormats ? (isEbook ? primary.priceCents : primary.ebookPriceCents ?? undefined) : undefined);
+  // The book-level merchandising status gates every printed edition — the
+  // same rule checkout applies before it will sell a printed copy.
+  const printHeld = book.inventoryStatus === "OUT_OF_STOCK" || book.inventoryStatus === "COMING_SOON";
+  const editions: BookEditionOffer[] = book.editions.map((edition) => ({
+    format: edition.format,
+    priceCents: edition.priceCents,
+    stockQty: edition.stockQty,
+    unavailable:
+      edition.format === "EBOOK"
+        ? ebookOwned
+          ? "Already in your library"
+          : undefined
+        : book.inventoryStatus === "COMING_SOON"
+          ? "Coming soon"
+          : printHeld || (edition.stockQty !== null && edition.stockQty <= 0)
+            ? "Out of stock"
+            : undefined,
+  }));
 
-  const display = primary as Partial<DisplayProduct>;
+  const display = book as Partial<DisplayBook>;
 
   return (
-    <ProductPage
-      companionPriceCents={companionPriceCents}
+    <BookPage
       related={related}
       pricing={pricing}
-      product={
-        {
-          ...primary,
-          type: primary.type === "EBOOK" ? "EBOOK" : "PHYSICAL_BOOK",
-          genre: display.genre ?? undefined,
-          rating: productRating(primary),
-          reviewCount: display.reviewCount,
-          pages: display.pages,
-          coverFrom: display.coverFrom,
-          coverTo: display.coverTo,
-        } as ProductPageData
-      }
+      isSignedIn={Boolean(user)}
+      editions={editions}
+      product={{
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        description: book.description,
+        coverImageUrl: book.coverImageUrl,
+        backCoverImageUrl: book.backCoverImageUrl,
+        prefaceImageUrl: book.prefaceImageUrl,
+        indexPageImageUrl: book.indexPageImageUrl,
+        isbn: book.isbn,
+        pages: display.pages,
+        weightGrams: book.weightGrams,
+        language: book.language,
+        formats: book.formats,
+        genre: book.genre ?? undefined,
+        rating: productRating(book),
+        reviewCount: book.reviewCount,
+        coverFrom: display.coverFrom,
+        coverTo: display.coverTo,
+      }}
     />
   );
 }

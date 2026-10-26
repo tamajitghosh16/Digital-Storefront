@@ -11,7 +11,19 @@ const globalForPrisma = globalThis as unknown as {
 // Prisma 7 requires an explicit driver adapter at runtime — the schema no
 // longer carries a connection string. Pooled (Supavisor), matching the app's
 // runtime query pattern; migrations use DIRECT_URL via prisma.config.ts instead.
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+//
+// Pool tuning: opening a connection to the Supabase pooler (TCP + TLS +
+// SCRAM) costs ~2s from far-off regions, versus ~one round trip for a query
+// on an open connection. `pg`'s default drops idle connections after 10s,
+// so a visitor pausing between pages paid that handshake again on every
+// parallel query. Keep them for 5 minutes, with TCP keep-alives so a NAT or
+// the pooler doesn't silently drop them first. Idle-connection errors are
+// already absorbed by the adapter's pool "error" listener.
+const adapter = new PrismaPg({
+  connectionString: process.env.DATABASE_URL,
+  idleTimeoutMillis: 5 * 60_000,
+  keepAlive: true,
+});
 
 export const prisma =
   globalForPrisma.prisma ??
@@ -68,6 +80,10 @@ export async function getSiteSettings() {
 export * from "./content";
 export * from "./pricing";
 export * from "./taxonomy";
+export * from "./book-formats";
+// Discount-code rules (validity, amount off), shared by the cart, checkout
+// and apps/admin's Discount page.
+export * from "./discounts";
 // The demo book catalogue the seed writes and apps/web falls back to — one
 // list of titles, so the storefront and the admin never disagree about
 // what's in the shop.
@@ -94,10 +110,9 @@ export async function getContent(): Promise<ContentMap> {
 /** The pricing rules the Publisher controls, as one serializable object. */
 export async function getPricingConfig(): Promise<PricingConfig> {
   try {
-    const [settings, tiers, codes] = await Promise.all([
+    const [settings, tiers] = await Promise.all([
       prisma.pricingSettings.findUnique({ where: { id: PRICING_SETTINGS_ID } }),
       prisma.classSetTier.findMany({ where: { isActive: true }, orderBy: { quantity: "asc" } }),
-      prisma.discountCode.findMany({ where: { isActive: true }, orderBy: { code: "asc" } }),
     ]);
 
     const base = settings
@@ -136,11 +151,6 @@ export async function getPricingConfig(): Promise<PricingConfig> {
           .filter((tier) => tier.quantity > 1)
           .map((tier) => ({ quantity: tier.quantity, discount: bpsToRate(tier.discountBps) })),
       ],
-      discountCodes: codes.map((code) => ({
-        code: code.code,
-        rate: bpsToRate(code.rateBps),
-        blurb: code.blurb ?? "",
-      })),
     };
   } catch {
     return DEFAULT_PRICING_CONFIG;

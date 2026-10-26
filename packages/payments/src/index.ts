@@ -1,5 +1,6 @@
+import "server-only";
 import Razorpay from "razorpay";
-import crypto from "node:crypto";
+import { isValidPaymentSignature, isValidWebhookSignature } from "./signature";
 
 /**
  * Razorpay adapter — Technical Design Document, Section 3.6 (Checkout & Payment).
@@ -29,22 +30,43 @@ export async function createRazorpayOrder(params: { amountCents: number; currenc
   });
 }
 
-/** Verifies the signature Razorpay returns to the client after checkout completes. */
+/**
+ * Verifies the signature Razorpay returns to the client after checkout
+ * completes. This only proves *some* payment for `orderId` happened — the
+ * caller must still check that `orderId` is the gateway order it created for
+ * the order being confirmed (see apps/web's confirmCheckout).
+ */
 export function verifyPaymentSignature(params: { orderId: string; paymentId: string; signature: string }): boolean {
-  const expected = crypto
-    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET!)
-    .update(`${params.orderId}|${params.paymentId}`)
-    .digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(params.signature));
+  return isValidPaymentSignature({ ...params, secret: process.env.RAZORPAY_KEY_SECRET });
 }
 
 /** Verifies the `X-Razorpay-Signature` header on incoming webhook requests. */
 export function verifyWebhookSignature(rawBody: string, signature: string): boolean {
-  const expected = crypto
-    .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET!)
-    .update(rawBody)
-    .digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  return isValidWebhookSignature({ rawBody, signature, secret: process.env.RAZORPAY_WEBHOOK_SECRET });
+}
+
+export interface GatewayPayment {
+  id: string;
+  orderId: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+}
+
+/**
+ * Fetches a payment from Razorpay's API — the authoritative record of what
+ * was actually charged, for the order it was charged against. Used to
+ * cross-check the client's claim before marking an order paid.
+ */
+export async function fetchGatewayPayment(paymentId: string): Promise<GatewayPayment> {
+  const payment = await getRazorpayClient().payments.fetch(paymentId);
+  return {
+    id: String(payment.id),
+    orderId: payment.order_id ? String(payment.order_id) : null,
+    amount: Number(payment.amount),
+    currency: String(payment.currency),
+    status: String(payment.status),
+  };
 }
 
 export { getRazorpayClient };

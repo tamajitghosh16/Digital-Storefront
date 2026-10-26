@@ -2,7 +2,7 @@
  * Storefront pricing rules.
  *
  * The *numbers* — delivery thresholds and fees, the print + e-book bundle
- * uplift, GST rates, class-set tiers, discount codes — live in the database
+ * uplift, GST rates, class-set tiers — live in the database
  * and are edited from apps/admin (Pricing & delivery). This module holds the
  * arithmetic that turns them into what a shopper sees.
  *
@@ -197,11 +197,4 @@ export function includedGstCents(
   const rate = rates[type];
   if (!rate) return 0;
   return Math.round((amountCents * rate) / (1 + rate));
-}
-
-// ── Discount codes ──────────────────────────────────────────────────
-
-export function lookupDiscount(config: PricingConfig, code: string) {
-  const wanted = code.trim().toUpperCase();
-  return config.discountCodes.find((candidate) => candidate.code === wanted);
 }

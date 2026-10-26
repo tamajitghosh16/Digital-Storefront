@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import type { Address } from "@repo/database";
 import { buttonClass } from "@/components/primitives";
 import { createAddress, updateAddress, type AddressInput } from "@/lib/actions/addresses";
+import { isIndianState } from "@/lib/india-address";
+import { StateSelect } from "./state-select";
 
 /**
  * The "Add address" / "Edit address" modal for the account details page.
@@ -75,7 +77,7 @@ export function AddressDialog({
           />
           <TextField
             id="address-line1"
-            label="Address line"
+            label="Address line 1"
             required
             placeholder="Flat, building, street"
             value={fields.line1}
@@ -83,11 +85,26 @@ export function AddressDialog({
           />
           <TextField
             id="address-line2"
-            label="Apartment, suite, etc. — optional"
+            label="Address line 2 — optional"
+            placeholder="Area, landmark"
             value={fields.line2 ?? ""}
             onChange={(value) => setFields((current) => ({ ...current, line2: value }))}
           />
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StateSelect
+              id="address-state"
+              required
+              value={fields.state}
+              onChange={(value) => setFields((current) => ({ ...current, state: value }))}
+            />
+            <TextField
+              id="address-district"
+              label="District"
+              required
+              placeholder="Kolkata"
+              value={fields.district}
+              onChange={(value) => setFields((current) => ({ ...current, district: value }))}
+            />
             <TextField
               id="address-city"
               label="City"
@@ -95,14 +112,6 @@ export function AddressDialog({
               placeholder="Kolkata"
               value={fields.city}
               onChange={(value) => setFields((current) => ({ ...current, city: value }))}
-            />
-            <TextField
-              id="address-state"
-              label="State"
-              required
-              placeholder="Karnataka"
-              value={fields.state}
-              onChange={(value) => setFields((current) => ({ ...current, state: value }))}
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -145,8 +154,11 @@ function toFields(address: Address | null): AddressInput {
     label: address?.label ?? "",
     line1: address?.line1 ?? "",
     line2: address?.line2 ?? "",
+    district: address?.district ?? "",
     city: address?.city ?? "",
-    state: address?.state ?? "",
+    // A legacy free-text state that isn't in the dropdown starts blank, so
+    // the customer is asked to pick it rather than silently keeping it.
+    state: address && isIndianState(address.state) ? address.state : "",
     postalCode: address?.postalCode ?? "",
     phone: address?.phone ?? "",
   };

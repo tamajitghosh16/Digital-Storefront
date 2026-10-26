@@ -3,8 +3,10 @@ import { prisma } from "@repo/database";
 import { ButtonLink, EmptyState, PageHeader, Pill, Table } from "@/components/ui";
 import { ConfirmButton, LinkButton } from "@/components/form-controls";
 import { deleteBanner, toggleBannerActive } from "./actions";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function BannersPage() {
+  await requireStaffPage();
   const banners = await prisma.banner.findMany({ orderBy: { order: "asc" } });
   // apps/web renders the first active banner as the hero; make that visible
   // here so nobody has to guess which row is the one on the homepage.

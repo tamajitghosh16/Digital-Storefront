@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@repo/database";
 import { cn } from "@repo/ui/utils";
 import { PageHeader, Pill } from "@/components/ui";
+import { requireStaffPage } from "@/lib/guard";
 
 // FR-11.2/FR-11.3: mirrors the approved back-office mockup — a period
 // selector, five headline stats, a weekly revenue chart and a recent-orders
@@ -59,6 +60,7 @@ function periodStart(period: PeriodKey): Date {
 }
 
 export default async function AdminDashboard({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
+  await requireStaffPage();
   const { period: periodParam } = await searchParams;
   const period: PeriodKey = PERIODS.some((p) => p.key === periodParam) ? (periodParam as PeriodKey) : "week";
 
@@ -206,7 +208,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
           <Shortcut
             href="/settings/pricing"
             title="Pricing & delivery"
-            body="Postage, bulk discounts, GST, and discount codes."
+            body="Postage, bulk discounts and GST."
           />
           <Shortcut href="/content/faqs" title="Questions & answers" body="What appears in the FAQ section." />
           <Shortcut

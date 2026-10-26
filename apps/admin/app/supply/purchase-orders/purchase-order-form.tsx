@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Product, Vendor } from "@repo/database";
+import type { Vendor } from "@repo/database";
 import { Trash2 } from "lucide-react";
 import { cn } from "@repo/ui/utils";
 import { buttonClass, controlClass, ErrorBanner, Field, Section, SelectField, TextAreaField, TextField } from "@/components/ui";
@@ -10,8 +10,16 @@ import { SaveButton } from "@/components/form-controls";
 
 const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
 
+/** One thing that can be ordered: a non-book product, or one printed edition of a book. */
+export interface PurchasableOption {
+  /** `<productId>` or `<productId>:PAPERBACK` / `<productId>:HARDCOVER`. */
+  value: string;
+  label: string;
+}
+
 interface ItemRow {
   key: string;
+  /** A {@link PurchasableOption} value. */
   productId: string;
   quantity: string;
   unitCost: string;
@@ -30,12 +38,12 @@ function emptyRow(): ItemRow {
 export function PurchaseOrderForm({
   action,
   vendors,
-  products,
+  options,
   error,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   vendors: Vendor[];
-  products: Product[];
+  options: PurchasableOption[];
   error?: string;
 }) {
   const [rows, setRows] = useState<ItemRow[]>([emptyRow()]);
@@ -45,7 +53,10 @@ export function PurchaseOrderForm({
       JSON.stringify(
         rows
           .filter((row) => row.productId && row.quantity)
-          .map((row) => ({ productId: row.productId, quantity: row.quantity, unitCost: row.unitCost || "0" }))
+          .map((row) => {
+            const [productId, bookFormat] = row.productId.split(":");
+            return { productId, bookFormat, quantity: row.quantity, unitCost: row.unitCost || "0" };
+          })
       ),
     [rows]
   );
@@ -94,7 +105,7 @@ export function PurchaseOrderForm({
       </Section>
 
       <Section title="What are you ordering?" description="Pick a book, how many copies, and the cost per copy.">
-        {products.length === 0 ? (
+        {options.length === 0 ? (
           <p className="text-sm text-ink-muted">No physical books in the catalogue yet — add one from Books first.</p>
         ) : (
           <div className="space-y-3">
@@ -111,9 +122,9 @@ export function PurchaseOrderForm({
                     className={controlClass}
                   >
                     <option value="">Choose a book</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.title}
+                    {options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
                   </select>

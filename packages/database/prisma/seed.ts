@@ -11,9 +11,9 @@ import { prisma, BOOK_SEEDS, PRICING_SETTINGS_ID, SITE_SETTINGS_ID } from "../sr
 
 /**
  * Writes the book catalogue the way the admin's product form writes a
- * book: **one row per title**, with `bookFormats: [PHYSICAL, EBOOK]` and the
- * two prices on that single row — not a printed row plus a separate
- * "(E-Book)" row.
+ * book: **one `Product` row per title**, plus one `BookEdition` row per
+ * format it's sold in (Paperback + E-book here, and Hardcover when the seed
+ * gives it a price) — `priceCents` on the product is the cheapest edition.
  *
  * `BOOK_SEEDS` is empty for the testing phase (see
  * `packages/database/src/book-catalog.ts`), so this is currently a no-op —
@@ -24,16 +24,23 @@ import { prisma, BOOK_SEEDS, PRICING_SETTINGS_ID, SITE_SETTINGS_ID } from "../sr
  */
 async function seedBookCatalogue() {
   for (const book of BOOK_SEEDS) {
+    const editions = [
+      { format: "PAPERBACK" as const, priceCents: book.physicalPriceCents, stockQty: book.stockQty },
+      ...(book.hardcoverPriceCents !== undefined
+        ? [{ format: "HARDCOVER" as const, priceCents: book.hardcoverPriceCents, stockQty: book.stockQty }]
+        : []),
+      { format: "EBOOK" as const, priceCents: book.ebookPriceCents, stockQty: null },
+    ];
     const data = {
       type: "PHYSICAL_BOOK" as const,
       productLine: "BOOK" as const,
-      bookFormats: ["PHYSICAL", "EBOOK"] as const,
       title: book.title,
       author: book.author,
-      description: `${book.description}\n\n${book.pages} pages.`,
-      priceCents: book.physicalPriceCents,
-      ebookPriceCents: book.ebookPriceCents,
-      stockQty: book.stockQty,
+      description: `${book.description}
+
+${book.pages} pages.`,
+      priceCents: Math.min(...editions.map((edition) => edition.priceCents)),
+      stockQty: null,
       isbn: book.isbn,
       weightGrams: 320,
       genre: book.genre,
@@ -43,11 +50,18 @@ async function seedBookCatalogue() {
       formats: ["EPUB", "MOBI", "PDF"],
       isPublished: true,
     };
-    await prisma.product.upsert({
+    const product = await prisma.product.upsert({
       where: { slug: book.slug },
       update: data,
       create: { ...data, slug: book.slug, publishedAt: new Date() },
     });
+    for (const edition of editions) {
+      await prisma.bookEdition.upsert({
+        where: { productId_format: { productId: product.id, format: edition.format } },
+        update: { priceCents: edition.priceCents, stockQty: edition.stockQty },
+        create: { ...edition, productId: product.id },
+      });
+    }
   }
   return BOOK_SEEDS.length;
 }

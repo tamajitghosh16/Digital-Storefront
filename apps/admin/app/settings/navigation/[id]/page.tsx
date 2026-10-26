@@ -3,6 +3,7 @@ import { prisma } from "@repo/database";
 import { PageHeader } from "@/components/ui";
 import { updateNavLink } from "../actions";
 import { NavLinkForm } from "../nav-link-form";
+import { requireStaffPage } from "@/lib/guard";
 
 export default async function EditNavLinkPage({
   params,
@@ -11,6 +12,7 @@ export default async function EditNavLinkPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireStaffPage();
   const { id } = await params;
   const { error } = await searchParams;
   const link = await prisma.navLink.findUnique({ where: { id } });

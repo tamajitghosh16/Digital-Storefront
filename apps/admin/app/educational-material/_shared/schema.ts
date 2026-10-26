@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { httpsUrl } from "@/lib/schema-fields";
 
 /**
  * Fields for the create/edit form shared by the three simpler Educational
@@ -22,25 +23,25 @@ function optionalInt() {
 }
 
 export const simpleProductFormSchema = z.object({
-  title: z.string().min(1, "A title is required"),
+  title: z.string().min(1, "A title is required").max(300, "That's too long"),
   // Stored in Product.author — labelled "Publisher or brand" / "Author or
   // creator" per line, but always required so the column is never blank.
-  maker: z.string().min(1, "This field is required"),
+  maker: z.string().min(1, "This field is required").max(300, "That's too long"),
   slug: z
     .string()
     .min(1, "Web address is required")
     .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Web address must be lowercase letters, numbers, and hyphens only"),
-  description: optional(z.string()),
+  description: optional(z.string().max(5000, "That's too long")),
   price: z.coerce.number().min(0, "Price must be zero or positive"),
-  coverImageUrl: optional(z.string().url("Must be a valid URL")),
+  coverImageUrl: optional(httpsUrl()),
   stockQty: optionalInt(),
   // A generic product code / ISBN — kept in Product.isbn, which is otherwise
   // books-only and unused for these lines.
-  code: optional(z.string()),
+  code: optional(z.string().max(500, "That's too long")),
   weightGrams: optionalInt(),
-  metaTitle: optional(z.string()),
-  metaDescription: optional(z.string()),
-  ogImageUrl: optional(z.string().url("Must be a valid URL")),
+  metaTitle: optional(z.string().max(200, "That's too long")),
+  metaDescription: optional(z.string().max(500, "That's too long")),
+  ogImageUrl: optional(httpsUrl()),
   isPublished: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
 });
 

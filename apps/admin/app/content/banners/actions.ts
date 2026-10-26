@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateStorefront } from "@/lib/storefront-cache";
 import type { z } from "zod";
 import { Prisma, prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
@@ -39,6 +40,7 @@ export async function createBanner(formData: FormData) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "banner.created", entity: "Banner", entityId: banner.id, diff: data as Prisma.InputJsonValue },
   });
 
+  revalidateStorefront();
   revalidatePath("/content/banners");
   redirect("/content/banners");
 }
@@ -59,6 +61,7 @@ export async function updateBanner(id: string, formData: FormData) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "banner.updated", entity: "Banner", entityId: id, diff: data as Prisma.InputJsonValue },
   });
 
+  revalidateStorefront();
   revalidatePath("/content/banners");
   revalidatePath(`/content/banners/${id}`);
   redirect("/content/banners");
@@ -75,6 +78,7 @@ export async function toggleBannerActive(id: string) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "banner.toggled", entity: "Banner", entityId: id, diff: { isActive: !existing.isActive } },
   });
 
+  revalidateStorefront();
   revalidatePath("/content/banners");
 }
 
@@ -88,5 +92,6 @@ export async function deleteBanner(id: string) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "banner.deleted", entity: "Banner", entityId: id, diff: Prisma.JsonNull },
   });
 
+  revalidateStorefront();
   revalidatePath("/content/banners");
 }
