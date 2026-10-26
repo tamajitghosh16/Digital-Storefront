@@ -8,6 +8,6 @@
     "@repo/database": "*",
     "@repo/email": "*",
     "@repo/security": "*",
-    "inngest": "^3.27.0"
+    "inngest": "^4.26.0"
   }
 }
