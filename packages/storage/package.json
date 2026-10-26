@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@repo/security": "*",
-    "@supabase/supabase-js": "^2.47.0",
+    "@supabase/supabase-js": "^2.118.0",
     "@vercel/blob": "^2.8.0",
     "server-only": "^0.0.1"
   },
