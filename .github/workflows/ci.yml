@@ -155,7 +155,7 @@ jobs:
           E2E_CUSTOMER_PASSWORD: ${{ secrets.E2E_CUSTOMER_PASSWORD }}
           E2E_STAFF_EMAIL: ${{ secrets.E2E_STAFF_EMAIL }}
           E2E_STAFF_PASSWORD: ${{ secrets.E2E_STAFF_PASSWORD }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always() && steps.env.outputs.skip != 'true'
         with:
           name: playwright-report-${{ matrix.app }}
@@ -164,7 +164,7 @@ jobs:
       # The first Linux run records the visual baselines instead of comparing.
       # Download this artifact and commit it under
       # apps/<app>/testing/e2e/__screenshots__/linux/ to start comparing.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always() && steps.env.outputs.skip != 'true'
         with:
           name: visual-baselines-linux-${{ matrix.app }}
