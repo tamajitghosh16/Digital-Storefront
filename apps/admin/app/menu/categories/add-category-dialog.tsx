@@ -40,7 +40,7 @@ export function AddCategoryDialog() {
         <form action={createMenuCategory} className="p-6">
           <h2 className="font-display text-lg font-bold tracking-[-0.01em] text-ink">New category</h2>
           <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-            Appears as a new item on the storefront&rsquo;s top menu, with a blank page of its own. You can add products
+            Appears as a new item on the storefront&rsquo;s top menu, with a blank page of its own. You can add sub-categories
             under it once it exists.
           </p>
 

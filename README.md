@@ -18,9 +18,8 @@ packages/
   database/ — Prisma schema (single source of truth) + client
   auth/     — Supabase Auth server/client helpers, role guards, middleware factory
   payments/ — Razorpay order creation + signature verification
-  storage/  — Vercel Blob upload/staging helpers
+  storage/  — Vercel Blob upload/staging helpers + Cloudmersive malware scan
   email/    — Resend + React Email templates
-  jobs/     — Inngest event catalogue + notification/malware-scan functions
   ui/       — shared button component + cn() utility (shadcn/ui-style)
   config/   — shared tsconfig, eslint, Tailwind v4 design tokens
 ```
@@ -115,8 +114,7 @@ npm run dev                           # runs both apps via Turborepo
 - Prisma schema — every entity from the BRD's Data Model Overview, with enums, indexes, and relations.
 - `packages/auth` — actual Supabase SSR client setup (server + browser) and a reusable middleware factory with role-gating. `apps/web` and `apps/admin` authenticate against **separate Supabase projects** (`packages/auth/src/env.ts`); a storefront customer account can't reach the back office.
 - `packages/payments` — real Razorpay order creation, payment signature verification, and webhook signature verification.
-- The Razorpay webhook route (`apps/web/app/api/webhooks/razorpay/route.ts`) — marks orders PAID and fires the `order/confirmed` Inngest event on `payment.captured`.
-- `packages/jobs` — a working Inngest client with 3 functions wired to `apps/web/app/api/inngest/route.ts`.
+- The Razorpay webhook route (`apps/web/app/api/webhooks/razorpay/route.ts`) — marks orders PAID and sends the order confirmation email on `payment.captured`.
 - `packages/email` — real Resend + React Email templates.
 - All list/detail pages that read from Postgres (homepage, catalogue, orders, submissions queue, royalties, analytics) — these run real Prisma queries today.
 - **Admin catalogue create/edit/publish forms** (`apps/admin/app/educational-material/books`) — full CRUD with Zod validation, `assertRole`, and `AuditLog` entries. The form adapts to what you're selling (printed book / e-book / service package) and only asks for the fields that apply, generates the web address from the title, and takes the front cover from a **file picker with a live preview** rather than asking for a URL.
@@ -129,9 +127,9 @@ npm run dev                           # runs both apps via Turborepo
 
 **Stubbed — needs implementation:**
 - Sign-in UI (Supabase Auth's email/OAuth components aren't wired into `app/sign-in`).
-- Add-to-cart Server Action and server-side cart persistence. Checkout itself is now wired (`apps/web/app/(checkout)/actions.ts` — `startCheckout`/`confirmCheckout` + Razorpay Checkout on the client); the class-set **bundle** line is priced from its component editions' DB prices until `Product` carries real multi-format pricing.
+- Add-to-cart Server Action (adding to the cart is still client-side; a signed-in customer's cart is now saved to their account — `carts` table, `apps/web/components/commerce/cart-sync.tsx`). Checkout itself is now wired (`apps/web/app/(checkout)/actions.ts` — `startCheckout`/`confirmCheckout` + Razorpay Checkout on the client); the class-set **bundle** line is priced from its component editions' DB prices until `Product` carries real multi-format pricing.
 - The self-publishing wizard's actual multi-step form (currently a static step list).
-- The customer-manuscript staging → malware-scan → promote pipeline end-to-end (the pieces exist in `packages/storage` and `packages/jobs/functions/malwareScan.ts`, and the scan now calls Cloudmersive and fails closed — files stay `PENDING` without `CLOUDMERSIVE_API_KEY` — but nothing yet emits `upload/scan_requested` or promotes scanned files). Admin e-book PDF uploads deliberately skip this, like image uploads.
+- The customer-manuscript staging → malware-scan → promote pipeline end-to-end (the pieces exist in `packages/storage`, including `scanUpload()`, which calls Cloudmersive and fails closed — files stay `PENDING` without `CLOUDMERSIVE_API_KEY` — but nothing yet calls the scan or promotes scanned files). Admin e-book PDF uploads deliberately skip this, like image uploads.
 - Refund flow, review moderation actions.
 - Product-line/department categorization in the UI — `Product.productLine` (the 8 lines across 5 departments) is a real schema field now, and `packages/database/src/taxonomy.ts` is its canonical label list, but `apps/admin`'s `FIXED_DEPARTMENTS` and `apps/web`'s `buildDepartments()` still hardcode their own copy instead of reading from it. Four of the eight lines now have an admin CMS that writes the field (Books plus Educational Charts / Worksheets & Activity Puzzles / Teaching & Learning Materials); the storefront still has no per-line browsing for the latter three. See root `CLAUDE.md`'s "Product & service taxonomy" section.
 
@@ -140,7 +138,7 @@ npm run dev                           # runs both apps via Turborepo
 Matches the roadmap in the Technical Design Document, Section 9:
 
 1. Finish auth end-to-end (sign-in/sign-up UI, session on both apps, confirm `sync_user.sql` fires on the storefront project and `sync_staff.sql` on the admin auth project). The "revamped admin auth" work (`settings/roles` staff management) also lands here.
-2. ~~Checkout Server Action + Razorpay Checkout on the client~~ — done (`startCheckout`/`confirmCheckout`, e-book delivery to My Library). Still open: add-to-cart Server Action and server-side cart persistence on login.
+2. ~~Checkout Server Action + Razorpay Checkout on the client~~ — done (`startCheckout`/`confirmCheckout`, e-book delivery to My Library). Still open: add-to-cart Server Action. (Server-side cart persistence per account is done.)
 3. ~~Admin catalogue CRUD~~ — done; admin is now the CMS for the whole storefront (site settings, nav, hero, every homepage heading and description, FAQs, testimonials, and pricing), with cover-image upload built into the catalogue form.
 4. Self-publishing wizard (steps 1–6), file upload + malware scan pipeline.
 5. Submissions queue actions (assign, move status, publish → auto-create Product), royalty calculation job.

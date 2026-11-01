@@ -80,7 +80,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
         where: { createdAt: { gte: weekStart } },
         select: { createdAt: true, totalCents: true, status: true },
       }),
-      prisma.order.count({ where: { status: "PAID" } }),
+      prisma.order.count({ where: { shipmentStatus: "AWAITING_APPROVAL" } }),
       prisma.selfPublishingProject.count({ where: { status: { in: ["SUBMITTED", "IN_REVIEW"] } } }),
       prisma.serviceRequest.count({ where: { status: "SUBMITTED" } }),
     ]);
@@ -107,7 +107,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
 
       {(ordersToProcess > 0 || pendingSubmissions > 0 || pendingServiceRequests > 0) && (
         <div className="-mt-3 mb-6 flex flex-wrap gap-2.5">
-          {ordersToProcess > 0 && <AttentionLink href="/orders" count={ordersToProcess} label="orders to process" />}
+          {ordersToProcess > 0 && <AttentionLink href="/supply/sales-orders" count={ordersToProcess} label="orders to approve" />}
           {pendingSubmissions > 0 && (
             <AttentionLink href="/submissions" count={pendingSubmissions} label="submissions to review" />
           )}

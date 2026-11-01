@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { cn } from "@repo/ui/utils";
@@ -12,6 +12,9 @@ export function HeaderSearch({ className }: { className?: string }) {
   const router = useRouter();
   const params = useSearchParams();
   const [value, setValue] = useState(params.get("q") ?? "");
+  // The masthead renders this twice (desktop and phone layouts), so the
+  // label/input pairing needs an id per instance.
+  const inputId = useId();
 
   return (
     <form
@@ -27,11 +30,11 @@ export function HeaderSearch({ className }: { className?: string }) {
       }}
       className={cn("relative", className)}
     >
-      <label htmlFor="site-search" className="sr-only">
+      <label htmlFor={inputId} className="sr-only">
         Search the catalogue
       </label>
       <input
-        id="site-search"
+        id={inputId}
         type="search"
         value={value}
         onChange={(event) => setValue(event.target.value)}

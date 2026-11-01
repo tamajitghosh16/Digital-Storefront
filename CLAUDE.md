@@ -32,10 +32,16 @@ npm run lint                             # turbo lint, both apps
 npm run typecheck                        # turbo typecheck, both apps
 ```
 
-Tests: `npm run test` runs Vitest in `packages/security` and
-`packages/payments` (security helpers and Razorpay signature checks). The
-apps have no tests yet; the Technical Design Document specifies Vitest +
-Playwright for them.
+Tests (full guide: `docs/testing.md`): `npm run test` runs Vitest unit +
+contract tests everywhere. `test:integration` and `test:migrations` need a
+throwaway local Postgres in `TEST_DATABASE_URL` (`npm run db:test:start`).
+`npm run test:e2e` runs each app's Playwright suite (starting or reusing its
+dev server); `test:smoke` / `test:sanity` / `test:security` / `test:a11y` /
+`test:visual` / `test:cross-browser` run subsets; `test:perf` (Lighthouse)
+and `test:load` (autocannon) are storefront-only. Each app keeps its tests in
+its own `testing/` folder, type-checked by `testing/tsconfig.json` and
+excluded from the app's tsconfig so a test can't break `next build`. CI/CD
+workflows are in `.github/workflows` (see the guide).
 
 Database (all proxy into `packages/database`'s Prisma scripts):
 
@@ -62,7 +68,7 @@ either app's Next.js env loading.
 
 **Two standalone apps, one shared data layer.** The monorepo exists only
 to share source code — `packages/database`, `packages/auth`,
-`packages/payments`, `packages/storage`, `packages/email`, `packages/jobs`,
+`packages/payments`, `packages/storage`, `packages/email`,
 `packages/ui`, `packages/config` — between `apps/web` (public storefront +
 customer account area) and `apps/admin` (internal back office, staff-only).
 Each app has its own `package.json`, `next.config.ts`, port, and is meant
@@ -203,24 +209,35 @@ only the Owner can do it; see "Staff access is Owner-granted" in
 UID from the admin auth project, which has no row in the storefront
 `users` table; `actorEmail` is denormalised next to it for legibility.
 
+**An order's printed part has its own status.** `Order.shipmentStatus`
+(null when nothing ships) runs AWAITING_APPROVAL → PROCESSING → SHIPPED →
+OUT_FOR_DELIVERY → DELIVERED, or → CANCELLED, moved by staff from
+`apps/admin`'s Sales Orders page; `Order.status` keeps tracking payment and
+the order as a whole, so a mixed order's parcel can be refused while its
+e-book stays delivered. Steps, labels and the online/offline split live in
+`packages/database/src/shipment.ts` (Client-Component-safe via
+`@repo/database/shipment`), used by both apps. The stock helpers
+(`takeStock`/`returnStock`) live in `packages/database/src/stock.ts` for the
+same reason — checkout takes copies, a denied sales order returns them.
+
 **Payments run through `packages/payments` (Razorpay).** Order status is
 only ever flipped to `PAID` by the signature-verified webhook at
 `apps/web/app/api/webhooks/razorpay/route.ts` — the client-side redirect
 after checkout is never trusted as the source of truth.
 
-**Notifications and background work are event-driven via `packages/jobs`
-(Inngest).** `src/client.ts` defines the full event catalogue; functions in
-`src/functions/*` are served from `apps/web/app/api/inngest/route.ts`. A
-mutation that needs to notify someone or trigger async work should
-`inngest.send()` an event rather than calling email/scan code directly —
-that's what keeps the fan-out logic in one place instead of scattered
-across every Server Action.
+**There is no background-job queue — the project opted out of Inngest.**
+Notifications are sent directly with `packages/email` helpers, inside
+`after()` when the caller shouldn't wait (e.g. COD checkout) and always
+best-effort: an email failure is logged, never thrown, and never retried
+(see `sendOrderConfirmationEmail` in `apps/web/lib/orders.ts`). Anything
+that genuinely needs retries or delays (e.g. expiring abandoned `PENDING`
+orders) needs a Vercel Cron route or a queue chosen at that point.
 
 **File uploads go through `packages/storage` (Vercel Blob)** using a
 staging → malware-scan → promote pattern. The scan itself
-(`packages/jobs/src/functions/malwareScan.ts`) is currently a stub that
-always returns `"CLEAN"` — it needs a real Cloudmersive or ClamAV
-integration before any upload pipeline built on top of it is safe to ship.
+(`scanUpload()` in `packages/storage/src/scan.ts`) calls Cloudmersive and
+fails closed — `PENDING` without `CLOUDMERSIVE_API_KEY` — but nothing calls
+it yet; the caller records the result on `FileAsset` and owns any retry.
 Admin image uploads (book covers, banner art) take a separate,
 deliberately simpler path — `uploadImage()` straight to a public `images/`
 prefix — because they come from a signed-in EDITOR/OWNER and are

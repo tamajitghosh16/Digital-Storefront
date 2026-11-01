@@ -10,3 +10,15 @@ dist/
 prisma/generated/
 coverage/
 .vercel/
+
+# Test output (apps/*/testing)
+test-results/
+playwright-report/
+blob-report/
+# Saved Playwright sign-in sessions: live cookies
+.auth/
+.env.e2e
+.env.test
+# Lighthouse CI scratch + reports
+.lighthouseci/
+apps/web/testing/performance/reports/

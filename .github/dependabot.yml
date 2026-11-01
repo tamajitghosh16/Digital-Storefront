@@ -8,13 +8,19 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    # Major versions are migrations, not routine bumps (e.g. Prisma 7 or
+    # Next 17), so Dependabot doesn't raise them; upgrade those by hand.
+    # This only affects scheduled version updates — security updates for a
+    # major version still come through.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    # Every minor/patch bump lands in one PR, so a weekly run is one Vercel
+    # preview per app instead of one per package.
     groups:
-      next-react:
-        patterns: ["next", "react", "react-dom", "eslint-config-next", "@types/react*"]
-      supabase:
-        patterns: ["@supabase/*"]
-      prisma:
-        patterns: ["prisma", "@prisma/*"]
+      minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

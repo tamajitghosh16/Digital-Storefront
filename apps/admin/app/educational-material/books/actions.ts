@@ -9,6 +9,7 @@ import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
 import { deleteEbookFile, isStoredEbookPdf } from "@repo/storage";
 import { securityEvent } from "@repo/security/log";
 import { productFormSchema, type ProductFormValues } from "./schema";
+import { deleteInventoryProduct, type DeleteProductResult } from "@/lib/delete-product";
 
 /**
  * Reconcile the single `EBOOK_FILE` FileAsset for a product against what the
@@ -253,4 +254,19 @@ export async function toggleProductPublished(id: string) {
 
   revalidateStorefront();
   revalidatePath("/educational-material/books");
+}
+
+// Permanent delete from the Books list's confirm dialog. Returns a message
+// instead of redirecting so the dialog can show why a sold title can't go;
+// on success the revalidated list simply drops the row.
+export async function deleteProduct(id: string): Promise<DeleteProductResult> {
+  const user = await getCurrentStaff();
+  assertRole(user?.role, CATALOGUE_WRITE_ROLES);
+
+  const result = await deleteInventoryProduct(id, "BOOK", user!);
+  if (result.error) return result;
+
+  revalidateStorefront();
+  revalidatePath("/educational-material/books");
+  return {};
 }

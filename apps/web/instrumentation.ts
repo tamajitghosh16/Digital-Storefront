@@ -1,4 +1,4 @@
-import { checkEnvironment, noInngestDevMode, noPublicSecrets } from "@repo/security/env";
+import { checkEnvironment, noPublicSecrets } from "@repo/security/env";
 
 /**
  * Runs once when the server starts. In production, security-critical
@@ -16,7 +16,6 @@ export function register() {
     ],
     invariants: [
       noPublicSecrets,
-      noInngestDevMode,
       () =>
         process.env.RAZORPAY_KEY_ID && !process.env.RAZORPAY_WEBHOOK_SECRET
           ? "RAZORPAY_KEY_ID is set but RAZORPAY_WEBHOOK_SECRET is not — every webhook would be rejected and paid orders would stay PENDING"

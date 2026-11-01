@@ -163,6 +163,7 @@ export function BookPage({
           <div className="mt-6">
             <BookPurchase
               title={product.title}
+              imageUrl={product.coverImageUrl}
               offers={offers}
               tiers={pricing.classSetTiers}
               isSignedIn={isSignedIn}

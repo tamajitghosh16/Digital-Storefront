@@ -8,7 +8,7 @@ import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
 import { categoryFormSchema } from "./schema";
 
-// Create-only for now — no edit/delete yet, see apps/admin/app/menu/products/actions.ts.
+// Create-only for now — no edit/delete yet, see apps/admin/app/menu/sub-category/actions.ts.
 export async function createMenuCategory(formData: FormData) {
   const user = await getCurrentStaff();
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);

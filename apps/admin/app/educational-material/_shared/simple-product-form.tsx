@@ -121,10 +121,12 @@ export function SimpleProductForm({
           />
           <TextField
             label="Copies in stock"
-            help="Leave empty if you aren't counting stock."
+            help="How many you have on hand right now. Enter 0 if none."
             name="stockQty"
             type="number"
             min={0}
+            step={1}
+            required
             defaultValue={product?.stockQty ?? ""}
           />
         </FieldRow>

@@ -111,11 +111,9 @@ number that needs to be right under concurrent writes, not just logged.
 2. **Razorpay webhook flips the order to `PAID`** (`apps/web/app/api/webhooks/razorpay/route.ts`,
    already real). Add: decrement `stockQty` and `committedQty` together —
    the reservation becomes an actual sale.
-3. **Order never gets paid.** Add an Inngest function — same pattern as the
-   existing ones in `packages/jobs/src/functions` — that does
-   `step.sleep("30m")` after order creation, then checks if the order is
-   still `PENDING`; if so, flips it to `CANCELLED` and releases the
-   `committedQty`. This also covers abandoned Razorpay checkouts, which
+3. **Order never gets paid.** Add a Vercel Cron route (every ~15 min) that
+   finds orders still `PENDING` 30+ minutes after creation, flips them to
+   `CANCELLED` and releases the `committedQty`. This also covers abandoned Razorpay checkouts, which
    otherwise commit stock forever.
 
 ### The concurrency problem, and why Prisma's normal API can't guard it
@@ -167,15 +165,11 @@ ledger and the snapshot never disagree.
   `StockMovement` — this is the "history of inventory adjustments" Shopify's
   docs describe, and it's needed the first time someone asks "why does this
   book show 3 copies."
-- **Low-stock notification**: add `"inventory/low_stock"` to the event
-  catalogue in `packages/jobs/src/client.ts` (same shape as
-  `"submission/received"`, which already fans out to staff emails), fire it
-  from the stock-adjustment Server Action and from the payment webhook
-  whenever a movement brings `available` at or below
-  `lowStockThreshold`. A new Inngest function creates `Notification` rows
-  for `EDITOR`/`OWNER` and sends the existing Resend email path — no new
-  infrastructure, just a new event and function following the file already
-  there.
+- **Low-stock notification**: from the stock-adjustment Server Action and
+  the payment webhook, whenever a movement brings `available` at or below
+  `lowStockThreshold`, create `Notification` rows for `EDITOR`/`OWNER` and
+  send the existing Resend email path (best-effort, in `after()`) — no new
+  infrastructure.
 
 ## What this deliberately leaves out
 
@@ -203,10 +197,10 @@ Razorpay → webhook confirms PAID") rather than being a separate phase:
    it needs this atomicity regardless of inventory, since it's also where
    the `Order`/`OrderItem`/`Payment` rows get created together.
 3. Extend the Razorpay webhook route to confirm the reservation on `PAID`.
-4. Add the expiry Inngest function for abandoned `PENDING` orders.
+4. Add the expiry cron route for abandoned `PENDING` orders.
 5. Admin: adjustments form + movement history + low-stock pill on the
    catalogue list.
-6. `inventory/low_stock` event + Inngest notification function.
+6. Low-stock `Notification` rows + email.
 
 Steps 1–4 are the load-bearing part — they're what stops overselling.
 5–6 are what makes stock levels manageable day to day; ship them in the same

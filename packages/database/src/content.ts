@@ -239,6 +239,68 @@ export const CONTENT_GROUPS = [
       },
     ],
   },
+  {
+    id: "policies",
+    title: "Policies and contact page",
+    description:
+      "The business details quoted on the Privacy, Terms, Refund, Shipping and Contact pages (linked from the footer). The site name, email, phone and address come from Site Settings.",
+    entries: [
+      {
+        key: "policies.legalName",
+        label: "Registered business name",
+        help: "The legal name of the business or proprietor, as on your GST or trade registration. Leave empty to use the site name.",
+        defaultValue: "",
+      },
+      {
+        key: "policies.gstin",
+        label: "GSTIN",
+        help: "Shown on the Contact page and in the Terms. Leave empty if you are not GST-registered.",
+        defaultValue: "",
+      },
+      {
+        key: "policies.grievanceOfficer.name",
+        label: "Grievance Officer — name",
+        help: "Indian e-commerce and data-protection rules require a named person customers can complain to.",
+        defaultValue: "",
+      },
+      {
+        key: "policies.grievanceOfficer.email",
+        label: "Grievance Officer — email",
+        help: "Leave empty to use the contact email from Site Settings.",
+        defaultValue: "",
+      },
+      {
+        key: "policies.jurisdiction",
+        label: "Courts with jurisdiction",
+        help: "The city whose courts hear disputes, e.g. “Kolkata, West Bengal”. Leave empty to say “the courts where our registered office is”.",
+        defaultValue: "",
+      },
+      {
+        key: "policies.supportHours",
+        label: "Support hours",
+        help: "Shown on the Contact page.",
+        defaultValue: "Monday to Saturday, 10 am – 6 pm IST (closed on public holidays)",
+      },
+      {
+        key: "policies.returnWindowDays",
+        label: "Return window (days)",
+        help: "How many days after delivery a printed item can be reported damaged, defective or wrong. Use digits only.",
+        defaultValue: "7",
+      },
+      {
+        key: "policies.dispatchTime",
+        label: "Dispatch time",
+        help: "How long it takes to hand an order to the courier, shown on the Shipping page.",
+        defaultValue: "1–2 working days",
+      },
+      {
+        key: "policies.lastUpdated",
+        label: "Policies last updated",
+        help: "The date printed at the top of each policy page. Change it whenever you change a policy.",
+        defaultValue: "27 October 2026",
+      },
+    ],
+  },
 ] as const satisfies readonly ContentGroup[];
 
 /** Every key in the registry, as a union — so a typo in apps/web won't compile. */

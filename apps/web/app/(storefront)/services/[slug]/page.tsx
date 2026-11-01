@@ -139,6 +139,7 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
                   fulfillmentType: "SERVICE",
                   taxType: "SERVICE_PACKAGE",
                   note: `E-book creation service · ${product.turnaroundDays ?? 5}-day turnaround`,
+                  imageUrl: product.coverImageUrl ?? null,
                 }}
               />
               <Link href="/services" className={buttonClass("secondary", "lg", "w-full")}>

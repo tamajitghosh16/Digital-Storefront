@@ -5,6 +5,15 @@ import { createClient } from "@repo/auth/client";
 import { safeNextPath } from "@repo/security/redirect";
 import { buttonClass } from "@/components/primitives";
 import { AuthShell, Field, GoogleButton, SwitchLink, friendlyAuthError } from "@/components/auth/auth-parts";
+import {
+  type FieldErrors,
+  type SignUpValues,
+  NAME_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_RULES,
+  fieldErrors,
+  signUpSchema,
+} from "@/lib/auth-schemas";
 
 // FR-5.1: registration via email or Google (Supabase Auth), shown as
 // "Create an account". Until transactional email (Resend) is connected the
@@ -15,8 +24,6 @@ import { AuthShell, Field, GoogleButton, SwitchLink, friendlyAuthError } from "@
 //
 // name/phone go into user_metadata; sync_user.sql copies `name` into
 // public.users. Phone isn't a column there yet — it lives in metadata only.
-
-const PHONE_PATTERN = /^\+?[0-9][0-9\s-]{6,18}[0-9]$/;
 
 function SignUpForm() {
   const router = useRouter();
@@ -30,26 +37,31 @@ function SignUpForm() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<FieldErrors<SignUpValues>>({});
   const [loading, setLoading] = useState(false);
   const [checkInbox, setCheckInbox] = useState(false);
+
+  // Editing a field clears its message; the rest stay until the next submit.
+  const edit = (field: keyof SignUpValues, set: (value: string) => void) => (value: string) => {
+    set(value);
+    setErrors((prev) => ({ ...prev, [field]: undefined }));
+  };
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
 
-    const trimmedName = name.trim();
-    const trimmedPhone = phone.trim();
-    if (!trimmedName) return setError("Please enter your name.");
-    if (!PHONE_PATTERN.test(trimmedPhone)) return setError("Please enter a valid phone number.");
-    if (password.length < 8) return setError("Choose a password of at least 8 characters.");
-    if (password !== confirmPassword) return setError("The two passwords don't match.");
+    const parsed = signUpSchema.safeParse({ name, email, phone, password, confirmPassword });
+    if (!parsed.success) return setErrors(fieldErrors(parsed.error));
+    setErrors({});
+    const values = parsed.data;
 
     setLoading(true);
     const supabase = createClient();
     const { data, error: authError } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: { data: { name: trimmedName, phone: trimmedPhone } },
+      email: values.email,
+      password: values.password,
+      options: { data: { name: values.name, phone: values.phone } },
     });
     setLoading(false);
 
@@ -85,45 +97,61 @@ function SignUpForm() {
         </p>
       ) : (
         <>
-          <form onSubmit={handleSubmit} className="grid gap-4">
-            <Field id="name" label="Name" type="text" value={name} onChange={setName} autoComplete="name" maxLength={100} />
+          <form onSubmit={handleSubmit} noValidate className="grid gap-4">
+            <Field
+              id="name"
+              label="Name"
+              type="text"
+              value={name}
+              onChange={edit("name", setName)}
+              autoComplete="name"
+              maxLength={NAME_MAX_LENGTH}
+              error={errors.name}
+            />
             <Field
               id="email"
               label="Email"
               type="email"
               value={email}
-              onChange={setEmail}
+              onChange={edit("email", setEmail)}
               placeholder="you@example.com"
               autoComplete="email"
+              error={errors.email}
             />
             <Field
               id="phone"
               label="Phone"
               type="tel"
               value={phone}
-              onChange={setPhone}
+              onChange={edit("phone", setPhone)}
               placeholder="+91 98765 43210"
               autoComplete="tel"
               maxLength={20}
+              error={errors.phone}
             />
             <Field
               id="password"
               label="Create a password"
               type="password"
               value={password}
-              onChange={setPassword}
-              placeholder="At least 8 characters"
+              onChange={edit("password", setPassword)}
+              placeholder={`At least ${PASSWORD_MIN_LENGTH} characters`}
               autoComplete="new-password"
-              minLength={8}
+              minLength={PASSWORD_MIN_LENGTH}
+              error={errors.password}
             />
+            {/* No maxLength on the inputs: the browser would silently cut a
+                longer pasted password, so the 16-character rule is shown here. */}
+            <PasswordChecklist password={password} />
             <Field
               id="confirm-password"
               label="Confirm password"
               type="password"
               value={confirmPassword}
-              onChange={setConfirmPassword}
+              onChange={edit("confirmPassword", setConfirmPassword)}
               autoComplete="new-password"
-              minLength={8}
+              minLength={PASSWORD_MIN_LENGTH}
+              error={errors.confirmPassword}
             />
             {error && <p className="text-sm font-bold text-sale">{error}</p>}
             <button type="submit" disabled={loading} className={buttonClass("primary", "lg", "w-full")}>
@@ -134,6 +162,26 @@ function SignUpForm() {
         </>
       )}
     </AuthShell>
+  );
+}
+
+/** Ticks each PASSWORD_RULES entry off as the customer types. */
+function PasswordChecklist({ password }: { password: string }) {
+  return (
+    <ul aria-label="Password requirements" className="-mt-2 grid gap-1 text-sm sm:grid-cols-2">
+      {PASSWORD_RULES.map((rule) => {
+        const met = rule.test(password);
+        return (
+          <li key={rule.label} className={`flex gap-2 ${met ? "text-ok" : "text-ink-muted"}`}>
+            <span aria-hidden className="w-3 font-bold">
+              {met ? "✓" : "•"}
+            </span>
+            {rule.label}
+            <span className="sr-only">{met ? " (done)" : " (not yet)"}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

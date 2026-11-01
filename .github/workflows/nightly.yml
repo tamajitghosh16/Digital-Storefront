@@ -1,0 +1,59 @@
+# The slow suites, nightly and on demand (docs/testing.md): every browser
+# engine and device profile. Same staging secrets as ci.yml; skips without them.
+name: nightly
+
+on:
+  schedule:
+    - cron: "30 21 * * *" # 03:00 IST
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-browser:
+    name: Cross-browser (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: web
+            env_secret: WEB_ENV_FILE
+          - app: admin
+            env_secret: ADMIN_ENV_FILE
+    steps:
+      - name: Check for staging secrets
+        id: env
+        env:
+          ENV_FILE: ${{ secrets[matrix.env_secret] }}
+        run: |
+          if [ -z "$ENV_FILE" ]; then
+            echo "::notice::No ${{ matrix.env_secret }} secret — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.env.outputs.skip != 'true'
+      - uses: actions/setup-node@v4
+        if: steps.env.outputs.skip != 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+        if: steps.env.outputs.skip != 'true'
+      - run: npx playwright install --with-deps chromium firefox webkit
+        if: steps.env.outputs.skip != 'true'
+      - name: Write the app's staging environment
+        if: steps.env.outputs.skip != 'true'
+        env:
+          ENV_FILE: ${{ secrets[matrix.env_secret] }}
+        run: printf '%s\n' "$ENV_FILE" > apps/${{ matrix.app }}/.env.local
+      - run: npm run test:cross-browser --workspace=${{ matrix.app }}
+        if: steps.env.outputs.skip != 'true'
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.env.outputs.skip != 'true'
+        with:
+          name: cross-browser-report-${{ matrix.app }}
+          path: apps/${{ matrix.app }}/testing/playwright-report/cross-browser
+          retention-days: 14

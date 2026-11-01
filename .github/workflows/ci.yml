@@ -1,0 +1,173 @@
+# Tests on every push and pull request (docs/testing.md). Typecheck, lint,
+# unit + contract tests, npm audit, secret scanning and CodeQL run in
+# security.yml; this workflow adds everything that needs a database or a
+# running app.
+#
+# Secrets (Settings → Secrets and variables → Actions). Without them the E2E
+# job reports a notice and skips instead of failing, so forks and fresh
+# clones stay green:
+#   WEB_ENV_FILE / ADMIN_ENV_FILE   full contents of a .env.local for each app,
+#                                   pointing at STAGING (staging Supabase,
+#                                   Razorpay test keys) — never production
+#   E2E_CUSTOMER_EMAIL / _PASSWORD  optional test customer (storefront project)
+#   E2E_STAFF_EMAIL / _PASSWORD     optional SUPPORT-role test staff account
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migrations:
+    name: Database migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Supabase runs Postgres 17.
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: storefront_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/storefront_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      # A migration that has run anywhere is history: editing it changes what
+      # new environments get without touching existing ones. Fix forward
+      # with a new migration instead.
+      - name: Applied migrations are never edited
+        if: github.event_name == 'pull_request'
+        run: |
+          base="origin/${{ github.base_ref }}"
+          edited=$(git diff --name-only --diff-filter=MDR "$base...HEAD" -- packages/database/prisma/migrations | grep '/migration.sql$' || true)
+          if [ -n "$edited" ]; then
+            echo "::error::These migrations already exist on ${{ github.base_ref }} and must not change:"
+            echo "$edited"
+            exit 1
+          fi
+
+      # Prisma applies migrations in name order; one that sorts before the
+      # newest on the base branch would be skipped by deployed databases.
+      - name: New migrations sort after existing ones
+        if: github.event_name == 'pull_request'
+        run: |
+          base="origin/${{ github.base_ref }}"
+          latest=$(git ls-tree --name-only "$base" packages/database/prisma/migrations/ | xargs -n1 basename | grep -E '^[0-9]{14}_' | sort | tail -1)
+          for dir in $(git diff --name-only --diff-filter=A "$base...HEAD" -- packages/database/prisma/migrations | cut -d/ -f5 | sort -u); do
+            if [[ "$dir" < "$latest" || "$dir" == "$latest" ]]; then
+              echo "::error::$dir must sort after $latest — regenerate it with a newer timestamp."
+              exit 1
+            fi
+          done
+
+      - run: npx prisma validate
+        working-directory: packages/database
+      - run: npm run test:migrations
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: storefront_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/storefront_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:integration
+
+  e2e:
+    name: E2E (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: web
+            env_secret: WEB_ENV_FILE
+          - app: admin
+            env_secret: ADMIN_ENV_FILE
+    steps:
+      - name: Check for staging secrets
+        id: env
+        env:
+          ENV_FILE: ${{ secrets[matrix.env_secret] }}
+        run: |
+          if [ -z "$ENV_FILE" ]; then
+            echo "::notice::No ${{ matrix.env_secret }} secret — skipping E2E for ${{ matrix.app }}. See docs/testing.md."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.env.outputs.skip != 'true'
+      - uses: actions/setup-node@v4
+        if: steps.env.outputs.skip != 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+        if: steps.env.outputs.skip != 'true'
+      - run: npx playwright install --with-deps chromium
+        if: steps.env.outputs.skip != 'true'
+      - name: Write the app's staging environment
+        if: steps.env.outputs.skip != 'true'
+        env:
+          ENV_FILE: ${{ secrets[matrix.env_secret] }}
+        run: printf '%s\n' "$ENV_FILE" > apps/${{ matrix.app }}/.env.local
+      # Builds and serves the production app (CI=true), then runs every
+      # project: desktop (+ mobile for web), visual, and signed-in if the
+      # test-account secrets are set.
+      - run: npm run test:e2e --workspace=${{ matrix.app }}
+        if: steps.env.outputs.skip != 'true'
+        env:
+          E2E_CUSTOMER_EMAIL: ${{ secrets.E2E_CUSTOMER_EMAIL }}
+          E2E_CUSTOMER_PASSWORD: ${{ secrets.E2E_CUSTOMER_PASSWORD }}
+          E2E_STAFF_EMAIL: ${{ secrets.E2E_STAFF_EMAIL }}
+          E2E_STAFF_PASSWORD: ${{ secrets.E2E_STAFF_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.env.outputs.skip != 'true'
+        with:
+          name: playwright-report-${{ matrix.app }}
+          path: apps/${{ matrix.app }}/testing/playwright-report
+          retention-days: 14
+      # The first Linux run records the visual baselines instead of comparing.
+      # Download this artifact and commit it under
+      # apps/<app>/testing/e2e/__screenshots__/linux/ to start comparing.
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.env.outputs.skip != 'true'
+        with:
+          name: visual-baselines-linux-${{ matrix.app }}
+          path: apps/${{ matrix.app }}/testing/e2e/__screenshots__/linux
+          if-no-files-found: ignore
+          retention-days: 14

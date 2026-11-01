@@ -78,6 +78,20 @@ enum OrderStatus {
   REFUNDED
 }
 
+/// Where the printed (shipped) part of an order is, from staff approval to
+/// the customer's door. Only orders with at least one SHIP line have one —
+/// see `Order.shipmentStatus`. Staff move it one step at a time from
+/// apps/admin's Sales Orders page; the order of the steps and their labels
+/// live in packages/database/src/shipment.ts.
+enum ShipmentStatus {
+  AWAITING_APPROVAL
+  PROCESSING
+  SHIPPED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
 enum FulfillmentType {
   SHIP
   DIGITAL
@@ -177,8 +191,24 @@ model User {
   notifications     Notification[]
   wishlists         Wishlist[]
   libraryDownloads  LibraryDownload[]
+  cart              Cart?
 
   @@map("users")
+}
+
+/// A signed-in customer's cart, so it follows the account to every browser and
+/// device it signs in on. One row per user; `items` is the storefront's
+/// `CartItem[]` (apps/web/lib/cart-store.ts) as last saved, replaced wholesale
+/// on every change. Display state only — checkout re-prices and re-checks
+/// stock for every line itself, so nothing here is trusted for a charge.
+/// A guest's cart stays in their browser until they sign in.
+model Cart {
+  userId    String   @id @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     Json     @default("[]")
+  updatedAt DateTime @updatedAt
+
+  @@map("carts")
 }
 
 /// A customer's saved-for-later titles (FR-2.x). One row per (user, product);
@@ -339,6 +369,14 @@ model Order {
   user           User?       @relation(fields: [userId], references: [id])
   guestEmail     String?
   status         OrderStatus @default(PENDING)
+  /// The printed part's progress, separate from `status` so a mixed order
+  /// can have its parcel refused (CANCELLED) while its e-book stays
+  /// delivered. Set to AWAITING_APPROVAL when an order with a SHIP line is
+  /// placed — paid online (`settleOrderPayment`) or ordered cash on delivery
+  /// — and null before then and on orders with nothing to ship. `status`
+  /// keeps tracking payment and the order as a whole: it only turns
+  /// CANCELLED here when staff refuse an order that has no online part.
+  shipmentStatus ShipmentStatus?
 
   subtotalCents  Int
   taxCents       Int         @default(0)
@@ -376,6 +414,7 @@ model Order {
 
   @@index([userId])
   @@index([status])
+  @@index([shipmentStatus])
   @@index([discountCodeId])
   @@map("orders")
 }
@@ -560,8 +599,8 @@ model LibraryDownload {
   @@map("library_downloads")
 }
 
-/// FR-12: order/shipping/project-status/submission notifications, fanned out
-/// to email (Resend) by an Inngest function; this row is the in-app record.
+/// FR-12: order/shipping/project-status/submission notifications, also sent
+/// by email (Resend); this row is the in-app record.
 model Notification {
   id        String   @id @default(cuid())
   userId    String   @db.Uuid

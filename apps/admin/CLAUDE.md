@@ -41,7 +41,14 @@ npm run dev          # next dev --turbopack, port 3001
 npm run build
 npm run lint
 npm run typecheck
+npm run test               # Vitest: unit + contract tests
+npm run test:integration   # Vitest against TEST_DATABASE_URL (local Postgres)
+npm run test:e2e           # Playwright: everything in testing/e2e
+npm run test:smoke         # or test:sanity, test:security, test:a11y, test:visual, test:cross-browser
 ```
+
+Tests live in `testing/`; see `docs/testing.md` for every kind, the test
+database, test accounts and CI.
 
 ## Architecture
 
@@ -138,7 +145,9 @@ on conflict, so a later `auth.users` sync won't clobber it.
 (product/inventory CMS — despite the path, this manages every product type,
 not just books; see "The catalogue CMS lives under Books" below — with
 an "Add new book" modal on the list page and an
-`educational-material/books/[id]` edit form), `orders`, `submissions` (self-publishing +
+`educational-material/books/[id]` edit form), `supply/sales-orders` (see
+"Sales orders are approved here" below; `orders` now just redirects there),
+`supply/purchase-orders` + `supply/vendors`, `submissions` (self-publishing +
 service-request queues in one view), `royalties`, `reviews` (moderation
 queue), `analytics`, `settings/roles`, the three sibling
 Educational-Materials inventory CMSs
@@ -206,7 +215,7 @@ CMS-only ones, delete) Server Actions — each validates with Zod, calls
 `AuditLog` row, and `revalidatePath()`s its own list page. `apps/web` caches
 the CMS data it renders on every page (`apps/web/lib/cms.ts`), which this
 app's `revalidatePath()` can't reach, so every CMS action (site, navigation,
-pricing, homepage, banners, FAQs, testimonials, Products Menu) also calls
+pricing, homepage, banners, FAQs, testimonials, Menu categories/sub-categories) also calls
 `revalidateStorefront()` (`lib/storefront-cache.ts`) before redirecting: it
 POSTs to the storefront's `/api/revalidate` with the shared
 `STOREFRONT_REVALIDATE_SECRET`, from `after()` so a slow or down storefront
@@ -253,7 +262,9 @@ and receiving adds to that edition's stock.
 
 **E-book PDF upload (`components/pdf-field.tsx` + `app/api/uploads/ebook`).**
 The catalogue form's "Upload .pdf file" field renders only when "E-book" is
-ticked. The PDF never passes through the app server: `api/uploads/ebook`
+ticked, and is then required (`productFormSchema` refuses an e-book with no
+`ebookFilePath`; the field blocks submit client-side too). Copies in stock
+are likewise required for every printed format and every simple-line item. The PDF never passes through the app server: `api/uploads/ebook`
 checks the caller's role and returns a one-time signed URL from
 `createEbookUploadUrl()` (`@repo/storage`), and the browser `PUT`s the file
 straight to a **private** `ebooks` Supabase Storage bucket — so there's no
@@ -286,7 +297,25 @@ without `CLOUDMERSIVE_API_KEY`). Needs `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SE
 (both already required by this app); `isImageUploadConfigured()` gates the
 route so a missing config falls back to "paste a URL" instead of throwing.
 
-**Still read-only stubs:** `orders`, `submissions`, `royalties`, `reviews`,
+**Sales orders are approved here.** `supply/sales-orders` lists every
+placed order (paid online, or cash on delivery — an unpaid checkout isn't
+listed) with its delivery type: Online (e-books, services — shown
+"Complete" as soon as it's paid), Offline (printed items) or both. The
+printed part has its own `Order.shipmentStatus`, separate from
+`Order.status`: it starts `AWAITING_APPROVAL` and staff move it with
+`moveSalesOrder` (`ORDER_WRITE_ROLES`, so Support can too) — Accept →
+Processing → Shipping → Out for delivery → Delivered, or Deny → Cancelled.
+Each move is a conditional update on the status the operator saw, so a
+double click can't skip a step. Deny returns the printed copies to stock
+(`returnStock` from `@repo/database`) and cancels the whole order only if
+nothing in it was delivered online; a mixed order keeps its e-book and
+reads "Partially complete" until its parcel is delivered. There's no refund
+integration: a denied online-paid order shows a "refund it from Razorpay"
+note in its detail pop-up. The step order and labels live in
+`packages/database/src/shipment.ts`, shared with the storefront's order
+tracking.
+
+**Still read-only stubs:** `submissions`, `royalties`, `reviews`,
 `analytics` — these still do a direct read-only Prisma query with no
 create/update forms or status-change actions wired up yet (see the root
 README's "What's real vs. what's a stub" list). `settings/roles` is now

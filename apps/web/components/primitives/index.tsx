@@ -187,10 +187,19 @@ export function CheckList({ items, className }: { items: React.ReactNode[]; clas
   );
 }
 
-/** Horizontally scrollable table — never lets a wide table scroll the page. */
+/**
+ * Horizontally scrollable table — never lets a wide table scroll the page.
+ * Focusable, so keyboard users can scroll it with the arrow keys too.
+ */
 export function TableWrap({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("overflow-x-auto rounded-tile bg-tile inset-ring inset-ring-card-edge", className)}>
+    <div
+      tabIndex={0}
+      className={cn(
+        "overflow-x-auto rounded-tile bg-tile inset-ring inset-ring-card-edge focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+        className
+      )}
+    >
       {children}
     </div>
   );

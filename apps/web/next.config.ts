@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
     "@repo/database",
     "@repo/payments",
     "@repo/storage",
-    "@repo/jobs",
+    "@repo/email",
     "@repo/security",
   ],
   // Don't advertise the framework.

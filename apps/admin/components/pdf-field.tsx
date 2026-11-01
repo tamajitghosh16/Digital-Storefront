@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@repo/ui/utils";
 
 /**
@@ -18,16 +18,27 @@ export function PdfField({
   label,
   help,
   defaultValue,
+  required,
 }: {
   name: string;
   label: string;
   help?: string;
   defaultValue?: { path: string; fileName: string; sizeBytes: number } | null;
+  /** Block the form's submit, with the browser's own message, until a PDF is stored. */
+  required?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const requiredRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(defaultValue ?? null);
   const [status, setStatus] = useState<"idle" | "uploading">("idle");
   const [error, setError] = useState<string | null>(null);
+
+  // Hidden inputs are skipped by browser validation, so `required` is
+  // carried by an invisible text input mirroring the stored path; this
+  // swaps its generic "fill in this field" bubble for plain wording.
+  useEffect(() => {
+    requiredRef.current?.setCustomValidity(value ? "" : "Please upload the PDF file.");
+  }, [value]);
 
   async function upload(file: File) {
     if (file.type !== "application/pdf" && !/\.pdf$/i.test(file.name)) {
@@ -78,7 +89,14 @@ export function PdfField({
 
   return (
     <div>
-      <span className="block text-sm font-semibold text-ink">{label}</span>
+      <span className="block text-sm font-semibold text-ink">
+        {label}
+        {required && (
+          <span className="ml-1 text-sale" aria-hidden>
+            *
+          </span>
+        )}
+      </span>
       {help && <p className="mt-0.5 text-[13px] leading-snug text-ink-muted">{help}</p>}
 
       {/* What the form actually posts. */}
@@ -86,7 +104,18 @@ export function PdfField({
       <input type="hidden" name={`${name}Name`} value={value?.fileName ?? ""} />
       <input type="hidden" name={`${name}Size`} value={value?.sizeBytes ?? ""} />
 
-      <div className="mt-2 rounded-btn border border-dashed border-line-strong bg-tile-3 p-4">
+      <div className="relative mt-2 rounded-btn border border-dashed border-line-strong bg-tile-3 p-4">
+        {required && (
+          <input
+            ref={requiredRef}
+            aria-hidden
+            tabIndex={-1}
+            required
+            value={value?.path ?? ""}
+            onChange={() => {}}
+            className="pointer-events-none absolute bottom-0 left-1/2 h-px w-px opacity-0"
+          />
+        )}
         {value ? (
           <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-2 rounded-btn border border-line bg-ground px-3 py-1.5 text-sm font-semibold text-ink">

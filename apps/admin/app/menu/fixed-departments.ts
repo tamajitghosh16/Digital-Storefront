@@ -10,8 +10,8 @@
  * the fixed half — keep the two in sync if either changes.
  *
  * Consumed by `components/sidebar-nav.tsx` (the Inventory group) and by
- * `app/menu/{categories,products}/page.tsx`, which list every category and
- * product on the storefront menu — these built-in ones plus the live rows.
+ * `app/menu/{categories,sub-category}/page.tsx`, which list every category and
+ * sub-category on the storefront menu — these built-in ones plus the live rows.
  *
  * Pure data, no Prisma or server imports, so a Client Component can pull it
  * in directly.

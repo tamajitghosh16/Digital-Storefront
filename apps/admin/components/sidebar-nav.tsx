@@ -21,7 +21,7 @@ import { FIXED_DEPARTMENTS } from "@/app/menu/fixed-departments";
  * from two merged sources: five fixed business-line departments with real
  * pages already built, and the admin-managed `MenuCategory`/`MenuProduct`
  * rows. The fixed half is `FIXED_DEPARTMENTS` in `app/menu/fixed-departments.ts`,
- * shared with the `/menu/categories` and `/menu/products` listings.
+ * shared with the `/menu/categories` and `/menu/sub-category` listings.
  */
 
 interface NavItem {
@@ -74,15 +74,16 @@ const NAV_GROUPS_BEFORE_INVENTORY: NavGroup[] = [
     heading: "Menu",
     items: [
       { href: "/menu/categories", label: "Category" },
-      { href: "/menu/products", label: "Product" },
+      { href: "/menu/sub-category", label: "Sub-Category" },
     ],
   },
 ];
 
 const NAV_GROUPS_AFTER_INVENTORY: NavGroup[] = [
   {
-    heading: "Supply",
+    heading: "Supply and Sales",
     items: [
+      { href: "/supply/sales-orders", label: "Sales Orders" },
       { href: "/supply/purchase-orders", label: "Purchase Orders" },
       { href: "/supply/vendors", label: "All Vendors" },
     ],

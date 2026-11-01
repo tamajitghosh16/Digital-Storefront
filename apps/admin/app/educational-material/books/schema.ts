@@ -46,7 +46,8 @@ export const productFormSchema = z
     paperbackPrice: optionalPrice(),
     hardcoverPrice: optionalPrice(),
     ebookPrice: optionalPrice(),
-    // Printed copies on hand, per printed format. Empty = not tracked.
+    // Printed copies on hand, per printed format — required for each printed
+    // format that's ticked (see the refinements below). E-books carry none.
     paperbackStock: optionalInt(),
     hardcoverStock: optionalInt(),
     coverImageUrl: optional(httpsUrl()),
@@ -86,6 +87,20 @@ export const productFormSchema = z
   .refine((data) => data.isService || !data.formatEbook || data.ebookPrice !== undefined, {
     message: "Enter a price for the e-book",
     path: ["ebookPrice"],
+  })
+  .refine((data) => data.isService || !data.formatPaperback || data.paperbackStock !== undefined, {
+    message: "Enter the copies in stock for the paperback",
+    path: ["paperbackStock"],
+  })
+  .refine((data) => data.isService || !data.formatHardcover || data.hardcoverStock !== undefined, {
+    message: "Enter the copies in stock for the hardcover",
+    path: ["hardcoverStock"],
+  })
+  // The PDF is what the buyer actually receives, so an e-book can't be
+  // listed without one. PdfField uploads it before submit and posts its path.
+  .refine((data) => data.isService || !data.formatEbook || Boolean(data.ebookFilePath?.trim()), {
+    message: "Upload the e-book's PDF file",
+    path: ["ebookFilePath"],
   })
   .refine((data) => (data.paperbackStock ?? 0) >= 0 && (data.hardcoverStock ?? 0) >= 0, {
     message: "Stock can't be negative",

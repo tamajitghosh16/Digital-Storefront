@@ -32,7 +32,9 @@ export async function SiteHeader() {
     <header>
       <PromoBar pricing={pricing} />
 
-      <Wrap className="flex items-center gap-4 py-4 lg:gap-7">
+      {/* Tighter spacing and a smaller logo on the narrowest phones (320–359px),
+          where the full-size masthead would scroll sideways. */}
+      <Wrap className="flex items-center gap-2 py-4 min-[360px]:gap-4 lg:gap-7">
         <MobileNav departments={departments} signedIn={!!user} />
 
         <Link href="/" className="flex shrink-0 items-center" aria-label={settings.siteName}>
@@ -40,13 +42,13 @@ export async function SiteHeader() {
           <img
             src="/logo.svg"
             alt={settings.siteName}
-            className="h-auto w-[168px] object-contain dark:hidden min-[600px]:w-[216px] lg:w-[248px]"
+            className="h-auto w-[120px] object-contain dark:hidden min-[360px]:w-[168px] min-[600px]:w-[216px] lg:w-[248px]"
           />
           {/* eslint-disable-next-line @next/next/no-img-element -- static vector logo, no benefit from next/image optimization */}
           <img
             src="/logo-dark.svg"
             alt={settings.siteName}
-            className="hidden h-auto w-[168px] object-contain dark:block min-[600px]:w-[216px] lg:w-[248px]"
+            className="hidden h-auto w-[120px] object-contain dark:block min-[360px]:w-[168px] min-[600px]:w-[216px] lg:w-[248px]"
           />
         </Link>
 

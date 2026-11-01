@@ -1,0 +1,49 @@
+# Database deployment (docs/production-launch.md: "Apply pending migrations
+# to production before promoting code"). Manual, per environment:
+# Actions → db-migrate → Run workflow → staging | production.
+#
+# Set up once (Settings → Environments):
+#   - environments `staging` and `production`, each with a DIRECT_URL secret
+#     (the non-pooled Postgres URL, port 5432)
+#   - `production`: Required reviewers, so a migration needs a second click
+name: db-migrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which database to migrate
+        type: choice
+        options: [staging, production]
+        default: staging
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-migrate-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Migrate ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Pending migrations
+        run: npx prisma migrate status || true
+        working-directory: packages/database
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+      # `deploy`, never `dev`: it only applies committed migrations and never
+      # resets data.
+      - run: npx prisma migrate deploy
+        working-directory: packages/database
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}

@@ -44,6 +44,7 @@ const MAX_QTY = 99;
 export function BuyBox({
   productId,
   title,
+  imageUrl,
   author,
   genre,
   rating,
@@ -57,6 +58,8 @@ export function BuyBox({
 }: {
   productId: string;
   title: string;
+  /** The front-cover scan, carried onto the cart line so the cart shows it. */
+  imageUrl?: string | null;
   author: string;
   genre?: string;
   rating?: number;
@@ -135,6 +138,7 @@ export function BuyBox({
       fulfillmentType: editionKind === "ebook" ? "DIGITAL" : "SHIP",
       taxType: editionKind === "ebook" ? "EBOOK" : "PHYSICAL_BOOK",
       stockQty: physicalSelected ? (stockQty ?? null) : null,
+      imageUrl: imageUrl ?? null,
     };
   }
 

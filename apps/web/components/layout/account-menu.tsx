@@ -21,6 +21,8 @@ import {
   DropdownMenuTrigger,
 } from "@repo/ui/dropdown-menu";
 import { createClient } from "@repo/auth/client";
+import { useCartStore } from "@/lib/cart-store";
+import { useCheckoutStore } from "@/lib/checkout-store";
 import { ICON_BUTTON_CLASS, ICON_LABEL_CLASS } from "./icon-button";
 
 export interface AccountMenuUser {
@@ -50,6 +52,10 @@ export function AccountMenu({ user }: { user: AccountMenuUser | null }) {
     startTransition(async () => {
       const supabase = createClient();
       await supabase.auth.signOut();
+      // The account's cart and delivery details stay with the account, not
+      // this browser (CartSync does the same on the refresh; this is just sooner).
+      useCartStore.getState().replace([], null);
+      useCheckoutStore.getState().clear();
       setOpen(false);
       router.refresh();
       router.push("/");

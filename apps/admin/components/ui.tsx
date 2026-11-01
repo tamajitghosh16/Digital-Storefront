@@ -237,8 +237,8 @@ export function CheckboxField({
 export function ErrorBanner({ message }: { message?: string }) {
   if (!message) return null;
   return (
-    <div role="alert" className="flex items-start gap-3 rounded-btn bg-ink px-4 py-3.5 text-sm font-semibold text-white">
-      <span aria-hidden className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full bg-white text-[10px] font-bold text-ink">
+    <div role="alert" className="flex items-start gap-3 rounded-btn bg-ink px-4 py-3.5 text-sm font-semibold text-ground">
+      <span aria-hidden className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full bg-ground text-[10px] font-bold text-ink">
         !
       </span>
       {message}
@@ -251,7 +251,7 @@ export function SavedBanner({ message }: { message?: string }) {
   if (!message) return null;
   return (
     <div role="status" className="flex items-start gap-3 rounded-btn border border-line-strong bg-ground px-4 py-3.5 text-sm font-semibold text-ink">
-      <span aria-hidden className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full bg-ink text-[10px] font-bold text-white">
+      <span aria-hidden className="mt-px grid h-4 w-4 shrink-0 place-items-center rounded-full bg-ink text-[10px] font-bold text-ground">
         ✓
       </span>
       {message}
@@ -330,6 +330,57 @@ export function Table({ head, children }: { head: React.ReactNode; children: Rea
 }
 
 /**
+ * A table whose columns sit the same distance apart at every screen width —
+ * used by the inventory lists. A plain <table> hands spare width to
+ * whichever columns it likes, so the gaps came out uneven. Here each column
+ * is an `auto` grid track that hugs its content, and `justify-between`
+ * shares the spare width out equally between them. Each row is a subgrid
+ * spanning every track, so its divider still runs edge to edge. Below the
+ * table's natural width (`min-w-max`) the gaps bottom out at `gap-x-6` and
+ * the box scrolls sideways rather than squeezing a column. The box is
+ * `relative` so the `sr-only` (absolutely positioned) header labels are
+ * clipped by it instead of widening the whole page on a phone.
+ *
+ * `head` and each child row are arrays of cells, one per column; a column
+ * with no visible heading passes its label as `{ srOnly: "…" }`.
+ */
+export function EvenTable({
+  head,
+  rows,
+}: {
+  head: (React.ReactNode | { srOnly: string })[];
+  rows: { key: string; cells: React.ReactNode[] }[];
+}) {
+  const row = "col-span-full grid grid-cols-subgrid items-center px-4 py-3";
+  return (
+    <div className="relative overflow-x-auto rounded-tile border border-line-strong bg-ground">
+      <div
+        role="table"
+        className="grid w-full min-w-max justify-between gap-x-6 text-sm"
+        style={{ gridTemplateColumns: `repeat(${head.length}, auto)` }}
+      >
+        <div role="row" className={cn(row, "border-b border-line-strong text-left text-xs font-medium text-ink-muted")}>
+          {head.map((cell, i) => (
+            <div key={i} role="columnheader">
+              {cell && typeof cell === "object" && "srOnly" in cell ? <span className="sr-only">{cell.srOnly}</span> : cell}
+            </div>
+          ))}
+        </div>
+        {rows.map(({ key, cells }) => (
+          <div key={key} role="row" className={cn(row, "[&:not(:last-child)]:border-b [&:not(:last-child)]:border-line")}>
+            {cells.map((cell, i) => (
+              <div key={i} role="cell">
+                {cell}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Status reads as a stamp, not a colour: filled ink for "live", a hairline
  * outline for "off", a dashed outline for "in progress". Three tones, three
  * shapes — legible without a single hue in the system.
@@ -339,7 +390,7 @@ export function Pill({ tone, children }: { tone: "on" | "off" | "info"; children
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide",
-        tone === "on" && "bg-ink text-white",
+        tone === "on" && "bg-ink text-ground",
         tone === "off" && "border border-line-strong text-ink-muted",
         tone === "info" && "border border-dashed border-line-strong text-ink"
       )}

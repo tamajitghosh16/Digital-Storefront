@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Callout, TABLE_CLASS, TD_CLASS, TH_CLASS, TableWrap, buttonClass } from "@/components/primitives";
 import { formatINRWhole } from "@/lib/format";
-import { ORDER_STATUS, formatOrderDate, type OrderDetail } from "@/lib/order-tracking";
+import { formatOrderDate, orderStatusBadge, type OrderDetail } from "@/lib/order-tracking";
 import { OrderDetailDialog } from "./order-detail-dialog";
 
 /**
@@ -64,7 +64,7 @@ export function OrdersTable({
           </thead>
           <tbody>
             {orders.map((order) => {
-              const status = ORDER_STATUS[order.status];
+              const status = orderStatusBadge(order);
               const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
               return (
                 <tr

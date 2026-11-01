@@ -8,9 +8,10 @@ import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, CATALOGUE_WRITE_ROLES } from "@repo/auth/roles";
 import { getProductLineConfig, lineBasePath } from "./product-line-config";
 import { simpleProductFormSchema, type SimpleProductFormValues } from "./schema";
+import { deleteInventoryProduct, type DeleteProductResult } from "@/lib/delete-product";
 
 /**
- * Create / edit / hide-show Server Actions for the three simpler
+ * Create / edit / hide-show / delete Server Actions for the three simpler
  * Educational Materials lines. The mirror of `../books/actions.ts`, minus
  * everything book- and service-specific.
  *
@@ -43,7 +44,7 @@ function toProductData(slug: string, raw: SimpleProductFormValues) {
     genre: null,
     priceCents: Math.round(raw.price * 100),
     coverImageUrl: raw.coverImageUrl ?? null,
-    stockQty: raw.stockQty ?? null,
+    stockQty: raw.stockQty,
     isbn: raw.code ?? null,
     weightGrams: raw.weightGrams ?? null,
     formats: [],
@@ -148,4 +149,17 @@ export async function toggleLineProductPublished(slug: string, id: string) {
 
   revalidateStorefront();
   revalidatePath(lineBasePath(slug));
+}
+
+// Permanent delete from a line's list — see `deleteProduct` in ../books/actions.ts.
+export async function deleteLineProduct(slug: string, id: string): Promise<DeleteProductResult> {
+  const user = await getCurrentStaff();
+  assertRole(user?.role, CATALOGUE_WRITE_ROLES);
+
+  const result = await deleteInventoryProduct(id, getProductLineConfig(slug).productLine, user!);
+  if (result.error) return result;
+
+  revalidateStorefront();
+  revalidatePath(lineBasePath(slug));
+  return {};
 }

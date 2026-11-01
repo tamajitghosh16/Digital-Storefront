@@ -24,4 +24,10 @@ export const RESERVED_SLUGS = [
   "bulk-publishing",
   "indoor-plants",
   "api",
+  // apps/web's policy pages (POLICY_PAGES in its lib/navigation.ts).
+  "privacy-policy",
+  "terms",
+  "refund-policy",
+  "shipping-policy",
+  "contact",
 ];

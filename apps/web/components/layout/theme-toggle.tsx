@@ -26,7 +26,9 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      // Starts with the visible "Theme" so voice-control users can say what
+      // they see (WCAG 2.5.3, label in name).
+      aria-label={isDark ? "Theme: switch to light mode" : "Theme: switch to dark mode"}
       className={ICON_BUTTON_CLASS}
     >
       <span className="text-lg leading-none">

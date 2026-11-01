@@ -22,6 +22,9 @@ export const CATALOGUE_WRITE_ROLES: Role[] = [ROLES.EDITOR, ROLES.OWNER];
 /** Roles that may edit site-wide CMS content: site settings, navigation, homepage banners, FAQs, testimonials. */
 export const CONTENT_WRITE_ROLES: Role[] = [ROLES.EDITOR, ROLES.OWNER];
 
+/** Roles that may accept, refuse and move customer orders along to delivery — Support's day job. */
+export const ORDER_WRITE_ROLES: Role[] = [ROLES.SUPPORT, ROLES.EDITOR, ROLES.OWNER];
+
 /** Only the Owner (Publisher) may configure royalty rates and manage staff roles. */
 export const OWNER_ONLY_ROLES: Role[] = [ROLES.OWNER];
 

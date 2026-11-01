@@ -24,8 +24,6 @@
         "RESEND_API_KEY",
         "EMAIL_FROM",
         "BLOB_READ_WRITE_TOKEN",
-        "INNGEST_EVENT_KEY",
-        "INNGEST_SIGNING_KEY",
         "CLOUDMERSIVE_API_KEY",
         "NEXT_PUBLIC_AUTH_SUPABASE_URL",
         "NEXT_PUBLIC_AUTH_SUPABASE_PUBLISHABLE_KEY",
@@ -35,7 +33,9 @@
         "UPSTASH_REDIS_REST_URL",
         "UPSTASH_REDIS_REST_TOKEN",
         "CSP_REPORT_ONLY",
-        "STOREFRONT_REVALIDATE_SECRET"
+        "STOREFRONT_REVALIDATE_SECRET",
+        "VERCEL_ENV",
+        "VERCEL_PROJECT_PRODUCTION_URL"
       ]
     },
     "dev": {
@@ -54,6 +54,90 @@
     },
     "test": {
       "dependsOn": []
+    },
+    "web#test": {
+      "dependsOn": [],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/admin/testing/contracts/**"
+      ]
+    },
+    "test:contract": {
+      "dependsOn": [],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/admin/testing/contracts/**"
+      ]
+    },
+    "test:integration": {
+      "cache": false,
+      "passThroughEnv": [
+        "TEST_DATABASE_URL",
+        "ALLOW_REMOTE_TEST_DATABASE"
+      ]
+    },
+    "test:migrations": {
+      "cache": false,
+      "passThroughEnv": [
+        "TEST_DATABASE_URL",
+        "ALLOW_REMOTE_TEST_DATABASE"
+      ]
+    },
+    "test:e2e": {
+      "cache": false,
+      "passThroughEnv": [
+        "CI",
+        "E2E_*",
+        "VERCEL_ENV"
+      ]
+    },
+    "test:smoke": {
+      "cache": false,
+      "passThroughEnv": [
+        "CI",
+        "E2E_*",
+        "VERCEL_ENV"
+      ]
+    },
+    "test:sanity": {
+      "cache": false,
+      "passThroughEnv": [
+        "CI",
+        "E2E_*",
+        "VERCEL_ENV"
+      ]
+    },
+    "test:security": {
+      "cache": false,
+      "passThroughEnv": [
+        "CI",
+        "E2E_*",
+        "VERCEL_ENV"
+      ]
+    },
+    "test:a11y": {
+      "cache": false,
+      "passThroughEnv": [
+        "CI",
+        "E2E_*",
+        "VERCEL_ENV"
+      ]
+    },
+    "test:visual": {
+      "cache": false,
+      "passThroughEnv": [
+        "CI",
+        "E2E_*",
+        "VERCEL_ENV"
+      ]
+    },
+    "test:cross-browser": {
+      "cache": false,
+      "passThroughEnv": [
+        "CI",
+        "E2E_*",
+        "VERCEL_ENV"
+      ]
     },
     "@repo/database#generate": {
       "cache": false

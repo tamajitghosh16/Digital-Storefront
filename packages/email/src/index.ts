@@ -6,8 +6,8 @@ import { StaffInvite } from "./templates/StaffInvite";
 
 // Built lazily, not at module load — Resend's constructor throws
 // synchronously if no API key is available (env or arg), and this module is
-// imported transitively by apps/web/app/api/inngest/route.ts, which Next.js
-// imports during the build's "collect page data" step. Constructing eagerly
+// imported by Server Actions and Route Handlers, which Next.js imports
+// during the build's "collect page data" step. Constructing eagerly
 // meant any build without RESEND_API_KEY set would fail outright.
 let resend: Resend | undefined;
 function getResendClient(): Resend {
