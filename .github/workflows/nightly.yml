@@ -33,7 +33,7 @@ jobs:
             echo "::notice::No ${{ matrix.env_secret }} secret — skipping."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.env.outputs.skip != 'true'
       - uses: actions/setup-node@v4
         if: steps.env.outputs.skip != 'true'
