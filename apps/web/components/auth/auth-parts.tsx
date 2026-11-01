@@ -118,6 +118,7 @@ export function Field({
   autoComplete,
   minLength,
   maxLength,
+  error,
 }: {
   id: string;
   label: string;
@@ -128,7 +129,10 @@ export function Field({
   autoComplete?: string;
   minLength?: number;
   maxLength?: number;
+  /** A validation message for this field, from `fieldErrors()` in lib/auth-schemas.ts. */
+  error?: string;
 }) {
+  const errorId = `${id}-error`;
   return (
     <div className="flex flex-col gap-[7px]">
       <label htmlFor={id} className="caps text-ink-muted">
@@ -145,8 +149,17 @@ export function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-12 rounded-btn border-2 border-line-strong bg-ground px-3.5 text-[15px] focus:border-ink focus:outline-none"
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? errorId : undefined}
+        className={`h-12 rounded-btn border-2 bg-ground px-3.5 text-[15px] focus:border-ink focus:outline-none ${
+          error ? "border-sale" : "border-line-strong"
+        }`}
       />
+      {error && (
+        <p id={errorId} className="text-sm font-bold text-sale">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

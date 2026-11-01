@@ -15,7 +15,16 @@ npm run dev          # next dev --turbopack, port 3000
 npm run build
 npm run lint
 npm run typecheck
+npm run test               # Vitest: unit + contract tests
+npm run test:integration   # Vitest against TEST_DATABASE_URL (local Postgres)
+npm run test:e2e           # Playwright: everything in testing/e2e
+npm run test:smoke         # or test:sanity, test:security, test:a11y, test:visual, test:cross-browser
+npm run test:perf          # Lighthouse budgets (builds, serves on :3100)
+npm run test:load          # autocannon load test — local build or staging only
 ```
+
+Tests live in `testing/`; see `docs/testing.md` for every kind, the test
+database, test accounts and CI.
 
 ## Architecture
 
@@ -39,8 +48,8 @@ the page/layout itself.
 **Route groups map directly to BRD modules:**
 - `app/(storefront)/` — public catalogue, product/service detail pages, the self-publishing landing page. No auth required.
 - `app/(account)/` — `layout.tsx` calls `getCurrentUser()` and redirects to `/sign-in` if absent (defense-in-depth behind middleware). `account/publishing/page.tsx` additionally requires `role === "SELF_PUB_AUTHOR"`.
-- `app/(checkout)/` — `cart` holds the lines and the "Checkout" section (delivery details: name/email pre-filled from the account, a saved-address picker, Address line 1/2, State · District · City, PIN; then a billing address with a "same as delivery" checkbox, ticked by default, that mirrors the delivery fields read-only until unticked, plus the optional GSTIN); the order snapshots both into `Order.shippingAddress` / `Order.billingAddress`. "Proceed to payment" stores those details in `lib/checkout-store.ts` (sessionStorage) and goes to `payment`, where the shopper picks Cash on Delivery / UPI / Net Banking / cards and places the order. `checkout` only `permanentRedirect`s to `cart`, so old links keep working.
-- `app/api/` — the three Route Handlers that need a stable HTTP contract: `webhooks/razorpay` (payment source of truth), `inngest` (serves `packages/jobs` functions), `library/[assetId]` (entitlement-checked digital delivery).
+- `app/(checkout)/` — `cart` holds the lines and the "Checkout" section (billing details first: name on invoice/email pre-filled from the account, a saved-address picker, Address line 1/2, State · District · City, PIN, then the optional GSTIN on its own row; then a delivery address with a "same as billing" checkbox, unticked by default: ticking it mirrors the billing fields read-only, unticking blanks the delivery fields); the order snapshots both into `Order.shippingAddress` / `Order.billingAddress`. "Proceed to payment" stores those details in `lib/checkout-store.ts` (sessionStorage) and goes to `payment`, where the shopper picks Cash on Delivery / UPI / Net Banking / cards and places the order. `checkout` only `permanentRedirect`s to `cart`, so old links keep working.
+- `app/api/` — the Route Handlers that need a stable HTTP contract: `webhooks/razorpay` (payment source of truth), `library/[assetId]` (entitlement-checked digital delivery).
 
 **Components are grouped by role, not by page:**
 - `components/layout/` — the chrome: promo marquee, utility bar, masthead, department bar with its hover mega-panels, mobile drawer, footer, theme toggle. The department bar's 5 departments/8 product lines come from `lib/navigation.ts`'s `buildDepartments()`, hardcoded to mirror `apps/admin/components/sidebar-nav.tsx`'s `FIXED_DEPARTMENTS` by hand rather than importing `PRODUCT_LINE_CATALOG` from `@repo/database` — see root `CLAUDE.md`'s "Product & service taxonomy" section for the canonical list, `Product.productLine`, and why the nav files don't read from it yet.
@@ -59,8 +68,16 @@ are re-pointed onto that palette so `packages/ui` and apps/admin keep
 working without a second system.
 
 **Cart state lives in `lib/cart-store.ts`** — a Zustand store persisted to
-`localStorage`, not yet synced to the database on login/checkout (see root
-README's stub list). `CartItem` carries `listPriceCents` and `taxType`
+`localStorage` and stamped with the `ownerId` of the account it belongs to
+(`null` for a guest). `components/commerce/cart-sync.tsx`, mounted by the root
+layout with the signed-in `userId`, keeps it tied to the account: a signed-in
+customer's cart is loaded from and saved to the `carts` table
+(`getSavedCart`/`saveCart` in `lib/actions/cart.ts`), so it is the same on
+every browser and device; a guest cart is merged in on sign-in; and an
+account's cart (plus `checkout-store`'s delivery details) is emptied from the
+browser on sign-out or when a different account signs in. The saved lines are
+display state only — checkout re-prices every line. `WishlistProvider` takes
+the same `userId` and reloads on a change of account. `CartItem` carries `listPriceCents` and `taxType`
 alongside the net price so the cart can show bundle savings and per-line
 GST.
 
@@ -151,10 +168,10 @@ cart), sets `OrderItem.includesEbook`, and snapshots the delivery address
 into `Order.shippingAddress` (a saved `Address` can change later). Delivery
 is always standard — checkout no longer offers a speed.
 `placeCodOrder` (Cash on Delivery, the only method live until Razorpay is
-configured) creates the `Order` as `PROCESSING` with a `Payment` of method
-`COD`, status `CREATED`, and queues `order/confirmed` in `after()`, once the
-response has gone (with no `INNGEST_EVENT_KEY` locally, `inngest.send` spends
-~6s retrying 401s from Inngest Cloud); it refuses any cart
+configured) creates the `Order` as `PROCESSING` (with `shipmentStatus`
+`AWAITING_APPROVAL` — staff accept or deny it from apps/admin's Sales
+Orders page) with a `Payment` of method `COD`, status `CREATED`, and sends the confirmation email in `after()`, once the
+response has gone (best-effort, never retried); it refuses any cart
 with an e-book or service line, because `PROCESSING` is an entitling status
 in `lib/library.ts`. `startCheckout` (UPI / net banking / cards) requires a
 signed-in user, is rate-limited, creates the `Order` + `Payment` and a real
@@ -166,7 +183,8 @@ any order), fetches the payment from Razorpay to check amount, currency and
 captured status, then settles through `settleOrderPayment()`
 (`lib/orders.ts`) — the same function the webhook uses. That does a
 conditional `PENDING → PAID` update (so it's **idempotent** and the email
-fires once) and relies on `Payment.gatewayPaymentId` being unique. The
+fires once), and sets `shipmentStatus` `AWAITING_APPROVAL` if anything in the
+order ships; it relies on `Payment.gatewayPaymentId` being unique. The
 webhook (`api/webhooks/razorpay`) remains the authoritative status source and
 also cross-checks amount and currency. Discount codes are looked up one at a time
 on the server (`lib/discounts.ts`, rules in `@repo/database`'s

@@ -46,10 +46,3 @@ export function noPublicSecrets(): string | null {
   );
   return leaked.length ? `Secret-looking variables are exposed to the browser: ${leaked.join(", ")}` : null;
 }
-
-/** Inngest's dev mode skips request signing — it must never be on in production. */
-export function noInngestDevMode(): string | null {
-  return process.env.NODE_ENV === "production" && process.env.INNGEST_DEV
-    ? "INNGEST_DEV is set in production — the /api/inngest endpoint would accept unsigned requests"
-    : null;
-}

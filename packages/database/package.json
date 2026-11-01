@@ -7,7 +7,9 @@
   "types": "./src/client.ts",
   "exports": {
     ".": "./src/client.ts",
-    "./discounts": "./src/discounts.ts"
+    "./discounts": "./src/discounts.ts",
+    "./shipment": "./src/shipment.ts",
+    "./testing": "./testing/test-db.ts"
   },
   "scripts": {
     "generate": "prisma generate",
@@ -16,7 +18,10 @@
     "studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
     "check:data-api": "tsx scripts/check-data-api.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:migrations": "vitest run --config testing/vitest.migrations.config.ts",
+    "db:test:start": "prisma dev --name storefront-test --detach",
+    "db:test:stop": "prisma dev stop storefront-test"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.0.0",

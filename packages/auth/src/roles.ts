@@ -22,11 +22,7 @@ export const CATALOGUE_WRITE_ROLES: Role[] = [ROLES.EDITOR, ROLES.OWNER];
 /** Roles that may edit site-wide CMS content: site settings, navigation, homepage banners, FAQs, testimonials. */
 export const CONTENT_WRITE_ROLES: Role[] = [ROLES.EDITOR, ROLES.OWNER];
 
-/**
- * Roles that may move an order along (pack, ship, deliver, cancel, refund)
- * and record cash-on-delivery money as collected. Includes Support: looking
- * after orders and the customers behind them is that role's whole job.
- */
+/** Roles that may accept, refuse and move customer orders along to delivery — Support's day job. */
 export const ORDER_WRITE_ROLES: Role[] = [ROLES.SUPPORT, ROLES.EDITOR, ROLES.OWNER];
 
 /** Only the Owner (Publisher) may configure royalty rates and manage staff roles. */

@@ -30,7 +30,7 @@ export default async function HomepageContentPage({
     <div className="max-w-3xl">
       <PageHeader
         title="Homepage text"
-        description="Every heading, description and button label on the homepage. Leave a box empty to go back to the wording the site came with."
+        description="Every heading, description and button label on the homepage, plus the business details shown on the policy and contact pages. Leave a box empty to go back to the wording the site came with."
         action={<ButtonLink href="/content/banners" variant="secondary">Edit the hero →</ButtonLink>}
       />
 

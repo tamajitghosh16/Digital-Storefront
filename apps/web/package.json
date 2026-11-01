@@ -8,12 +8,27 @@
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p testing",
+    "test": "vitest run --config testing/vitest.config.ts",
+    "test:watch": "vitest --config testing/vitest.config.ts",
+    "test:contract": "vitest run --config testing/vitest.config.ts testing/contracts",
+    "test:integration": "vitest run --config testing/vitest.integration.config.ts",
+    "test:e2e": "playwright test --config testing/playwright.config.ts",
+    "test:smoke": "playwright test --config testing/playwright.config.ts --grep @smoke",
+    "test:sanity": "playwright test --config testing/playwright.config.ts --grep @sanity",
+    "test:security": "playwright test --config testing/playwright.config.ts --grep @security",
+    "test:a11y": "playwright test --config testing/playwright.config.ts --grep @a11y",
+    "test:visual": "playwright test --config testing/playwright.config.ts --project=visual",
+    "test:visual:update": "playwright test --config testing/playwright.config.ts --project=visual --update-snapshots=changed",
+    "test:cross-browser": "playwright test --config testing/playwright.cross-browser.config.ts",
+    "test:responsive": "playwright test --config testing/playwright.config.ts --project=desktop --grep @responsive",
+    "test:perf": "lhci autorun --config=testing/performance/lighthouserc.cjs",
+    "test:load": "node testing/load/load.mjs"
   },
   "dependencies": {
     "@repo/auth": "*",
     "@repo/database": "*",
-    "@repo/jobs": "*",
+    "@repo/email": "*",
     "@repo/payments": "*",
     "@repo/security": "*",
     "@repo/storage": "*",
@@ -27,14 +42,24 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@lhci/cli": "^0.15.1",
+    "@playwright/test": "^1.64.1",
     "@repo/config": "*",
     "@tailwindcss/postcss": "^4.0.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "autocannon": "^8.0.0",
     "eslint": "^9.17.0",
     "eslint-config-next": "^16.0.0",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.7"
   }
 }

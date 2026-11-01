@@ -172,6 +172,23 @@ export async function buildDepartments(): Promise<Department[]> {
 }
 
 /** Footer sitemap — grouped the way the approved design lays it out. */
+/**
+ * The policy pages Razorpay's website review, the Consumer Protection
+ * (E-Commerce) Rules 2020 and the DPDP Act 2023 expect every Indian store to
+ * publish. One list, read by the footer, each policy page's side nav and the
+ * sitemap.
+ *
+ * Every slug here must also be in apps/admin's `menu/reserved-slugs.ts`,
+ * or an admin-created menu page with the same slug would be unreachable.
+ */
+export const POLICY_PAGES: NavLeaf[] = [
+  { label: "Privacy policy", href: "/privacy-policy" },
+  { label: "Terms & conditions", href: "/terms" },
+  { label: "Refund & cancellation", href: "/refund-policy" },
+  { label: "Shipping & delivery", href: "/shipping-policy" },
+  { label: "Contact us", href: "/contact" },
+];
+
 export const FOOTER_COLUMNS: NavColumn[] = [
   {
     title: "Shop",
@@ -197,7 +214,11 @@ export const FOOTER_COLUMNS: NavColumn[] = [
       { label: "Track an order", href: "/account/orders" },
       { label: "Digital library", href: "/account/library" },
       { label: "Your cart", href: "/cart" },
-      { label: "Returns policy", href: "/services" },
+      { label: "Contact us", href: "/contact" },
     ],
+  },
+  {
+    title: "Policies",
+    items: POLICY_PAGES.filter((page) => page.href !== "/contact"),
   },
 ];

@@ -314,6 +314,7 @@ export function ProductPage({
             <BuyBox
               productId={product.id}
               title={product.title}
+              imageUrl={product.coverImageUrl}
               author={product.author}
               genre={product.genre}
               rating={product.rating}

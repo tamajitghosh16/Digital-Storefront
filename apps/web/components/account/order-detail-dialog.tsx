@@ -6,7 +6,7 @@ import { cn } from "@repo/ui/utils";
 import { Callout, buttonClass } from "@/components/primitives";
 import { formatINRWhole } from "@/lib/format";
 import {
-  ORDER_STATUS,
+  orderStatusBadge,
   PAYMENT_METHOD_LABEL,
   buildTrackingTimeline,
   carrierTrackingUrl,
@@ -46,7 +46,7 @@ export function OrderDetailDialog({
     dialogRef.current?.close();
   }
 
-  const status = ORDER_STATUS[order.status];
+  const status = orderStatusBadge(order);
   const steps = buildTrackingTimeline(order, standardEta);
   const physical = shipsPhysically(order);
   // Orders from before checkout asked for a billing address were billed to

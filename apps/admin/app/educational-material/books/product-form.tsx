@@ -322,10 +322,12 @@ export function ProductForm({
                     {format.isPrint && (
                       <TextField
                         label="Copies in stock"
-                        help="Leave empty if you aren't counting stock."
+                        help="How many you have on hand right now. Enter 0 if none."
                         name={`${format.field.toLowerCase()}Stock`}
                         type="number"
                         min={0}
+                        step={1}
+                        required
                         defaultValue={edition?.stockQty ?? ""}
                       />
                     )}
@@ -347,6 +349,7 @@ export function ProductForm({
             label="Upload .pdf file"
             help="The PDF the customer downloads from their library after buying the e-book."
             defaultValue={ebookFile ?? null}
+            required
           />
         </Section>
       )}

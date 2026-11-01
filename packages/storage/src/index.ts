@@ -2,16 +2,18 @@ import "server-only";
 import { put, del, head } from "@vercel/blob";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+export { scanUpload, type ScanResult } from "./scan";
+
 /**
  * Vercel Blob helpers — manuscripts, covers, proofs, and delivery assets
  * (Technical Design Document, Section 3.7).
  *
- * Uploads go to a staging prefix first so the malware-scan Inngest job can
- * gate promotion to the permanent path (NFR-8).
+ * Uploads go to a staging prefix first so the malware scan (`scanUpload`,
+ * ./scan.ts) can gate promotion to the permanent path (NFR-8).
  */
 export async function uploadToStaging(file: File | Blob, pathHint: string) {
   // Private: an unscanned upload must not be fetchable by URL. Only the
-  // scan job (holding BLOB_READ_WRITE_TOKEN) reads it before promotion.
+  // scan (holding BLOB_READ_WRITE_TOKEN) reads it before promotion.
   const key = `staging/${crypto.randomUUID()}-${safeObjectName(pathHint) || "upload"}`;
   return put(key, file, { access: "private", addRandomSuffix: false });
 }
@@ -156,9 +158,8 @@ export async function deleteEbookFile(path: string): Promise<void> {
  * manuscripts, source documents — where the uploader isn't trusted. These
  * come from a signed-in EDITOR/OWNER, are type- and signature-checked before
  * they get here, and are needed at a stable public URL the moment the form
- * is saved. Sending them through a scan that is currently a stub returning
- * "CLEAN" (packages/jobs/src/functions/malwareScan.ts) would add a
- * round-trip and imply a guarantee that doesn't exist yet.
+ * is saved. Sending them through the scan (./scan.ts) would only add a
+ * round-trip to a paid scanner for files a trusted staff member chose.
  *
  * Stored in the public `images` Supabase Storage bucket; the returned
  * `url` is the bucket's permanent public URL for the object.

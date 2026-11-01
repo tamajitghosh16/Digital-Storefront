@@ -1,10 +1,6 @@
-import type { BookFormat, Prisma } from "@prisma/client";
-
 /**
  * Taking counted stock off the shelf when an order is placed, and putting it
- * back when that order is cancelled. Shared by apps/web's checkout (which
- * takes it) and apps/admin's order page (which returns it when staff cancel
- * an order that hasn't left the building).
+ * back when that order is cancelled.
  *
  * A shipped line draws on one of two counters: a book's printed
  * `BookEdition.stockQty` (the line names its `bookFormat`), or the row's own
@@ -15,9 +11,15 @@ import type { BookFormat, Prisma } from "@prisma/client";
  * Each deduction is a conditional `stockQty >= quantity` update, so two
  * shoppers racing for the last copies can't both win: the second one's
  * update matches no row and the whole order rolls back. Run it inside the
- * transaction that creates (or cancels) the order, so the order and the
- * stock change land or fail together.
+ * transaction that creates the order, so the order and the deduction land
+ * or fail together.
+ *
+ * Shared by apps/web's checkout (`lib/stock.ts`, which adds the storefront
+ * cache expiry) and apps/admin's Sales Orders page, which returns a refused
+ * order's copies.
  */
+
+import type { BookFormat, Prisma } from "@prisma/client";
 
 export type StockLine = { productId: string; bookFormat: BookFormat | null; quantity: number };
 

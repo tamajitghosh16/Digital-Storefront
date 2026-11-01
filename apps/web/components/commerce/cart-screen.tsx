@@ -17,30 +17,36 @@ import {
 } from "@/lib/checkout-store";
 import { checkCoupon } from "@/app/(checkout)/actions";
 import { createAddress } from "@/lib/actions/addresses";
-import { getCartStock } from "@/lib/actions/cart";
+import { getCartCovers, getCartStock } from "@/lib/actions/cart";
 import { isIndianState } from "@/lib/india-address";
 import type { PricingConfig } from "@/lib/pricing";
 import { BookJacket, ProductShot } from "./book-jacket";
 import { SummaryLines, cartTotals } from "./order-summary";
 
 /**
- * The cart, with the Checkout (delivery and billing details) section under
+ * The cart, with the Checkout (billing and delivery details) section under
  * its lines and a sticky summary on the right. "Proceed to payment" stays
  * disabled until the details are filled in, then hands them to /payment (via
  * `useCheckoutStore`), where the shopper picks how to pay.
  *
- * The billing address starts ticked as "same as delivery": its fields then
- * show the delivery address, read-only, and follow it as it's edited.
- * Unticking copies the delivery address in once as a starting point, so only
- * what differs needs typing.
+ * The billing address comes first and is the one the shopper types (with the
+ * contact email and optional GSTIN). The delivery address under it starts
+ * blank with "same as billing" unticked. Ticking it shows the billing address
+ * there, read-only, following it as it's edited; unticking blanks the
+ * delivery fields again.
  */
 
-/** The delivery half of `CheckoutDetails` — what the top of the form edits. */
-type ShippingFields = Omit<CheckoutDetails, "billingSameAsShipping" | "billing">;
-type FieldName = keyof ShippingFields;
+/**
+ * What the top of the form edits: the billing name and address, plus the
+ * contact email and GSTIN. Same shape as `CheckoutDetails`' delivery half,
+ * which it fills too while the delivery address is "same as billing".
+ */
+type FormFields = Omit<CheckoutDetails, "billingSameAsShipping" | "billing">;
+type FieldName = keyof FormFields;
 
 const REQUIRED_FIELDS = ["name", "email", "line1", "state", "district", "city", "pin"] as const;
-const BILLING_REQUIRED_FIELDS = ["name", "line1", "state", "district", "city", "pin"] as const;
+const DELIVERY_REQUIRED_FIELDS = ["name", "line1", "state", "district", "city", "pin"] as const;
+const BLANK_DELIVERY: BillingDetails = { name: "", line1: "", line2: "", district: "", city: "", state: "", pin: "" };
 const ADDRESS_FIELDS: FieldName[] = ["line1", "line2", "state", "district", "city", "pin"];
 
 function isFieldValid(name: FieldName, raw: string): boolean {
@@ -52,7 +58,7 @@ function isFieldValid(name: FieldName, raw: string): boolean {
   return true;
 }
 
-function shippingAsBilling(fields: ShippingFields): BillingDetails {
+function nameAndAddress(fields: FormFields): BillingDetails {
   const { name, line1, line2, district, city, state, pin } = fields;
   return { name, line1, line2, district, city, state, pin };
 }
@@ -97,7 +103,7 @@ export function CartScreen({
   initialAddresses: Address[];
 }) {
   const router = useRouter();
-  const { items, removeItem, updateQuantity, syncStock } = useCartStore();
+  const { items, removeItem, updateQuantity, syncStock, syncCovers } = useCartStore();
   const setCheckout = useCheckoutStore((state) => state.setCheckout);
 
   const [addresses, setAddresses] = useState<Address[]>(initialAddresses);
@@ -110,17 +116,17 @@ export function CartScreen({
   // Name and email come from the account; the address from the default
   // saved one (if any), so a returning customer lands on checkout with it
   // already applied, not just offered in a dropdown they might not notice.
-  const [fields, setFields] = useState<ShippingFields>(() => ({
+  const [fields, setFields] = useState<FormFields>(() => ({
     name: account.name,
     email: account.email,
     ...addressToFields(pickDefaultAddress(initialAddresses)),
     gst: "",
   }));
-  const [billingSame, setBillingSame] = useState(true);
-  // Only read while `billingSame` is off; until then the billing address is
-  // derived from `fields` so it can't fall out of step.
-  const [billingFields, setBillingFields] = useState<BillingDetails>(() => shippingAsBilling(fields));
-  const billing = billingSame ? shippingAsBilling(fields) : billingFields;
+  const [deliverySame, setDeliverySame] = useState(false);
+  // Only read while `deliverySame` is off; while it's on the delivery address
+  // is derived from `fields` so it can't fall out of step.
+  const [deliveryFields, setDeliveryFields] = useState<BillingDetails>(BLANK_DELIVERY);
+  const delivery = deliverySame ? nameAndAddress(fields) : deliveryFields;
   const [couponInput, setCouponInput] = useState("");
   const [coupon, setCoupon] = useState<AppliedCoupon | null>(null);
   const [couponMessage, setCouponMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -129,7 +135,8 @@ export function CartScreen({
   const totals = useMemo(() => cartTotals(items, pricing, coupon), [items, coupon, pricing]);
 
   const formValid = REQUIRED_FIELDS.every((name) => isFieldValid(name, fields[name]));
-  const billingValid = billingSame || BILLING_REQUIRED_FIELDS.every((name) => isFieldValid(name, billingFields[name]));
+  const deliveryValid =
+    deliverySame || DELIVERY_REQUIRED_FIELDS.every((name) => isFieldValid(name, deliveryFields[name]));
   const gstValid = !fields.gst.trim() || /^[0-9A-Z]{15}$/i.test(fields.gst.trim());
 
   // A line's stock is a snapshot from when it was added, so re-read the
@@ -164,11 +171,32 @@ export function CartScreen({
     };
   }, [shipLineKey, syncStock]);
 
+  // Same for covers, on every line: one added before lines carried a cover,
+  // or whose cover staff have since replaced, picks up the current scan.
+  const lineKey = items
+    .map((item) => item.productId)
+    .sort()
+    .join(",");
+
+  useEffect(() => {
+    if (!lineKey) return;
+    let cancelled = false;
+    getCartCovers(lineKey.split(","))
+      .then((covers) => {
+        if (!cancelled && covers) syncCovers(covers);
+      })
+      // Display only: a failed refresh just leaves the remembered cover (or the drawn jacket).
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [lineKey, syncCovers]);
+
   const hasSoldOutLine = items.some(
     (item) => item.fulfillmentType === "SHIP" && typeof item.stockQty === "number" && item.stockQty <= 0
   );
 
-  const canProceed = formValid && billingValid && gstValid && items.length > 0 && !hasSoldOutLine;
+  const canProceed = formValid && deliveryValid && gstValid && items.length > 0 && !hasSoldOutLine;
 
   useEffect(() => {
     const dialog = saveDialogRef.current;
@@ -187,13 +215,13 @@ export function CartScreen({
     if (ADDRESS_FIELDS.includes(name)) setSelectedAddressId("");
   }
 
-  function updateBillingField(name: keyof BillingDetails, value: string) {
-    setBillingFields((current) => ({ ...current, [name]: value }));
+  function updateDeliveryField(name: keyof BillingDetails, value: string) {
+    setDeliveryFields((current) => ({ ...current, [name]: value }));
   }
 
-  function toggleBillingSame(same: boolean) {
-    if (!same) setBillingFields(shippingAsBilling(fields));
-    setBillingSame(same);
+  function toggleDeliverySame(same: boolean) {
+    if (!same) setDeliveryFields(BLANK_DELIVERY);
+    setDeliverySame(same);
   }
 
   function selectAddress(id: string) {
@@ -249,13 +277,14 @@ export function CartScreen({
   }
 
   function goToPayment() {
-    const shipping = trimAll(fields);
+    const form = trimAll(fields);
     setCheckout(
       {
-        ...shipping,
-        gst: shipping.gst.toUpperCase(),
-        billingSameAsShipping: billingSame,
-        billing: trimAll(billing),
+        ...form,
+        ...trimAll(delivery),
+        gst: form.gst.toUpperCase(),
+        billingSameAsShipping: deliverySame,
+        billing: nameAndAddress(form),
       },
       coupon
     );
@@ -291,18 +320,18 @@ export function CartScreen({
     setCouponMessage(null);
   }
 
-  /** Wires one delivery field to `fields`. */
-  const ship = (name: FieldName) => ({
+  /** Wires one billing/contact field to `fields`. */
+  const bill = (name: FieldName) => ({
     id: `cart-${name}`,
     value: fields[name],
     onChange: (value: string) => updateField(name, value),
   });
-  /** Wires one billing field; read-only while it mirrors the delivery address. */
-  const bill = (name: keyof BillingDetails) => ({
-    id: `cart-billing-${name}`,
-    value: billing[name],
-    onChange: (value: string) => updateBillingField(name, value),
-    readOnly: billingSame,
+  /** Wires one delivery field; read-only while it mirrors the billing address. */
+  const ship = (name: keyof BillingDetails) => ({
+    id: `cart-delivery-${name}`,
+    value: delivery[name],
+    onChange: (value: string) => updateDeliveryField(name, value),
+    readOnly: deliverySame,
   });
 
   return (
@@ -336,8 +365,9 @@ export function CartScreen({
                     key={item.productId}
                     className="grid grid-cols-[76px_1fr_auto] items-start gap-[18px] border-b border-line py-5"
                   >
-                    <ProductShot square className="rounded-[10px] p-2.5">
-                      <BookJacket title={item.title} className="w-[62%]" sizes="60px" />
+                    {/* A 2:3 tile, the jacket's own shape, so the cover fills it bar a hairline of padding. */}
+                    <ProductShot aspect="aspect-2/3" className="rounded-[10px] p-1">
+                      <BookJacket title={item.title} imageUrl={item.imageUrl} className="w-full" sizes="76px" />
                     </ProductShot>
 
                     <div className="min-w-0">
@@ -437,15 +467,23 @@ export function CartScreen({
           <Rule className="my-[34px]" />
 
           <h2>Checkout</h2>
-          <p className="mt-2 text-sm text-ink-muted">Where should we deliver? Fill these in to continue to payment.</p>
+          <p className="mt-2 text-sm text-ink-muted">
+            Who&rsquo;s the invoice for, and where should we deliver? Fill these in to continue to payment.
+          </p>
 
-          <h3 className="mt-7">Delivery address</h3>
+          <h3 className="mt-7">Billing address</h3>
+          <p className="mt-2 text-sm text-ink-muted">The name and address your invoice is made out to.</p>
 
           <div className="mt-5 grid gap-[18px]">
             <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
-              <Field {...ship("name")} label="Full name" placeholder="Ananya Sharma" autoComplete="shipping name" />
               <Field
-                {...ship("email")}
+                {...bill("name")}
+                label="Name on invoice"
+                placeholder="Your name or institution"
+                autoComplete="billing name"
+              />
+              <Field
+                {...bill("email")}
                 label="Email"
                 type="email"
                 placeholder="you@example.com"
@@ -486,6 +524,58 @@ export function CartScreen({
             )}
 
             <Field
+              {...bill("line1")}
+              label="Address line 1"
+              placeholder="Flat, building, street"
+              autoComplete="billing address-line1"
+            />
+            <Field
+              {...bill("line2")}
+              label="Address line 2 — optional"
+              placeholder="Area, landmark"
+              autoComplete="billing address-line2"
+            />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <StateSelect
+                id="cart-state"
+                value={fields.state}
+                onChange={(value) => updateField("state", value)}
+                autoComplete="billing address-level1"
+              />
+              <Field {...bill("district")} label="District" placeholder="Kolkata" />
+              <Field {...bill("city")} label="City" placeholder="Kolkata" autoComplete="billing address-level2" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                {...bill("pin")}
+                label="PIN code"
+                placeholder="700001"
+                inputMode="numeric"
+                autoComplete="billing postal-code"
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field {...bill("gst")} label="GST number — optional" placeholder="29AAACX0000X1ZX" />
+            </div>
+            {!gstValid && <p className="-mt-2 text-xs font-bold text-sale">A GST number is 15 letters and digits.</p>}
+          </div>
+
+          <h3 className="mt-9">Delivery address</h3>
+          <p className="mt-2 text-sm text-ink-muted">Where we should send the printed copies.</p>
+
+          <label className="mt-4 flex w-fit cursor-pointer items-center gap-3 text-[15px] font-bold">
+            <input
+              type="checkbox"
+              checked={deliverySame}
+              onChange={(event) => toggleDeliverySame(event.target.checked)}
+              className="h-[18px] w-[18px] shrink-0 accent-brand"
+            />
+            Delivery address is the same as my billing address
+          </label>
+
+          <div className="mt-5 grid gap-[18px]">
+            <Field {...ship("name")} label="Full name" placeholder="Ananya Sharma" autoComplete="shipping name" />
+            <Field
               {...ship("line1")}
               label="Address line 1"
               placeholder="Flat, building, street"
@@ -499,9 +589,10 @@ export function CartScreen({
             />
             <div className="grid gap-4 sm:grid-cols-3">
               <StateSelect
-                id="cart-state"
-                value={fields.state}
-                onChange={(value) => updateField("state", value)}
+                id="cart-delivery-state"
+                value={delivery.state}
+                onChange={(value) => updateDeliveryField("state", value)}
+                disabled={deliverySame}
                 autoComplete="shipping address-level1"
               />
               <Field {...ship("district")} label="District" placeholder="Kolkata" />
@@ -516,62 +607,6 @@ export function CartScreen({
                 autoComplete="shipping postal-code"
               />
             </div>
-          </div>
-
-          <h3 className="mt-9">Billing address</h3>
-          <p className="mt-2 text-sm text-ink-muted">The name and address your invoice is made out to.</p>
-
-          <label className="mt-4 flex w-fit cursor-pointer items-center gap-3 text-[15px] font-bold">
-            <input
-              type="checkbox"
-              checked={billingSame}
-              onChange={(event) => toggleBillingSame(event.target.checked)}
-              className="h-[18px] w-[18px] shrink-0 accent-brand"
-            />
-            Billing address is the same as my delivery address
-          </label>
-
-          <div className="mt-5 grid gap-[18px]">
-            <Field
-              {...bill("name")}
-              label="Name on invoice"
-              placeholder="Your name or institution"
-              autoComplete="billing name"
-            />
-            <Field
-              {...bill("line1")}
-              label="Address line 1"
-              placeholder="Flat, building, street"
-              autoComplete="billing address-line1"
-            />
-            <Field
-              {...bill("line2")}
-              label="Address line 2 — optional"
-              placeholder="Area, landmark"
-              autoComplete="billing address-line2"
-            />
-            <div className="grid gap-4 sm:grid-cols-3">
-              <StateSelect
-                id="cart-billing-state"
-                value={billing.state}
-                onChange={(value) => updateBillingField("state", value)}
-                disabled={billingSame}
-                autoComplete="billing address-level1"
-              />
-              <Field {...bill("district")} label="District" placeholder="Kolkata" />
-              <Field {...bill("city")} label="City" placeholder="Kolkata" autoComplete="billing address-level2" />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field
-                {...bill("pin")}
-                label="PIN code"
-                placeholder="700001"
-                inputMode="numeric"
-                autoComplete="billing postal-code"
-              />
-              <Field {...ship("gst")} label="GST number — optional" placeholder="29AAACX0000X1ZX" />
-            </div>
-            {!gstValid && <p className="-mt-2 text-xs font-bold text-sale">A GST number is 15 letters and digits.</p>}
           </div>
         </div>
 
@@ -598,7 +633,7 @@ export function CartScreen({
                   ? "Your cart is empty."
                   : hasSoldOutLine
                     ? "Remove the out-of-stock items to continue."
-                    : "Fill in your delivery and billing details to continue."}
+                    : "Fill in your billing and delivery details to continue."}
           </p>
 
           <Rule />

@@ -75,6 +75,7 @@ function toOrderDetail(order: OrderRow): OrderDetail {
     id: order.id,
     ref: `#${order.id.slice(-5)}`,
     status: order.status,
+    shipmentStatus: order.shipmentStatus,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
     subtotalCents: order.subtotalCents,

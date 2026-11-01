@@ -26,9 +26,9 @@ _Audit date: 2026-09-27 · Scope: every tracked source file in `apps/web`, `apps
 | M4 Invite host header | ✅ `NEXT_PUBLIC_ADMIN_URL` required in production | `apps/admin/lib/staff-invites.ts` |
 | M5 Raw error text | ✅ fixed generic messages on sign-in, forgot/reset password, join, and password change | both apps |
 | M6 E-book upload | ✅ path pattern and `%PDF-` magic-byte check before attaching · ⏳ run `harden-buckets` | `packages/storage` |
-| M7 Malware scan | ✅ real Cloudmersive scan that fails closed (stays `PENDING`), private staging, quarantine | `packages/jobs/src/functions/malwareScan.ts` |
+| M7 Malware scan | ✅ real Cloudmersive scan that fails closed (stays `PENDING`), private staging, quarantine | `packages/storage/src/scan.ts` |
 | M8 Proxy matcher and page guards | ✅ anchored public paths, `requireStaffPage()` on all 32 data-reading admin pages | `apps/admin/proxy.ts`, `apps/admin/lib/guard.ts` |
-| M9 Inngest | ✅ boot check rejects `INNGEST_DEV` in production | `apps/web/instrumentation.ts` |
+| M9 Inngest | ✅ n/a — Inngest removed, so there is no job endpoint to sign | — |
 | M10 Secret sprawl | ✅ admin no longer depends on payments or jobs, env examples trimmed, boot check rejects secrets in `NEXT_PUBLIC_*` · ⏳ move to per-app Supabase secret keys | env examples |
 | M11 Swallowed errors | ✅ `withFallback` logs errors · ⏳ Sentry | `apps/web/lib/safe-fetch.ts` |
 | M12 Vulnerable deps | ❌ not done: needs Prisma 8 and `@react-email/components` 1.x major upgrades. CI reports these without blocking | — |
@@ -102,7 +102,7 @@ The rest are Medium or Low findings, listed in §3. The roadmap in §4 orders th
 3. **Phished or compromised staff.** Staff reach the whole back office through one password.
 4. **Supply chain.** npm dependencies and the Razorpay checkout script.
 
-**Trust boundaries:** browser → Next.js (`proxy.ts`, Server Actions, Route Handlers) → Prisma (uses the `postgres` role and **bypasses RLS**) / Supabase REST (uses the anon or authenticated role and **is subject to RLS**) / Supabase Storage / Razorpay / Resend / Inngest.
+**Trust boundaries:** browser → Next.js (`proxy.ts`, Server Actions, Route Handlers) → Prisma (uses the `postgres` role and **bypasses RLS**) / Supabase REST (uses the anon or authenticated role and **is subject to RLS**) / Supabase Storage / Razorpay / Resend.
 
 The key point: **the apps' own queries bypass RLS, but anyone can also reach the same tables directly over Supabase's REST API with the public key.** RLS is the only thing that stops the second path.
 
@@ -154,7 +154,7 @@ if (order.status !== "PAID") await prisma.order.update({ ...status: "PAID" })   
 - Load `order.payment` and require `order.payment.gatewayOrderId === input.razorpayOrderId`.
 - Require that `gatewayPaymentId` isn't already recorded against another payment (add `@unique` to `Payment.gatewayPaymentId`).
 - Optionally fetch the payment from Razorpay (`payments.fetch`) and check `amount === order.totalCents`, `status === "captured"`, and `order_id === gatewayOrderId`.
-- Make the PENDING → PAID transition atomic: `updateMany({ where: { id, status: "PENDING" } })`, then fire Inngest only when `count === 1`. That closes the webhook/confirm race that can send two emails.
+- Make the PENDING → PAID transition atomic: `updateMany({ where: { id, status: "PENDING" } })`, then send the confirmation email only when `count === 1`. That closes the webhook/confirm race that can send two emails.
 
 **Apply the same checks to the webhook** (`route.ts:21-56`): compare `payment.entity.amount` and `currency` against `Payment.amountCents`, and use the same atomic transition.
 
@@ -240,7 +240,7 @@ Admin needs `connect-src` for both Supabase projects plus the storage upload URL
 | M4 | Invite link built from `x-forwarded-host` when `NEXT_PUBLIC_ADMIN_URL` is unset | `apps/admin/lib/staff-invites.ts:31-39` | Require `NEXT_PUBLIC_ADMIN_URL` in production and drop the header fallback. |
 | M5 | Raw Supabase/Resend error text shown to users | `join/[token]/actions.ts:40`, `settings/roles/actions.ts:75,147`, both sign-in pages | Map to generic messages. Log the detail server-side. Account-enumeration text ("User already registered") should become "Check your email". |
 | M6 | E-book upload: `.pdf` name check only, and the signed upload URL accepts any bytes of any size | `apps/admin/app/api/uploads/ebook/route.ts:48-56` | Set the `ebooks` bucket's **allowed MIME types = application/pdf** and **file size limit = 100 MB** in Supabase. After upload, verify the `%PDF-` magic bytes server-side in `syncEbookFileAsset` before writing the `FileAsset`. Check that `ebookFilePath` matches the `<uuid>-<name>.pdf` pattern the route minted. |
-| M7 | Malware scan is a stub that always returns `CLEAN`, and `uploadToStaging` uses `access: "public"` | `packages/jobs/src/functions/malwareScan.ts:9-13`, `packages/storage/src/index.ts:13` | Implement Cloudmersive/ClamAV **before** any customer upload feature (manuscripts, self-publishing) ships. Make staging `private`. Make `quarantine` move rather than delete. |
+| M7 | Malware scan is a stub that always returns `CLEAN`, and `uploadToStaging` uses `access: "public"` | `packages/storage/src/scan.ts`, `packages/storage/src/index.ts:13` | Implement Cloudmersive/ClamAV **before** any customer upload feature (manuscripts, self-publishing) ships. Make staging `private`. Make `quarantine` move rather than delete. |
 | M8 | Admin proxy matcher uses prefix lookahead, so `/joinX`, `/sign-inY` and similar skip auth | `apps/admin/proxy.ts:13` | Anchor it: `(?!(?:sign-in|forgot-password|reset-password|unauthorized|join)(?:/|$)|_next/static|_next/image|favicon.ico)`. Also add a `requireStaff()` guard in admin **pages** that render PII (orders, submissions, royalties) as defence in depth. The docs say proxy is not a security boundary, but those pages rely on it today. |
 | M9 | Inngest endpoint must verify signatures | `apps/web/app/api/inngest/route.ts` | Make sure `INNGEST_SIGNING_KEY` is set in production (Inngest v3 then rejects unsigned calls) and that `INNGEST_DEV` is never set there. Add a startup assertion. |
 | M10 | Secrets live where they aren't needed | `apps/admin/.env.example` lists `RAZORPAY_KEY_SECRET`, `INNGEST_*` (admin imports neither `@repo/payments` nor `@repo/jobs`). `apps/web` lists `DIRECT_URL` and `BLOB_READ_WRITE_TOKEN` (runtime unused today) | Remove them. Give each app its own Supabase **secret key** (the new `sb_secret_…` keys) so each can be rotated on its own, and delete the legacy `service_role` JWT once migrated. |
@@ -310,7 +310,7 @@ Phases are ordered by risk, not effort. Each task lists **Where** (code vs dashb
 **2.1 Secrets management (M10).**
 - Store secrets per app and per environment in Vercel. Mark them **Sensitive**. Keep production-only secrets out of Preview.
 - Move to Supabase's new publishable and secret API keys, with one secret key per app.
-- Write a rotation runbook for the Razorpay key and webhook secret, Supabase keys, Resend, Inngest, and the DB password.
+- Write a rotation runbook for the Razorpay key and webhook secret, Supabase keys, Resend, and the DB password.
 - Remove unused secrets from `apps/admin`.
 
 **2.2 Database hygiene.**
@@ -358,7 +358,7 @@ Enable GitHub **secret scanning + push protection** and a **branch protection** 
 **3.4 Privacy and compliance (India).**
 - **DPDP Act 2023**: a privacy notice, clear consent at sign-up and checkout, a documented purpose for each PII field, and self-service **account deletion and data export** for customers (currently missing).
 - Retention rules: purge abandoned PENDING orders and expired `staff_invites`.
-- Data-processing agreements with Supabase, Vercel, Resend, Razorpay, and Inngest.
+- Data-processing agreements with Supabase, Vercel, Resend, and Razorpay.
 - **PCI DSS**: card data never touches the servers (Razorpay Checkout), so scope stays minimal. Keep it that way: never log Razorpay payloads in full, and never add a custom card form.
 - **GST invoices** carry PII too, so apply the same access rules when that feature lands.
 

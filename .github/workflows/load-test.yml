@@ -1,0 +1,38 @@
+# Load test on demand (docs/testing.md): Actions → load-test → Run workflow.
+# Point it at a STAGING deployment only — every request reads the database,
+# and the point is to push it. Results are in the job summary log.
+name: load-test
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Staging URL of the storefront (never production)
+        required: true
+      connections:
+        description: Concurrent connections per scenario
+        default: "20"
+      duration:
+        description: Seconds per scenario
+        default: "30"
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:load --workspace=web -- --confirm-remote
+        env:
+          LOAD_TEST_URL: ${{ inputs.url }}
+          LOAD_CONNECTIONS: ${{ inputs.connections }}
+          LOAD_DURATION: ${{ inputs.duration }}
+          E2E_VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

@@ -84,13 +84,16 @@ export * from "./book-formats";
 // Discount-code rules (validity, amount off), shared by the cart, checkout
 // and apps/admin's Discount page.
 export * from "./discounts";
-// Taking stock at checkout and returning it on cancel, shared by apps/web's
-// checkout and apps/admin's order page.
-export * from "./stock";
 // The demo book catalogue the seed writes and apps/web falls back to — one
 // list of titles, so the storefront and the admin never disagree about
 // what's in the shop.
 export * from "./book-catalog";
+// The sales-order lifecycle (online/offline parts, shipment steps), shared by
+// apps/admin's Sales Orders page and the storefront's order tracking.
+export * from "./shipment";
+// Taking stock off the shelf for an order and putting it back when one is
+// cancelled — by checkout in apps/web, by a refused sales order in apps/admin.
+export * from "./stock";
 
 import { mergeContent, type ContentMap } from "./content";
 import {

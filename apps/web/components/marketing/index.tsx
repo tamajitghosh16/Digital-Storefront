@@ -16,6 +16,8 @@ import { BookJacket } from "@/components/commerce/book-jacket";
 export interface HeroJacket {
   title: string;
   author: string;
+  /** The uploaded front-cover scan; without one the jacket is drawn. */
+  imageUrl?: string | null;
   from?: string;
   to?: string;
 }
@@ -72,6 +74,7 @@ export function Hero({
               key={`${jacket.title}-${i}`}
               title={jacket.title}
               author={jacket.author}
+              imageUrl={jacket.imageUrl}
               from={jacket.from}
               to={jacket.to}
               className={cn("absolute", fan[i])}
@@ -105,7 +108,10 @@ const BAND_HEADING = "text-[32px] leading-[1.15] tracking-[-0.02em]";
 /** Digital & Tech Solutions' teal and Lifestyle's green — the two accent
  *  pairs the mockup keeps from the storefront's own per-line palette. */
 const TEAL = { border: "#0f8a95", from: "#e3f2f2", to: "#cfe6e6" };
-const GREEN = { text: "#2f8b52", from: "#e6f2ea", to: "#d5e8db" };
+// `text` is the darkest of the greens: white on it, and it on the white card,
+// both clear WCAG AA (5.6:1). The card turns dark in dark mode, where the
+// label switches to `textOnDark` instead.
+const GREEN = { text: "#27764a", textOnDark: "#6fcf97", from: "#e6f2ea", to: "#d5e8db" };
 const GOLD = "#b08600";
 
 /** A striped stand-in for a product photo, labelled with what belongs there. */
@@ -409,7 +415,10 @@ export function LifestyleBand({
         />
         <div className="absolute inset-x-4 bottom-4 max-w-[420px] rounded-tile bg-ground p-6 shadow-pop min-[760px]:inset-x-auto min-[760px]:bottom-6 min-[760px]:left-6 min-[760px]:p-8">
           <h2 className={BAND_HEADING}>{title}</h2>
-          <p className="mt-2 text-[15px] font-bold" style={{ color: GREEN.text }}>
+          <p
+            className="mt-2 text-[15px] font-bold text-(--band-green) dark:text-(--band-green-dark)"
+            style={{ "--band-green": GREEN.text, "--band-green-dark": GREEN.textOnDark } as React.CSSProperties}
+          >
             {item.label}
           </p>
           <p className="mt-3 max-w-[40ch] text-[15px] leading-[1.6] text-ink-muted">{body}</p>
@@ -573,7 +582,7 @@ export function Newsletter({
         <h2 className="text-[28px]">{title}</h2>
         <p className="mt-2.5 max-w-[52ch] text-base leading-[1.55]">{body}</p>
         {/* No mailing-list backend in this scaffold yet — wiring it up means
-            an inngest.send() from a Server Action (packages/jobs). */}
+            a Server Action that calls the provider directly. */}
         <form className="mt-5 flex max-w-[520px] flex-wrap gap-2.5">
           <label htmlFor="newsletter-email" className="sr-only">
             Email address

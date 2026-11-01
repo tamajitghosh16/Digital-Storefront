@@ -141,6 +141,7 @@ export default async function HomePage() {
         jackets={allBooks.slice(0, 4).map((book) => ({
           title: book.title,
           author: book.author,
+          imageUrl: book.coverImageUrl,
           from: book.coverFrom,
           to: book.coverTo,
         }))}

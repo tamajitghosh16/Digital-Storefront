@@ -8,9 +8,10 @@ import type { BookEdition, Product } from "@repo/database";
 type BookRow = Product & { editions: BookEdition[]; coverFrom: string; coverTo: string };
 import { LayoutGrid, List, Search } from "lucide-react";
 import { cn } from "@repo/ui/utils";
-import { EmptyState, Pill, Thumb, controlClass } from "@/components/ui";
+import { EmptyState, EvenTable, Pill, Thumb, controlClass } from "@/components/ui";
 import { LinkButton } from "@/components/form-controls";
-import { toggleProductPublished } from "./actions";
+import { DeleteItemButton } from "@/components/delete-item-button";
+import { deleteProduct, toggleProductPublished } from "./actions";
 
 /**
  * The interactive half of the Books list: search, sort, and table/grid
@@ -196,86 +197,71 @@ export function BooksList({ products }: { products: BookRow[] }) {
 
 function BooksTable({ products }: { products: BookRow[] }) {
   return (
-    <div className="overflow-x-auto rounded-tile border border-line-strong bg-ground">
-      <table className="w-full min-w-[48rem] text-sm">
-        <thead className="border-b border-line-strong text-left">
-          <tr className="[&>th]:px-4 [&>th]:py-3 [&>th]:text-xs [&>th]:font-medium [&>th]:text-ink-muted">
-            <th>Sl. no</th>
-            <th>Title</th>
-            <th>Author</th>
-            <th>Status</th>
-            <th>Stock</th>
-            <th>Format</th>
-            <th>Price per copy</th>
-            <th className="text-right">&nbsp;</th>
-          </tr>
-        </thead>
-        <tbody className="[&>tr:not(:last-child)]:border-b [&>tr:not(:last-child)]:border-line [&>tr>td]:px-4 [&>tr>td]:py-3 [&>tr]:align-middle">
-          {products.map((product, index) => {
-            const lines = formatLines(product);
-            return (
-              <tr key={product.id}>
-                <td className="tabular-nums text-ink-muted">{index + 1}</td>
-                <td>
-                  <div className="flex items-center gap-3">
-                    <Thumb
-                      src={product.coverImageUrl}
-                      alt=""
-                      title={product.title}
-                      from={product.coverFrom}
-                      to={product.coverTo}
-                    />
-                    <Link
-                      href={`/educational-material/books/${product.id}`}
-                      className="font-semibold text-ink hover:text-brand hover:underline"
-                    >
-                      {product.title}
-                    </Link>
-                  </div>
-                </td>
-                <td className="text-ink-muted">{product.author}</td>
-                <td>
-                  <InventoryStatusCell status={product.inventoryStatus} />
-                </td>
-                <td className="tabular-nums text-ink-muted">
-                  <div className="flex flex-col gap-1">
-                    {lines.map((line, i) => (
-                      <span key={i}>{line.stock}</span>
-                    ))}
-                  </div>
-                </td>
-                <td className="min-w-[8.5rem]">
-                  <div className="flex flex-col gap-1">
-                    {lines.map((line, i) => (
-                      <span key={i} className={cn("whitespace-nowrap font-medium", line.colorClass)}>
-                        {line.label}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="tabular-nums">
-                  <div className="flex flex-col gap-1">
-                    {lines.map((line, i) => (
-                      <span key={i} className={line.colorClass}>
-                        {money.format(line.priceCents / 100)}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <Pill tone={product.isPublished ? "on" : "off"}>{product.isPublished ? "Showing" : "Hidden"}</Pill>
-                    <form action={toggleProductPublished.bind(null, product.id)}>
-                      <LinkButton>{product.isPublished ? "Hide" : "Show"}</LinkButton>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <EvenTable
+      head={[
+        "Sl. no",
+        "Title",
+        "Author",
+        "Status",
+        "Stock",
+        "Format",
+        "Price per copy",
+        "Visibility",
+        { srOnly: "Delete" },
+      ]}
+      rows={products.map((product, index) => {
+        const lines = formatLines(product);
+        return {
+          key: product.id,
+          cells: [
+            <span key="n" className="tabular-nums text-ink-muted">{index + 1}</span>,
+            <div key="title" className="flex items-center gap-3">
+              <Thumb
+                src={product.coverImageUrl}
+                alt=""
+                title={product.title}
+                from={product.coverFrom}
+                to={product.coverTo}
+              />
+              <Link
+                href={`/educational-material/books/${product.id}`}
+                className="block max-w-[14rem] font-semibold text-ink hover:text-brand hover:underline"
+              >
+                {product.title}
+              </Link>
+            </div>,
+            <p key="author" className="max-w-[12rem] text-ink-muted">{product.author}</p>,
+            <InventoryStatusCell key="status" status={product.inventoryStatus} />,
+            <div key="stock" className="flex flex-col gap-1 tabular-nums text-ink-muted">
+              {lines.map((line, i) => (
+                <span key={i}>{line.stock}</span>
+              ))}
+            </div>,
+            <div key="format" className="flex flex-col gap-1">
+              {lines.map((line, i) => (
+                <span key={i} className={cn("whitespace-nowrap font-medium", line.colorClass)}>
+                  {line.label}
+                </span>
+              ))}
+            </div>,
+            <div key="price" className="flex flex-col gap-1 tabular-nums">
+              {lines.map((line, i) => (
+                <span key={i} className={line.colorClass}>
+                  {money.format(line.priceCents / 100)}
+                </span>
+              ))}
+            </div>,
+            <div key="visibility" className="flex items-center gap-2">
+              <Pill tone={product.isPublished ? "on" : "off"}>{product.isPublished ? "Showing" : "Hidden"}</Pill>
+              <form action={toggleProductPublished.bind(null, product.id)}>
+                <LinkButton>{product.isPublished ? "Hide" : "Show"}</LinkButton>
+              </form>
+            </div>,
+            <DeleteItemButton key="delete" itemName={product.title} onConfirm={() => deleteProduct(product.id)} />,
+          ],
+        };
+      })}
+    />
   );
 }
 
@@ -322,11 +308,14 @@ function BooksGrid({ products }: { products: BookRow[] }) {
               ))}
             </div>
 
-            <div className="mt-3.5 flex items-center justify-between border-t border-line pt-3.5">
+            <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3.5">
               <Pill tone={product.isPublished ? "on" : "off"}>{product.isPublished ? "Showing" : "Hidden"}</Pill>
-              <form action={toggleProductPublished.bind(null, product.id)}>
-                <LinkButton>{product.isPublished ? "Hide" : "Show"}</LinkButton>
-              </form>
+              <div className="flex items-center gap-2">
+                <form action={toggleProductPublished.bind(null, product.id)}>
+                  <LinkButton>{product.isPublished ? "Hide" : "Show"}</LinkButton>
+                </form>
+                <DeleteItemButton itemName={product.title} onConfirm={() => deleteProduct(product.id)} />
+              </div>
             </div>
           </div>
         );

@@ -1,0 +1,137 @@
+# Continuous deployment checks. Vercel deploys both apps from GitHub
+# (docs/production-launch.md, Phase 6) and reports each deployment back as a
+# GitHub deployment status; when one succeeds, this verifies the live URL:
+#   - @smoke, @sanity and @security Playwright tests against the deployment
+#   - OWASP ZAP baseline scan (passive; report only)
+#   - Lighthouse performance budgets (storefront only)
+#
+# Secrets: VERCEL_AUTOMATION_BYPASS_SECRET (Vercel → project → Settings →
+# Deployment Protection → Protection Bypass for Automation) so tests can reach
+# protected previews. Same value for both projects, or name it per project.
+name: post-deploy
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-deploy-${{ github.event.deployment.id }}
+  cancel-in-progress: true
+
+jobs:
+  target:
+    name: Identify deployment
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.which.outputs.app }}
+      url: ${{ steps.which.outputs.url }}
+      production: ${{ steps.which.outputs.production }}
+    steps:
+      - id: which
+        env:
+          ENVIRONMENT: ${{ github.event.deployment.environment }}
+          URL: ${{ github.event.deployment_status.environment_url || github.event.deployment_status.target_url }}
+        run: |
+          # Vercel names environments "Preview – <project>" / "Production – <project>".
+          case "$ENVIRONMENT" in
+            *admin*) app=admin ;;
+            *) app=web ;;
+          esac
+          case "$ENVIRONMENT" in
+            Production*) production=1 ;;
+            *) production= ;;
+          esac
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "url=${URL%/}" >> "$GITHUB_OUTPUT"
+          echo "production=$production" >> "$GITHUB_OUTPUT"
+          echo "Verifying $app at ${URL%/} (${ENVIRONMENT})"
+
+  smoke:
+    name: Smoke, sanity, security (${{ needs.target.outputs.app }})
+    needs: target
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run against the deployment
+        env:
+          E2E_WEB_URL: ${{ needs.target.outputs.app == 'web' && needs.target.outputs.url || '' }}
+          E2E_ADMIN_URL: ${{ needs.target.outputs.app == 'admin' && needs.target.outputs.url || '' }}
+          E2E_PRODUCTION: ${{ needs.target.outputs.production }}
+          E2E_VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: >-
+          npx playwright test --config testing/playwright.config.ts
+          --project=desktop --grep "@smoke|@sanity|@security"
+        working-directory: apps/${{ needs.target.outputs.app }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: post-deploy-report-${{ needs.target.outputs.app }}
+          path: apps/${{ needs.target.outputs.app }}/testing/playwright-report
+          retention-days: 14
+
+  zap:
+    name: OWASP ZAP baseline (${{ needs.target.outputs.app }})
+    needs: target
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha }}
+      # Passive scan: spiders the site and flags missing headers, leaky
+      # cookies, mixed content and the like. Report only for now — tighten
+      # `fail_action` once the first report is triaged (rules file:
+      # .github/zap-rules.tsv).
+      - uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ needs.target.outputs.url }}
+          rules_file_name: .github/zap-rules.tsv
+          fail_action: false
+          allow_issue_writing: false
+          artifact_name: zap-report-${{ needs.target.outputs.app }}
+          cmd_options: >-
+            -z "-config replacer.full_list(0).description=vercel-bypass
+            -config replacer.full_list(0).enabled=true
+            -config replacer.full_list(0).matchtype=REQ_HEADER
+            -config replacer.full_list(0).matchstr=x-vercel-protection-bypass
+            -config replacer.full_list(0).regex=false
+            -config replacer.full_list(0).replacement=${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}"
+
+  lighthouse:
+    name: Lighthouse budgets (web)
+    needs: target
+    if: needs.target.outputs.app == 'web'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:perf --workspace=web
+        env:
+          E2E_WEB_URL: ${{ needs.target.outputs.url }}
+          E2E_VERCEL_BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          CHROME_PATH: /usr/bin/google-chrome
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-reports
+          path: apps/web/testing/performance/reports
+          retention-days: 14

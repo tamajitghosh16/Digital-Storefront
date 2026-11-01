@@ -22,6 +22,13 @@ function optionalInt() {
   return z.preprocess((v) => (v === "" || v == null ? undefined : Number(v)), z.number().int().min(0, "Must be zero or more").optional());
 }
 
+function requiredInt(message: string) {
+  return z.preprocess(
+    (v) => (v === "" || v == null ? undefined : Number(v)),
+    z.number({ required_error: message, invalid_type_error: message }).int("Must be a whole number").min(0, "Must be zero or more")
+  );
+}
+
 export const simpleProductFormSchema = z.object({
   title: z.string().min(1, "A title is required").max(300, "That's too long"),
   // Stored in Product.author — labelled "Publisher or brand" / "Author or
@@ -34,7 +41,7 @@ export const simpleProductFormSchema = z.object({
   description: optional(z.string().max(5000, "That's too long")),
   price: z.coerce.number().min(0, "Price must be zero or positive"),
   coverImageUrl: optional(httpsUrl()),
-  stockQty: optionalInt(),
+  stockQty: requiredInt("Enter the copies in stock"),
   // A generic product code / ISBN — kept in Product.isbn, which is otherwise
   // books-only and unused for these lines.
   code: optional(z.string().max(500, "That's too long")),

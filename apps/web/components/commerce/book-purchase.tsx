@@ -47,11 +47,14 @@ const LABELS: Record<BookFormatKind, string> = {
 
 export function BookPurchase({
   title,
+  imageUrl,
   offers,
   tiers,
   isSignedIn,
 }: {
   title: string;
+  /** The front-cover scan, carried onto each cart line so the cart shows it. */
+  imageUrl?: string | null;
   offers: BookFormatOffer[];
   /** Admin-managed class-set tiers — the only pricing rule a printed line needs here. */
   tiers: ClassSetTierConfig[];
@@ -109,6 +112,7 @@ export function BookPurchase({
             taxType: "EBOOK",
             note: offer.detail,
             stockQty: null,
+            imageUrl: imageUrl ?? null,
           }
         : {
             productId: offer.lineId,
@@ -119,6 +123,7 @@ export function BookPurchase({
             taxType: "PHYSICAL_BOOK",
             note: LABELS[offer.kind],
             stockQty: offer.stockQty,
+            imageUrl: imageUrl ?? null,
           }
     );
   }

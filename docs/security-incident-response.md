@@ -49,7 +49,6 @@ Do whichever apply — speed beats perfection here.
 | DB password (`DATABASE_URL`/`DIRECT_URL`) | Storefront Supabase → Settings → Database | web + admin + `packages/database/.env` |
 | `RAZORPAY_KEY_SECRET` / `RAZORPAY_WEBHOOK_SECRET` | Razorpay Dashboard → API Keys / Webhooks | web |
 | `RESEND_API_KEY` | Resend → API Keys | web + admin |
-| `INNGEST_SIGNING_KEY` / `INNGEST_EVENT_KEY` | Inngest → Manage → Keys | web |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash console | web + admin |
 | `CLOUDMERSIVE_API_KEY` | Cloudmersive portal | web |
 

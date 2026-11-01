@@ -5,9 +5,10 @@ import Link from "next/link";
 import type { Product } from "@repo/database";
 import { LayoutGrid, List, Search } from "lucide-react";
 import { cn } from "@repo/ui/utils";
-import { EmptyState, Pill, Thumb, controlClass } from "@/components/ui";
+import { EmptyState, EvenTable, Pill, Thumb, controlClass } from "@/components/ui";
 import { LinkButton } from "@/components/form-controls";
-import { toggleLineProductPublished } from "./actions";
+import { DeleteItemButton } from "@/components/delete-item-button";
+import { deleteLineProduct, toggleLineProductPublished } from "./actions";
 import { lineBasePath, type ProductLineConfig } from "./product-line-config";
 
 /**
@@ -130,14 +131,15 @@ export function SimpleProductsList({ products, config }: { products: Product[]; 
   );
 }
 
-/** Status pill plus the hide/show toggle, bound to this line's route slug. */
+/** Grid-card footer: status pill, the hide/show toggle and Delete, bound to this line's route slug. */
 function StatusToggle({ product, slug }: { product: Product; slug: string }) {
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <Pill tone={product.isPublished ? "on" : "off"}>{product.isPublished ? "Showing" : "Hidden"}</Pill>
       <form action={toggleLineProductPublished.bind(null, slug, product.id)}>
         <LinkButton>{product.isPublished ? "Hide" : "Show"}</LinkButton>
       </form>
+      <DeleteItemButton itemName={product.title} onConfirm={() => deleteLineProduct(slug, product.id)} />
     </div>
   );
 }
@@ -145,41 +147,48 @@ function StatusToggle({ product, slug }: { product: Product; slug: string }) {
 function ProductsTable({ products, config }: { products: Product[]; config: ProductLineConfig }) {
   const base = lineBasePath(config.slug);
   return (
-    <div className="overflow-x-auto rounded-tile border border-line-strong bg-ground">
-      <table className="w-full min-w-[44rem] text-sm">
-        <thead className="border-b border-line-strong text-left">
-          <tr className="[&>th]:px-4 [&>th]:py-3 [&>th]:text-xs [&>th]:font-medium [&>th]:text-ink-muted">
-            <th>Sl. no</th>
-            <th>Title</th>
-            <th>{config.copy.makerLabel}</th>
-            <th>Stock</th>
-            <th>Price</th>
-            <th className="text-right">&nbsp;</th>
-          </tr>
-        </thead>
-        <tbody className="[&>tr:not(:last-child)]:border-b [&>tr:not(:last-child)]:border-line [&>tr>td]:px-4 [&>tr>td]:py-3 [&>tr]:align-middle">
-          {products.map((product, index) => (
-            <tr key={product.id}>
-              <td className="tabular-nums text-ink-muted">{index + 1}</td>
-              <td>
-                <div className="flex items-center gap-3">
-                  <Thumb src={product.coverImageUrl} alt="" title={product.title} />
-                  <Link href={`${base}/${product.id}`} className="font-semibold text-ink hover:text-brand hover:underline">
-                    {product.title}
-                  </Link>
-                </div>
-              </td>
-              <td className="text-ink-muted">{product.author}</td>
-              <td className="tabular-nums text-ink-muted">{product.stockQty != null ? product.stockQty : "—"}</td>
-              <td className="tabular-nums text-ink">{money.format(product.priceCents / 100)}</td>
-              <td className="text-right">
-                <StatusToggle product={product} slug={config.slug} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <EvenTable
+      head={[
+        "Sl. no",
+        "Title",
+        config.copy.makerLabel,
+        "Stock",
+        "Price",
+        "Visibility",
+        { srOnly: "Delete" },
+      ]}
+      rows={products.map((product, index) => ({
+        key: product.id,
+        cells: [
+          <span key="n" className="tabular-nums text-ink-muted">{index + 1}</span>,
+          <div key="title" className="flex items-center gap-3">
+            <Thumb src={product.coverImageUrl} alt="" title={product.title} />
+            <Link
+              href={`${base}/${product.id}`}
+              className="block max-w-[14rem] font-semibold text-ink hover:text-brand hover:underline"
+            >
+              {product.title}
+            </Link>
+          </div>,
+          <p key="maker" className="max-w-[12rem] text-ink-muted">{product.author}</p>,
+          <span key="stock" className="tabular-nums text-ink-muted">
+            {product.stockQty != null ? product.stockQty : "—"}
+          </span>,
+          <span key="price" className="tabular-nums text-ink">{money.format(product.priceCents / 100)}</span>,
+          <div key="visibility" className="flex items-center gap-2">
+            <Pill tone={product.isPublished ? "on" : "off"}>{product.isPublished ? "Showing" : "Hidden"}</Pill>
+            <form action={toggleLineProductPublished.bind(null, config.slug, product.id)}>
+              <LinkButton>{product.isPublished ? "Hide" : "Show"}</LinkButton>
+            </form>
+          </div>,
+          <DeleteItemButton
+            key="delete"
+            itemName={product.title}
+            onConfirm={() => deleteLineProduct(config.slug, product.id)}
+          />,
+        ],
+      }))}
+    />
   );
 }
 

@@ -1,13 +1,14 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@repo/auth/client";
 import { getWishlistedProductIds, toggleWishlist } from "@/lib/actions/wishlist";
 
 /**
  * Session-wide wishlist state, loaded once and shared by every heart button
  * on the page (catalogue tiles, the product page, the account wishlist
- * list) so toggling one updates them all instantly. There's no localStorage
+ * list) so toggling one updates them all instantly. Reloaded whenever the
+ * signed-in account changes (`userId` comes from the root layout), so a
+ * signed-out visitor never sees the previous account's hearts. There's no localStorage
  * fallback like `cart-store` — a wishlist only makes sense tied to an
  * account, so a signed-out visitor sees every heart unfilled and is sent to
  * sign in on click.
@@ -21,36 +22,42 @@ interface WishlistContextValue {
 
 const WishlistContext = createContext<WishlistContextValue | null>(null);
 
-export function WishlistProvider({ children }: { children: React.ReactNode }) {
+// Never mutated — every update copies it first.
+const NO_IDS = new Set<string>();
+
+export function WishlistProvider({ userId, children }: { userId: string | null; children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [ids, setIds] = useState<Set<string>>(new Set());
+  // Tagged with the account it was loaded for, so a change of account shows
+  // an empty wishlist straight away rather than the previous one's.
+  const [wishlist, setWishlist] = useState<{ userId: string | null; ids: Set<string> }>({
+    userId: null,
+    ids: new Set(),
+  });
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
-  const signedInRef = useRef(false);
+  const ids = wishlist.userId === userId ? wishlist.ids : NO_IDS;
+  const setIds = useCallback(
+    (update: (prev: Set<string>) => Set<string>) =>
+      setWishlist((prev) => ({ userId, ids: update(prev.userId === userId ? prev.ids : NO_IDS) })),
+    [userId]
+  );
 
   useEffect(() => {
     let active = true;
-    createClient()
-      .auth.getSession()
-      .then(({ data }) => {
-        if (!active) return;
-        signedInRef.current = Boolean(data.session);
-        if (!data.session) return;
-        getWishlistedProductIds()
-          .then((productIds) => {
-            if (active) setIds(new Set(productIds));
-          })
-          .catch(() => {});
+    if (!userId) return;
+    getWishlistedProductIds()
+      .then((productIds) => {
+        if (active) setWishlist({ userId, ids: new Set(productIds) });
       })
       .catch(() => {});
     return () => {
       active = false;
     };
-  }, []);
+  }, [userId]);
 
   const toggle = useCallback(
     (productId: string) => {
-      if (!signedInRef.current) {
+      if (!userId) {
         router.push(`/sign-in?next=${encodeURIComponent(pathname || "/")}`);
         return;
       }
@@ -96,7 +103,7 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
           });
         });
     },
-    [ids, pathname, router]
+    [ids, pathname, router, setIds, userId]
   );
 
   const value = useMemo<WishlistContextValue>(

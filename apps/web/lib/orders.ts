@@ -1,6 +1,6 @@
 import "server-only";
 import { Prisma, bookFormatLabel, prisma } from "@repo/database";
-import { inngest } from "@repo/jobs";
+import { sendOrderConfirmation } from "@repo/email";
 import { securityEvent } from "@repo/security/log";
 
 /**
@@ -45,6 +45,14 @@ export async function settleOrderPayment(params: {
         where: { id: params.orderId, status: "PENDING" },
         data: { status: "PAID" },
       });
+      // Paid is when the order counts as placed: anything printed in it now
+      // waits for staff to accept it on the admin Sales Orders page.
+      if (count === 1) {
+        await tx.order.updateMany({
+          where: { id: params.orderId, shipmentStatus: null, items: { some: { fulfillmentType: "SHIP" } } },
+          data: { shipmentStatus: "AWAITING_APPROVAL" },
+        });
+      }
       return count === 1;
     });
   } catch (error) {
@@ -73,22 +81,35 @@ export async function settleOrderPayment(params: {
     return "not_pending";
   }
 
-  const order = await prisma.order.findUniqueOrThrow({
-    where: { id: params.orderId },
-    include: { items: { include: { product: true } }, user: true },
-  });
-  await inngest.send({
-    name: "order/confirmed",
-    data: {
+  await sendOrderConfirmationEmail(params.orderId);
+  return "settled";
+}
+
+/**
+ * Emails the order confirmation. Never throws: by the time this runs the
+ * order already stands, and a mail-provider failure mustn't undo it or make
+ * the Razorpay webhook fail and retry. There is no automatic retry — a
+ * failure is only logged.
+ */
+export async function sendOrderConfirmationEmail(orderId: string, userEmail?: string): Promise<void> {
+  try {
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
+      include: { items: { include: { product: true } }, user: true },
+    });
+    const to = userEmail || order.user?.email || order.guestEmail;
+    if (!to) return;
+    await sendOrderConfirmation({
+      to,
       orderId: order.id,
-      userEmail: order.user?.email ?? order.guestEmail ?? "",
       totalCents: order.totalCents,
       items: order.items.map((item) => ({
         title: item.bookFormat ? `${item.product.title} (${bookFormatLabel(item.bookFormat)})` : item.product.title,
         quantity: item.quantity,
         priceCents: item.unitPriceCents,
       })),
-    },
-  });
-  return "settled";
+    });
+  } catch (error) {
+    console.error("[orders] could not send the order confirmation email", error);
+  }
 }

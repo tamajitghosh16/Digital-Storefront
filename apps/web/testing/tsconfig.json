@@ -1,0 +1,9 @@
+{
+  // Type-checks the tests (and the app code they import) apart from the app:
+  // the app's own tsconfig excludes testing/, so `next build` — and with it
+  // every Vercel deploy — never fails on a test file. `npm run typecheck`
+  // runs both.
+  "extends": "../tsconfig.json",
+  "include": ["../next-env.d.ts", "../types/**/*.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["playwright-report", "test-results"]
+}

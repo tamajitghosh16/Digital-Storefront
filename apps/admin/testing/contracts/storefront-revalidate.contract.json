@@ -1,0 +1,30 @@
+{
+  "consumer": "admin",
+  "provider": "web",
+  "description": "After a CMS or catalogue save, apps/admin (lib/storefront-cache.ts) asks apps/web (app/api/revalidate) to drop its cached reads. This is the only HTTP call between the two apps. Written by the consumer; apps/web/testing/contracts verifies the provider against it. `{{secret}}` is STOREFRONT_REVALIDATE_SECRET, the same value in both apps.",
+  "interactions": [
+    {
+      "name": "a cache ping carrying the shared secret",
+      "request": {
+        "method": "POST",
+        "path": "/api/revalidate",
+        "headers": { "Authorization": "Bearer {{secret}}" }
+      },
+      "response": {
+        "status": 200,
+        "body": { "revalidated": true }
+      }
+    },
+    {
+      "name": "a cache ping with the wrong secret",
+      "request": {
+        "method": "POST",
+        "path": "/api/revalidate",
+        "headers": { "Authorization": "Bearer not-the-secret" }
+      },
+      "response": {
+        "status": 401
+      }
+    }
+  ]
+}

@@ -5,7 +5,6 @@ import { after } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@repo/auth/server";
 import {
-  bookFormatLabel,
   discountAmountCents,
   getPricingConfig,
   gstAfterDiscountCents,
@@ -18,14 +17,13 @@ import {
   type Prisma,
   type Product,
 } from "@repo/database";
-import { inngest } from "@repo/jobs";
 import { createRazorpayOrder, fetchGatewayPayment, verifyPaymentSignature } from "@repo/payments";
 import { securityEvent } from "@repo/security/log";
 import { RATE_LIMITS, clientIp, rateLimit } from "@repo/security/rate-limit";
 import { isIndianState, type OrderBillingAddress, type OrderShippingAddress } from "@/lib/india-address";
 import { resolveDiscount } from "@/lib/discounts";
 import { ownsEbook } from "@/lib/library";
-import { settleOrderPayment } from "@/lib/orders";
+import { sendOrderConfirmationEmail, settleOrderPayment } from "@/lib/orders";
 import { OutOfStockError, expireCachedStock, returnStock, takeStock, type StockLine } from "@/lib/stock";
 import {
   deliveryFeeCents,
@@ -41,7 +39,8 @@ import {
  *
  *  - `placeCodOrder` — cash on delivery. No gateway: the order is confirmed
  *    straight away (PROCESSING) and its Payment stays CREATED, method COD,
- *    until the courier collects. Only for carts that ship entirely —
+ *    until the courier collects; its parcel still waits for staff approval
+ *    (`shipmentStatus` AWAITING_APPROVAL). Only for carts that ship entirely —
  *    e-books and services unlock on payment, so they can't be paid later.
  *  - `startCheckout` — online (UPI / net banking / cards) via Razorpay: hand
  *    back what the browser needs to open Razorpay Checkout, then verify the
@@ -472,6 +471,8 @@ export async function placeCodOrder(input: CheckoutInput): Promise<PlaceResult> 
       data: {
         ...orderData(user.id, prepared.order),
         status: "PROCESSING",
+        // Every COD line ships (checked above); staff accept it before it's packed.
+        shipmentStatus: "AWAITING_APPROVAL",
         payment: {
           create: {
             amountCents: prepared.order.totalCents,
@@ -486,35 +487,12 @@ export async function placeCodOrder(input: CheckoutInput): Promise<PlaceResult> 
   );
   if (!order) return { ok: false, error: "UNAVAILABLE" };
 
-  // Queued after the response is sent, so the shopper isn't kept waiting on
-  // a product lookup and the Inngest round trip — with no event key that's
-  // five retried 401s, ~6s. The order stands whether or not the email goes
-  // out; a queue hiccup mustn't make the shopper think it failed and order
-  // twice.
+  // Sent after the response has gone, so the shopper isn't kept waiting on
+  // a product lookup and the mail provider. The order stands whether or not
+  // the email goes out; a mail hiccup mustn't make the shopper think it
+  // failed and order twice.
   const userEmail = user.email || prepared.order.shippingAddress.email;
-  after(async () => {
-    try {
-      const placed = await prisma.order.findUniqueOrThrow({
-        where: { id: order.id },
-        include: { items: { include: { product: true } } },
-      });
-      await inngest.send({
-        name: "order/confirmed",
-        data: {
-          orderId: placed.id,
-          userEmail,
-          totalCents: placed.totalCents,
-          items: placed.items.map((item) => ({
-            title: item.bookFormat ? `${item.product.title} (${bookFormatLabel(item.bookFormat)})` : item.product.title,
-            quantity: item.quantity,
-            priceCents: item.unitPriceCents,
-          })),
-        },
-      });
-    } catch (error) {
-      console.error("[checkout] could not queue the COD confirmation email", error);
-    }
-  });
+  after(() => sendOrderConfirmationEmail(order.id, userEmail));
 
   return { ok: true, orderId: order.id, redirect: `/account/orders?placed=${order.id}` };
 }

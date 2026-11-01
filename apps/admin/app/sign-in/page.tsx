@@ -99,7 +99,7 @@ function SignInForm() {
 
         <div className="my-5 flex items-center gap-3">
           <span className="h-px flex-1 bg-line" />
-          <span className="text-xs text-ink-subtle">or continue with</span>
+          <span className="text-xs text-ink-muted">or continue with</span>
           <span className="h-px flex-1 bg-line" />
         </div>
         <button type="button" onClick={handleGoogle} className={buttonClass("secondary", "w-full")}>

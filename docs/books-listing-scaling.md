@@ -54,8 +54,8 @@ What made the Postgres branch real, from the state described below:
    a rating once `reviewCount > 0`, so a freshly added, unreviewed book
    reads as "no rating yet" rather than "rated zero". Nothing aggregates
    real `Review` rows into `ratingAvg`/`reviewCount` yet — that's the next
-   piece of this, once reviews go through a moderation flow that fires a
-   `packages/jobs` event on approval.
+   piece of this, once reviews go through a moderation flow that recomputes
+   them on approval.
 
 ## Still open, for genuine O(1M) scale
 

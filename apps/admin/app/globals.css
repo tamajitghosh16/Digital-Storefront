@@ -79,6 +79,16 @@
   --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
 
+/* The one exception to "status colour collapses to ink": permanent
+   deletes. A Delete that can't be undone is outlined in red so it never
+   reads like the Hide/Show link next to it (components/delete-item-button
+   .tsx). Registered with @theme so `text-danger`/`bg-danger` exist; the
+   `.dark` block below lifts it to a lighter red that holds up on black. */
+@theme {
+  --color-danger: #d92d20;
+  --color-on-danger: #ffffff;
+}
+
 /* Dark mode: the same ink-on-paper idea, inverted — white ink on a black
    ground rather than a separate palette. Toggled by next-themes' `class`
    attribute on <html> (see components/theme-provider.tsx); this overrides
@@ -107,6 +117,8 @@
   --color-ok: #ffffff;
   --color-warn: #ffffff;
   --color-sale: #ffffff;
+  --color-danger: #f97066;
+  --color-on-danger: #000000;
 
   --color-band: #ffffff;
   --color-band-ink: #000000;

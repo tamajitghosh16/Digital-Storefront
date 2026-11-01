@@ -3,9 +3,8 @@ import { revalidateTag } from "next/cache";
 import type { StockLine } from "@repo/database";
 import { PRODUCTS_CACHE_TAG } from "./products-cache";
 
-// Taking and returning stock lives in @repo/database (src/stock.ts) so
-// apps/admin can put a cancelled order's copies back with the same rules.
-// Re-exported here so checkout keeps one import for everything stock.
+// The stock arithmetic itself lives in @repo/database (src/stock.ts), shared
+// with apps/admin, which returns a refused sales order's copies.
 export { OutOfStockError, returnStock, takeStock, type StockLine } from "@repo/database";
 
 /**
