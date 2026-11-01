@@ -109,7 +109,7 @@ export default async function OrderDetailPage({
                     key={status}
                     value={status}
                     label={ships || status !== "DELIVERED" ? ORDER_STATUS_LABEL[status] : "Completed"}
-                    help={nextStatusHelp(status, ships)}
+                    help={nextStatusHelp(status, ships, order.status)}
                   />
                 ))}
               </fieldset>

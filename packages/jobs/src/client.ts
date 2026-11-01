@@ -9,7 +9,12 @@ type Events = {
   "order/confirmed": {
     data: { orderId: string; userEmail: string; totalCents: number; items: { title: string; quantity: number; priceCents: number }[] };
   };
-  "order/shipped": { data: { orderId: string; userEmail: string; trackingNumber: string } };
+  // Sent by apps/admin when staff mark an order shipped. `ordersUrl` is the
+  // storefront's My Orders page (where the carrier's tracking link lives),
+  // when admin knows the storefront's address.
+  "order/shipped": {
+    data: { orderId: string; userEmail: string; carrier: string; trackingNumber: string; ordersUrl?: string };
+  };
   "project/status_changed": { data: { projectId: string; authorEmail: string; bookTitle: string; status: string } };
   "submission/received": { data: { kind: "self_publishing" | "service_request"; id: string; staffEmails: string[] } };
   "upload/scan_requested": { data: { fileAssetId: string; blobPath: string } };

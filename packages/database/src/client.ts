@@ -84,6 +84,9 @@ export * from "./book-formats";
 // Discount-code rules (validity, amount off), shared by the cart, checkout
 // and apps/admin's Discount page.
 export * from "./discounts";
+// Taking stock at checkout and returning it on cancel, shared by apps/web's
+// checkout and apps/admin's order page.
+export * from "./stock";
 // The demo book catalogue the seed writes and apps/web falls back to — one
 // list of titles, so the storefront and the admin never disagree about
 // what's in the shop.

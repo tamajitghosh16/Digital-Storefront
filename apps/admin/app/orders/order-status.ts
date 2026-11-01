@@ -88,8 +88,21 @@ export function nextStatuses(order: OrderShape): OrderStatus[] {
   return next;
 }
 
+/** Not yet handed to a courier — whatever it took from stock is still on the shelf. */
+const NOT_YET_SENT: OrderStatus[] = ["PENDING", "PAID", "PROCESSING"];
+
+/**
+ * Cancelling (or refunding) an order that never left puts its copies back
+ * in stock. Once shipped, the parcel is out of our hands; if it comes back,
+ * staff add the copies back on the item's page.
+ */
+export function stockGoesBack(from: OrderStatus, to: OrderStatus): boolean {
+  return (to === "CANCELLED" || to === "REFUNDED") && NOT_YET_SENT.includes(from);
+}
+
 /** The line under each choice on the order page, saying what it means for the customer. */
-export function nextStatusHelp(status: OrderStatus, ships: boolean): string {
+export function nextStatusHelp(status: OrderStatus, ships: boolean, from: OrderStatus): string {
+  const restocks = ships && stockGoesBack(from, status) ? " Its copies go back into stock." : "";
   switch (status) {
     case "PROCESSING":
       return ships
@@ -100,9 +113,9 @@ export function nextStatusHelp(status: OrderStatus, ships: boolean): string {
     case "DELIVERED":
       return ships ? "The parcel has reached the customer." : "Everything has been handed over to the customer.";
     case "CANCELLED":
-      return "It won't be sent. If they paid online, refund them in Razorpay, then come back and mark the order Refunded.";
+      return `It won't be sent.${restocks} If they paid online, refund them in Razorpay, then come back and mark the order Refunded.`;
     case "REFUNDED":
-      return "You've already given their money back (in Razorpay, or in cash). Choosing this doesn't send the refund for you.";
+      return `You've already given their money back (in Razorpay, or in cash). Choosing this doesn't send the refund for you.${restocks}`;
     default:
       return "";
   }

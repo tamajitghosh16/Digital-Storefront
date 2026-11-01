@@ -301,11 +301,16 @@ DELIVERED. Gated on `ORDER_WRITE_ROLES` (Support included). Each save is
 conditional on the status the page rendered with (`expectedStatus`), and
 writes an `AuditLog` row (`order.status_changed`, `order.tracking_updated`,
 `order.cod_collected`, old/new values in `diff`) that the order page lists
-as its History. Marking SHIPPED sends `order/shipped` via `@repo/jobs` from
-`after()`, best-effort. There is **no** PENDING → PAID move here, by design:
-online payment is settled only by `apps/web`'s `settleOrderPayment`.
-Cancelling doesn't put stock back yet, and "Refunded" records a refund made
-in Razorpay — it doesn't send one.
+as its History. Cancelling (or refunding) an order that hadn't shipped yet
+puts its copies back in stock, in the same transaction, with `returnStock`
+from `@repo/database` — the same helper checkout uses — then pings
+`revalidateStorefront()`; once shipped, stock is left alone. Marking SHIPPED
+sends `order/shipped` via `@repo/jobs` from `after()`, best-effort, and
+`apps/web`'s Inngest route turns it into the customer's "on its way" email
+(`sendOrderShipped`, linking to My Orders via `NEXT_PUBLIC_STOREFRONT_URL`).
+There is **no** PENDING → PAID move here, by design: online payment is
+settled only by `apps/web`'s `settleOrderPayment`. "Refunded" records a
+refund made in Razorpay — it doesn't send one.
 
 **Still read-only stubs:** `submissions`, `royalties`, `reviews`,
 `analytics` — these still do a direct read-only Prisma query with no

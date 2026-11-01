@@ -1,7 +1,7 @@
 import { serve } from "inngest/next";
-import { inngest, onOrderConfirmed, onProjectStatusChanged, onUploadScanRequested } from "@repo/jobs";
+import { inngest, onOrderConfirmed, onOrderShipped, onProjectStatusChanged, onUploadScanRequested } from "@repo/jobs";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [onOrderConfirmed, onProjectStatusChanged, onUploadScanRequested],
+  functions: [onOrderConfirmed, onOrderShipped, onProjectStatusChanged, onUploadScanRequested],
 });

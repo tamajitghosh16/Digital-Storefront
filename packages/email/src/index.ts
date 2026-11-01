@@ -1,6 +1,7 @@
 import "server-only";
 import { Resend } from "resend";
 import { OrderConfirmation } from "./templates/OrderConfirmation";
+import { OrderShipped } from "./templates/OrderShipped";
 import { ProjectStatusChanged } from "./templates/ProjectStatusChanged";
 import { StaffInvite } from "./templates/StaffInvite";
 
@@ -40,6 +41,21 @@ export async function sendOrderConfirmation(params: {
     to: params.to,
     subject: `Order confirmed — #${subjectPart(params.orderId, 40)}`,
     react: OrderConfirmation(params),
+  });
+}
+
+export async function sendOrderShipped(params: {
+  to: string;
+  orderRef: string;
+  carrier: string;
+  trackingNumber: string;
+  ordersUrl?: string;
+}) {
+  return getResendClient().emails.send({
+    from: FROM,
+    to: params.to,
+    subject: `Your order ${subjectPart(params.orderRef, 40)} is on its way`,
+    react: OrderShipped(params),
   });
 }
 

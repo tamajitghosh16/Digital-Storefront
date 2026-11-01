@@ -3,11 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { prisma, type OrderStatus, type Prisma } from "@repo/database";
+import { prisma, returnStock, type OrderStatus, type Prisma, type StockLine } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, ORDER_WRITE_ROLES } from "@repo/auth/roles";
 import { inngest } from "@repo/jobs";
-import { ORDER_STATUS_LABEL, canMarkCashCollected, nextStatuses } from "./order-status";
+import { revalidateStorefront } from "@/lib/storefront-cache";
+import { ORDER_STATUS_LABEL, canMarkCashCollected, nextStatuses, stockGoesBack } from "./order-status";
 import { orderUpdateFormSchema } from "./schema";
 
 // Moving an order along its fulfilment path, and recording COD cash as
@@ -52,7 +53,7 @@ export async function updateOrder(orderId: string, formData: FormData) {
     where: { id: orderId },
     include: {
       payment: true,
-      items: { select: { fulfillmentType: true } },
+      items: { select: { productId: true, bookFormat: true, quantity: true, fulfillmentType: true } },
       user: { select: { email: true } },
     },
   });
@@ -92,6 +93,19 @@ export async function updateOrder(orderId: string, formData: FormData) {
   const refundPayment = targetStatus === "REFUNDED" && statusChanged && order.payment?.status === "CAPTURED";
   if (refundPayment) diff.paymentStatus = { from: "CAPTURED", to: "REFUNDED" };
 
+  // Stopped before it left the building: the copies checkout took off the
+  // shelf go back. `returnStock` skips any counter staff don't track, which
+  // is also how checkout decided what to take — except for an item whose
+  // counting was switched on after this order was placed, which gets back
+  // copies it never gave. Rare enough to live with; staff can correct it on
+  // the item's page.
+  const restock: StockLine[] =
+    statusChanged && stockGoesBack(order.status, targetStatus)
+      ? order.items
+          .filter((item) => item.fulfillmentType === "SHIP")
+          .map(({ productId, bookFormat, quantity }) => ({ productId, bookFormat, quantity }))
+      : [];
+
   try {
     await prisma.$transaction(async (tx) => {
       // Conditional on the status we read, so two people saving at once
@@ -104,6 +118,9 @@ export async function updateOrder(orderId: string, formData: FormData) {
       if (refundPayment) {
         await tx.payment.update({ where: { id: order.payment!.id }, data: { status: "REFUNDED" } });
       }
+      // Inside the same transaction as the status change, which only one
+      // save can win — so the copies go back exactly once.
+      if (restock.length) await returnStock(tx, restock);
       await tx.auditLog.create({
         data: {
           actorId: staff.id,
@@ -111,7 +128,7 @@ export async function updateOrder(orderId: string, formData: FormData) {
           action: statusChanged ? "order.status_changed" : "order.tracking_updated",
           entity: "Order",
           entityId: orderId,
-          diff: diff as Prisma.InputJsonValue,
+          diff: (restock.length ? { ...diff, stockReturned: restock } : diff) as Prisma.InputJsonValue,
         },
       });
     });
@@ -120,15 +137,20 @@ export async function updateOrder(orderId: string, formData: FormData) {
     throw error;
   }
 
+  // The storefront caches stock figures with the catalogue.
+  if (restock.length) revalidateStorefront();
+
   if (statusChanged && targetStatus === "SHIPPED") {
     const userEmail = order.user?.email ?? order.guestEmail ?? shippingEmail(order.shippingAddress);
+    const ordersUrl = storefrontOrdersUrl();
     // After the response, and best-effort: with no Inngest key configured a
     // send retries for several seconds, and the order is shipped either way.
     after(async () => {
+      if (!userEmail) return;
       try {
         await inngest.send({
           name: "order/shipped",
-          data: { orderId, userEmail: userEmail ?? "", trackingNumber: trackingNumber! },
+          data: { orderId, userEmail, carrier: carrier!, trackingNumber: trackingNumber!, ...(ordersUrl && { ordersUrl }) },
         });
       } catch (error) {
         console.error("[orders] could not queue the order-shipped event", error);
@@ -192,6 +214,17 @@ export async function markCashCollected(orderId: string) {
   revalidatePath("/orders");
   revalidatePath(`/orders/${orderId}`);
   back(orderId, `saved=${encodeURIComponent("Cash marked as collected.")}`);
+}
+
+/** The customer's My Orders page on the storefront, for the shipped email's button. */
+function storefrontOrdersUrl(): string | null {
+  const storefrontUrl = process.env.NEXT_PUBLIC_STOREFRONT_URL?.trim();
+  if (!storefrontUrl) return null;
+  try {
+    return new URL("/account/orders", storefrontUrl).toString();
+  } catch {
+    return null;
+  }
 }
 
 /** The email typed at checkout, from the `shippingAddress` snapshot. */
