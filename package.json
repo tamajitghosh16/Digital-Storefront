@@ -38,11 +38,11 @@
     "postinstall": "npm run db:generate"
   },
   "devDependencies": {
-    "prettier": "^3.4.0",
-    "turbo": "^2.3.0",
+    "prettier": "^3.9.10",
+    "turbo": "^2.11.10",
     "typescript": "^5.7.0"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.131.0"
+    "@anthropic-ai/sdk": "^0.137.0"
   }
 }
