@@ -1,10 +1,36 @@
 {
   "consumer": "admin",
   "provider": "web",
-  "description": "After a CMS or catalogue save, apps/admin (lib/storefront-cache.ts) asks apps/web (app/api/revalidate) to drop its cached reads. This is the only HTTP call between the two apps. Written by the consumer; apps/web/testing/contracts verifies the provider against it. `{{secret}}` is STOREFRONT_REVALIDATE_SECRET, the same value in both apps.",
+  "description": "After a CMS or catalogue save, apps/admin (lib/storefront-cache.ts) asks apps/web (app/api/revalidate) to drop the cached reads that save affected. This is the only HTTP call between the two apps. Written by the consumer; apps/web/testing/contracts verifies the provider against it. `{{secret}}` is STOREFRONT_REVALIDATE_SECRET, the same value in both apps. The body names the cache tags to expire (packages/cache/src/tags.ts) and the products whose covers to pre-build; a ping with no body (an older admin) expires everything.",
   "interactions": [
     {
-      "name": "a cache ping carrying the shared secret",
+      "name": "a targeted cache ping naming what changed",
+      "request": {
+        "method": "POST",
+        "path": "/api/revalidate",
+        "headers": { "Authorization": "Bearer {{secret}}", "Content-Type": "application/json" },
+        "body": { "tags": ["catalogue:covers", "catalogue:BOOK", "product:gitanjali"], "productIds": ["prod_123"] }
+      },
+      "response": {
+        "status": 200,
+        "body": { "revalidated": true, "expired": 3 }
+      }
+    },
+    {
+      "name": "a CMS-only cache ping that warms no covers",
+      "request": {
+        "method": "POST",
+        "path": "/api/revalidate",
+        "headers": { "Authorization": "Bearer {{secret}}", "Content-Type": "application/json" },
+        "body": { "tags": ["cms:faqs"], "productIds": [] }
+      },
+      "response": {
+        "status": 200,
+        "body": { "revalidated": true, "expired": 1 }
+      }
+    },
+    {
+      "name": "a bare cache ping from an older admin, expiring everything",
       "request": {
         "method": "POST",
         "path": "/api/revalidate",
@@ -12,7 +38,19 @@
       },
       "response": {
         "status": 200,
-        "body": { "revalidated": true }
+        "body": { "revalidated": true, "expired": 2 }
+      }
+    },
+    {
+      "name": "a cache ping naming a tag outside the taxonomy",
+      "request": {
+        "method": "POST",
+        "path": "/api/revalidate",
+        "headers": { "Authorization": "Bearer {{secret}}", "Content-Type": "application/json" },
+        "body": { "tags": ["_N_T_/everything"] }
+      },
+      "response": {
+        "status": 400
       }
     },
     {

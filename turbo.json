@@ -34,6 +34,10 @@
         "UPSTASH_REDIS_REST_TOKEN",
         "CSP_REPORT_ONLY",
         "STOREFRONT_REVALIDATE_SECRET",
+        "CACHE_STORE",
+        "CACHE_NAMESPACE",
+        "CACHE_DEBUG",
+        "DEPLOY_ENV",
         "VERCEL_ENV",
         "VERCEL_PROJECT_PRODUCTION_URL"
       ]

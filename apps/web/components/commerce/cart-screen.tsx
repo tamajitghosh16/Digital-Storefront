@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { Minus, Plus } from "lucide-react";
 import { cn } from "@repo/ui/utils";
 import type { Address } from "@repo/database";
@@ -141,56 +142,48 @@ export function CartScreen({
 
   // A line's stock is a snapshot from when it was added, so re-read the
   // shipped lines' live stock on opening the cart and on coming back to the
-  // tab — staff may have changed it in apps/admin since. Keyed on the line
-  // ids, not `items`, so the sync's own write doesn't trigger another fetch.
+  // tab — staff may have changed it in apps/admin since. Never treated as
+  // fresh (`staleTime: 0`): this is the last screen before a charge. Keyed on
+  // the line ids, not `items`, so the sync's own write doesn't refetch.
   const shipLineKey = items
     .filter((item) => item.fulfillmentType === "SHIP")
     .map((item) => item.productId)
     .sort()
     .join(",");
 
+  const { data: liveStock } = useQuery({
+    queryKey: ["cart-stock", shipLineKey],
+    queryFn: () => getCartStock(shipLineKey.split(",")),
+    enabled: shipLineKey !== "",
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    // Display only: checkout re-checks stock itself, so a failed refresh just leaves the snapshot.
+    retry: false,
+  });
   useEffect(() => {
-    if (!shipLineKey) return;
-    let cancelled = false;
-    const refresh = () => {
-      getCartStock(shipLineKey.split(","))
-        .then((stock) => {
-          if (!cancelled && stock) syncStock(stock);
-        })
-        // Display only: checkout re-checks stock itself, so a failed refresh just leaves the snapshot.
-        .catch(() => {});
-    };
-    const onVisible = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-    refresh();
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [shipLineKey, syncStock]);
+    if (liveStock) syncStock(liveStock);
+  }, [liveStock, syncStock]);
 
   // Same for covers, on every line: one added before lines carried a cover,
   // or whose cover staff have since replaced, picks up the current scan.
+  // Covers rarely change, so they're kept for five minutes — reopening the
+  // cart doesn't ask again.
   const lineKey = items
     .map((item) => item.productId)
     .sort()
     .join(",");
 
+  const { data: liveCovers } = useQuery({
+    queryKey: ["cart-covers", lineKey],
+    queryFn: () => getCartCovers(lineKey.split(",")),
+    enabled: lineKey !== "",
+    staleTime: 5 * 60_000,
+    // Display only: a failed refresh just leaves the remembered cover (or the drawn jacket).
+    retry: false,
+  });
   useEffect(() => {
-    if (!lineKey) return;
-    let cancelled = false;
-    getCartCovers(lineKey.split(","))
-      .then((covers) => {
-        if (!cancelled && covers) syncCovers(covers);
-      })
-      // Display only: a failed refresh just leaves the remembered cover (or the drawn jacket).
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [lineKey, syncCovers]);
+    if (liveCovers) syncCovers(liveCovers);
+  }, [liveCovers, syncCovers]);
 
   const hasSoldOutLine = items.some(
     (item) => item.fulfillmentType === "SHIP" && typeof item.stockQty === "number" && item.stockQty <= 0

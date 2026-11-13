@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma, type ProductLine } from "@repo/database";
+import type { ProductRef } from "@repo/cache/tags";
 import { deleteEbookFile } from "@repo/storage";
 
 /** What a list's Delete button gets back: nothing on success, a message to show in the dialog otherwise. */
@@ -26,13 +27,14 @@ export async function deleteInventoryProduct(
   id: string,
   productLine: ProductLine,
   actor: { id: string; email: string }
-): Promise<DeleteProductResult> {
+): Promise<DeleteProductResult & { deleted?: ProductRef }> {
   const product = await prisma.product.findUnique({
     where: { id },
     select: {
       title: true,
       slug: true,
       productLine: true,
+      type: true,
       fileAssets: { select: { id: true, blobPath: true } },
       _count: { select: { orderItems: true, purchaseOrderItems: true } },
     },
@@ -66,5 +68,6 @@ export async function deleteInventoryProduct(
     if (asset.blobPath && !/^https?:\/\//.test(asset.blobPath)) await deleteEbookFile(asset.blobPath);
   }
 
-  return {};
+  // What the caller expires on the storefront (`productChangedTags`).
+  return { deleted: { slug: product.slug, productLine: product.productLine, type: product.type } };
 }

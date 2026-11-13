@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { deploymentEnv } from "@repo/security/env";
 import { siteUrl } from "@/lib/site-url";
 
 // Everything a crawler has no business indexing: per-user pages, the
@@ -19,7 +20,8 @@ const PRIVATE_PATHS = [
 export default function robots(): MetadataRoute.Robots {
   const base = siteUrl();
   // Preview and local builds must never be indexed alongside production.
-  const isProduction = process.env.VERCEL_ENV ? process.env.VERCEL_ENV === "production" : process.env.NODE_ENV === "production";
+  const deployment = deploymentEnv();
+  const isProduction = deployment ? deployment === "production" : process.env.NODE_ENV === "production";
 
   if (!isProduction) {
     return { rules: { userAgent: "*", disallow: "/" } };

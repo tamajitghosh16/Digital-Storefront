@@ -39,6 +39,17 @@ export function checkEnvironment(app: string, check: EnvCheck): void {
   console.warn(report);
 }
 
+/**
+ * Which deployment this is — "production", "preview", … — or undefined for a
+ * local or unlabelled build. Vercel sets `VERCEL_ENV` itself; on any other
+ * host (Hostinger, a VPS) set `DEPLOY_ENV` there. Unlike `NODE_ENV`, which is
+ * "production" for every `next build`, this tells the live site apart from a
+ * staging copy or a local production build.
+ */
+export function deploymentEnv(): string | undefined {
+  return process.env.DEPLOY_ENV?.trim() || process.env.VERCEL_ENV?.trim() || undefined;
+}
+
 /** No secret may ever be exposed through a `NEXT_PUBLIC_` variable (they're inlined into the browser bundle). */
 export function noPublicSecrets(): string | null {
   const leaked = Object.keys(process.env).filter(

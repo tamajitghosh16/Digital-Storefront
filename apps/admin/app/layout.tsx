@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Manrope, Space_Grotesk } from "next/font/google";
 import { getCurrentStaff } from "@repo/auth/server";
-import { getSiteSettings, prisma } from "@repo/database";
 import { AppShell } from "@/components/app-shell";
+import { getChromeMenu, getChromeSiteName } from "@/lib/admin-cache";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 import { headers } from "next/headers";
@@ -42,17 +42,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // All three reads are best-effort: this shell also wraps /sign-in,
   // /forgot-password, /reset-password and /unauthorized, which are
   // reachable with no session and, in the case of a cold environment, no
-  // database either.
-  const [user, settings, menuCategories] = await Promise.all([
+  // database either. The site name and menu are cached (lib/admin-cache.ts)
+  // and expire the moment staff save either; the staff member never is.
+  const [user, siteName, menuCategories] = await Promise.all([
     getCurrentStaff().catch(() => null),
-    getSiteSettings().catch(() => null),
-    prisma.menuCategory
-      .findMany({
-        where: { isActive: true },
-        orderBy: { order: "asc" },
-        include: { products: { where: { isActive: true }, orderBy: { order: "asc" } } },
-      })
-      .catch(() => []),
+    getChromeSiteName().catch(() => undefined),
+    getChromeMenu().catch(() => []),
   ]);
 
   return (
@@ -60,7 +55,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="min-h-screen bg-page font-sans text-ink antialiased">
         <ThemeProvider nonce={nonce}>
           <AppShell
-            siteName={settings?.siteName}
+            siteName={siteName}
             userName={user?.name ?? user?.email ?? null}
             userRole={user?.role ?? null}
             menuCategories={menuCategories}

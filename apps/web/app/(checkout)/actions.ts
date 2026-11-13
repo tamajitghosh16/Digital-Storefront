@@ -24,7 +24,15 @@ import { isIndianState, type OrderBillingAddress, type OrderShippingAddress } fr
 import { resolveDiscount } from "@/lib/discounts";
 import { ownsEbook } from "@/lib/library";
 import { sendOrderConfirmationEmail, settleOrderPayment } from "@/lib/orders";
-import { OutOfStockError, expireCachedStock, returnStock, takeStock, type StockLine } from "@/lib/stock";
+import type { StockMove } from "@repo/cache/tags";
+import {
+  OutOfStockError,
+  expireReturnedStock,
+  expireTakenStock,
+  returnStock,
+  takeStock,
+  type StockLine,
+} from "@/lib/stock";
 import {
   deliveryFeeCents,
   includedGstCents,
@@ -181,6 +189,8 @@ type PreparedOrder = {
   }[];
   /** The shipped lines whose stock is counted — what placing the order takes off the shelf. */
   stockLines: StockLine[];
+  /** The same lines with the product and the count they started from, for expiring cached stock figures. */
+  stockMoves: StockMove[];
   subtotalCents: number;
   discountCents: number;
   /** The code that took `discountCents` off, or null when none did. */
@@ -301,14 +311,25 @@ async function prepareOrder(
 
   // Untracked (null) stock is left out so an order of uncounted items costs
   // no extra round trips; `takeStock` re-checks the counted ones atomically.
-  const stockLines: StockLine[] = orderItems
-    .filter((line) => {
-      if (line.fulfillmentType !== "SHIP") return false;
-      const product = byId.get(line.productId)!;
-      const edition = line.bookFormat ? product.editions.find((candidate) => candidate.format === line.bookFormat) : undefined;
-      return (edition ? edition.stockQty : product.stockQty) !== null;
-    })
-    .map(({ productId, bookFormat, quantity }) => ({ productId, bookFormat, quantity }));
+  const counted = orderItems.flatMap((line) => {
+    if (line.fulfillmentType !== "SHIP") return [];
+    const product = byId.get(line.productId)!;
+    const edition = line.bookFormat ? product.editions.find((candidate) => candidate.format === line.bookFormat) : undefined;
+    const before = edition ? edition.stockQty : product.stockQty;
+    return before === null ? [] : [{ line, product, before }];
+  });
+  const stockLines: StockLine[] = counted.map(({ line: { productId, bookFormat, quantity } }) => ({
+    productId,
+    bookFormat,
+    quantity,
+  }));
+  const stockMoves: StockMove[] = counted.map(({ line, product, before }) => ({
+    slug: product.slug,
+    productLine: product.productLine,
+    type: product.type,
+    before,
+    quantity: line.quantity,
+  }));
 
   const subtotalCents = orderItems.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0);
 
@@ -348,6 +369,7 @@ async function prepareOrder(
     order: {
       orderItems,
       stockLines,
+      stockMoves,
       subtotalCents,
       discountCents,
       discount,
@@ -431,7 +453,7 @@ async function createOrderTakingStock<T>(
       // for a large cart.
       { maxWait: 10_000, timeout: 30_000 }
     );
-    expireCachedStock(prepared.stockLines);
+    expireTakenStock(prepared.stockMoves);
     return created;
   } catch (error) {
     if (!(error instanceof OutOfStockError)) throw error;
@@ -532,12 +554,12 @@ export async function startCheckout(input: CheckoutInput): Promise<StartResult> 
   } catch (error) {
     console.error("[checkout] createRazorpayOrder failed", error);
     // Conditional, so the held copies go back exactly once.
-    const { stockLines } = prepared.order;
+    const { stockLines, stockMoves } = prepared.order;
     await prisma.$transaction(async (tx) => {
       const { count } = await tx.order.updateMany({ where: { id: order.id, status: "PENDING" }, data: { status: "CANCELLED" } });
       if (count === 1) await returnStock(tx, stockLines);
     });
-    expireCachedStock(stockLines);
+    expireReturnedStock(stockMoves);
     return { ok: false, error: "GATEWAY_ERROR" };
   }
 

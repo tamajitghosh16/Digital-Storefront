@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { stockReturnedTags } from "@repo/cache/tags";
 import { revalidateStorefront } from "@/lib/storefront-cache";
 import { prisma, type BookFormat, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
@@ -164,8 +165,13 @@ export async function receivePurchaseOrderItems(id: string, formData: FormData) 
     },
   });
 
-  // Received stock changes Product.stockQty, which the storefront caches.
-  revalidateStorefront();
+  // Received stock changes what the storefront shows as in stock: those
+  // products' pages and listings.
+  const received = await prisma.product.findMany({
+    where: { id: { in: [...new Set(updates.map((update) => update.productId))] } },
+    select: { slug: true, productLine: true, type: true },
+  });
+  revalidateStorefront(stockReturnedTags(received));
   revalidatePath("/supply/purchase-orders");
   revalidatePath(`/supply/purchase-orders/${id}`);
   redirect(`/supply/purchase-orders/${id}`);

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cmsChangedTags } from "@repo/cache/tags";
 import { revalidateStorefront } from "@/lib/storefront-cache";
 import { PRICING_SETTINGS_ID, prisma, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
@@ -69,7 +70,7 @@ export async function updatePricingSettings(formData: FormData) {
 
   await audit(user, "pricing.settings_updated", PRICING_SETTINGS_ID, data);
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("pricing"));
   revalidatePath("/settings/pricing");
   back();
 }
@@ -94,7 +95,7 @@ export async function saveClassSetTier(formData: FormData) {
 
   await audit(user, "pricing.tier_saved", String(quantity), { quantity, discountBps });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("pricing"));
   revalidatePath("/settings/pricing");
   back();
 }
@@ -105,6 +106,6 @@ export async function deleteClassSetTier(id: string) {
   const tier = await prisma.classSetTier.delete({ where: { id } });
   await audit(user, "pricing.tier_deleted", String(tier.quantity), { quantity: tier.quantity });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("pricing"));
   revalidatePath("/settings/pricing");
 }

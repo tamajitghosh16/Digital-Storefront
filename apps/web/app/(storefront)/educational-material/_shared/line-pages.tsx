@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma, type ProductLine } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
+import { listingEntryTags, productEntryTags } from "@repo/cache/tags";
 import { productsCache, reviveProduct } from "@/lib/products-cache";
 import { getCachedPricingConfig } from "@/lib/cms";
 import { countBookListings, fetchBookPage } from "@/lib/books-data";
@@ -17,8 +18,9 @@ import type { ProductTileData } from "@/components/commerce/product-tile";
  * Materials lines — Educational Charts, Worksheets and Activity Puzzles,
  * Teaching and Learning Materials. Each route folder is a two-line wrapper
  * passing its `ListingLine`; the rows are whatever `apps/admin` wrote to
- * `Product` with that `productLine`, cached under the `products` tag that
- * an admin save expires (`lib/products-cache`).
+ * `Product` with that `productLine`, cached under the line's
+ * `catalogue:<line>` and each item's `product:<slug>` tags, which an admin
+ * save or an order expires (`lib/products-cache`).
  *
  * Books keep their own routes (`../books`) for the edition / e-book logic.
  */
@@ -46,16 +48,21 @@ export async function LineListingPage({ line, searchParams }: { line: ListingLin
 }
 
 /** One published row of this line, or `null` — never another line's item at the same slug. */
-const cachedLineProduct = productsCache("line-product", (productLine: ProductLine, slug: string) =>
-  prisma.product.findFirst({ where: { slug, productLine, isPublished: true } })
+const cachedLineProduct = productsCache(
+  "line-product",
+  (productLine: ProductLine, slug: string) => productEntryTags(productLine, slug),
+  (productLine: ProductLine, slug: string) => prisma.product.findFirst({ where: { slug, productLine, isPublished: true } })
 );
 
-const cachedLineRelated = productsCache("line-related", (productLine: ProductLine, slug: string) =>
-  prisma.product.findMany({
-    where: { isPublished: true, productLine, NOT: { slug } },
-    orderBy: { createdAt: "desc" },
-    take: 8,
-  })
+const cachedLineRelated = productsCache(
+  "line-related",
+  (productLine: ProductLine) => listingEntryTags(productLine),
+  (productLine: ProductLine, slug: string) =>
+    prisma.product.findMany({
+      where: { isPublished: true, productLine, NOT: { slug } },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    })
 );
 
 function loadLineProduct(line: ListingLine, slug: string) {

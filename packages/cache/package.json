@@ -1,0 +1,25 @@
+{
+  "name": "@repo/cache",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tags": "./src/tags.ts",
+    "./policy": "./src/policy.ts",
+    "./keys": "./src/keys.ts",
+    "./query": "./src/query.ts",
+    "./invalidate": "./src/invalidate.ts",
+    "./metrics": "./src/metrics.ts",
+    "./env": "./src/env.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@repo/database": "*",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.0"
+  }
+}

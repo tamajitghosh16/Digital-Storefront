@@ -10,9 +10,9 @@ import { prisma } from "@repo/database";
  * the original from Supabase, then resizing — takes 1–2 s, and without
  * this the first shopper to see each cover at each width pays that. The
  * storefront's `/api/revalidate` runs this (in `after()`) whenever apps/admin
- * saves, so a newly added or re-imaged product is warm before anyone opens
- * its page. Covers already cached answer in milliseconds, so re-warming the
- * whole catalogue is cheap.
+ * saves a product, for just the products that save touched, so a newly
+ * added or re-imaged product is warm before anyone opens its page. Covers
+ * already cached answer in milliseconds, so even a full re-warm is cheap.
  *
  * {@link WARM_WIDTHS} are the srcset widths the browser picks for the
  * listing card (`BookCard`'s `sizes`) and product tiles at 1x–2x screens,
@@ -25,9 +25,20 @@ const WARM_WIDTHS = [256, 384, 640, 828];
 const QUALITY = 75;
 const CONCURRENCY = 6;
 
-export async function warmProductImages(origin: string): Promise<{ warmed: number; failed: number }> {
+/**
+ * `productIds` narrows the warm-up to the products a save touched; without
+ * it every published cover is warmed (an older admin's bare ping).
+ */
+export async function warmProductImages(
+  origin: string,
+  productIds?: readonly string[]
+): Promise<{ warmed: number; failed: number }> {
   const rows = await prisma.product.findMany({
-    where: { isPublished: true, coverImageUrl: { not: null } },
+    where: {
+      isPublished: true,
+      coverImageUrl: { not: null },
+      ...(productIds ? { id: { in: [...productIds] } } : {}),
+    },
     select: { coverImageUrl: true },
     distinct: ["coverImageUrl"],
   });

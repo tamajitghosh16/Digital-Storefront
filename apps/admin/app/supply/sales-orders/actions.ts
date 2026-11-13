@@ -1,13 +1,15 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import { hasOnlinePart, nextShipmentStatus, prisma, returnStock, type Prisma, type ShipmentStatus } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
 import { assertRole, ORDER_WRITE_ROLES } from "@repo/auth/roles";
 import { sendOrderShipped } from "@repo/email";
+import { stockReturnedTags } from "@repo/cache/tags";
 import { revalidateStorefront } from "@/lib/storefront-cache";
+import { ORDER_STATS_TAG } from "@/lib/admin-cache";
 import { canMarkCashCollected } from "./cod";
 
 const SHIPMENT_STATUSES = [
@@ -92,7 +94,16 @@ export async function moveSalesOrder(input: z.input<typeof moveSchema>): Promise
       guestEmail: true,
       shippingAddress: true,
       user: { select: { email: true } },
-      items: { select: { productId: true, bookFormat: true, quantity: true, fulfillmentType: true, includesEbook: true } },
+      items: {
+        select: {
+          productId: true,
+          bookFormat: true,
+          quantity: true,
+          fulfillmentType: true,
+          includesEbook: true,
+          product: { select: { slug: true, productLine: true, type: true } },
+        },
+      },
     },
   });
   if (!order) return { ok: false, error: "This order no longer exists." };
@@ -101,9 +112,8 @@ export async function moveSalesOrder(input: z.input<typeof moveSchema>): Promise
   }
 
   const cancelWholeOrder = to === "CANCELLED" && !hasOnlinePart(order.items);
-  const shipped = order.items
-    .filter((item) => item.fulfillmentType === "SHIP")
-    .map(({ productId, bookFormat, quantity }) => ({ productId, bookFormat, quantity }));
+  const shippedItems = order.items.filter((item) => item.fulfillmentType === "SHIP");
+  const shipped = shippedItems.map(({ productId, bookFormat, quantity }) => ({ productId, bookFormat, quantity }));
 
   const moved = await prisma.$transaction(async (tx) => {
     const { count } = await tx.order.updateMany({
@@ -162,8 +172,10 @@ export async function moveSalesOrder(input: z.input<typeof moveSchema>): Promise
 
   revalidatePath("/supply/sales-orders");
   revalidatePath("/");
+  // The dashboard's cached revenue and order figures.
+  revalidateTag(ORDER_STATS_TAG, { expire: 0 });
   // Returned copies change what the storefront shows as in stock.
-  if (to === "CANCELLED" && shipped.length) revalidateStorefront();
+  if (to === "CANCELLED" && shipped.length) revalidateStorefront(stockReturnedTags(shippedItems.map((item) => item.product)));
   return { ok: true };
 }
 
@@ -215,6 +227,8 @@ export async function markCashCollected(input: { orderId: string }): Promise<Mov
 
   revalidatePath("/supply/sales-orders");
   revalidatePath("/");
+  // The dashboard's cached revenue and order figures.
+  revalidateTag(ORDER_STATS_TAG, { expire: 0 });
   return { ok: true };
 }
 

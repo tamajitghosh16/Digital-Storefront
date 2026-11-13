@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { HTTPS_URL_MESSAGE, isHttpsUrl } from "@repo/security/href";
 import { cn } from "@repo/ui/utils";
 import { controlClass } from "./ui";
 
@@ -77,6 +78,15 @@ export function ImageField({
   const previewBox =
     shape === "cover" ? "h-40 w-[6.75rem]" : shape === "square" ? "h-32 w-32" : "h-28 w-full max-w-xs";
 
+  // Only an https:// address reaches the preview's `src` — the same rule the
+  // save applies (`httpsUrl()` in lib/schema-fields.ts) — so a typed
+  // `javascript:`/`data:` link is never handed to the DOM. The inline
+  // startsWith is the guard CodeQL's js/xss-through-dom recognises (it
+  // can't see inside isHttpsUrl); isHttpsUrl then checks it really parses.
+  const typed = url.trim();
+  const previewUrl = typed.startsWith("https://") && isHttpsUrl(typed) ? typed : null;
+  const linkInvalid = typed !== "" && !previewUrl;
+
   return (
     <div>
       <span className="block text-sm font-semibold text-ink">{label}</span>
@@ -90,14 +100,16 @@ export function ImageField({
           className={cn(
             "grid shrink-0 place-items-center overflow-hidden rounded-btn border bg-tile",
             previewBox,
-            url ? "border-line" : "border-dashed border-line-strong"
+            previewUrl ? "border-line" : "border-dashed border-line-strong"
           )}
         >
-          {url ? (
+          {previewUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt="" className="h-full w-full object-cover" />
+            <img src={previewUrl} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="px-2 text-center text-[11px] font-semibold leading-tight text-ink-subtle">No image</span>
+            <span className="px-2 text-center text-[11px] font-semibold leading-tight text-ink-subtle">
+              {linkInvalid ? "Can't preview" : "No image"}
+            </span>
           )}
         </div>
 
@@ -180,8 +192,14 @@ export function ImageField({
               onChange={(event) => setUrl(event.target.value)}
               placeholder="https://example.com/cover.jpg"
               aria-label={`${label} — image link`}
+              aria-invalid={linkInvalid || undefined}
               className={cn(controlClass, "mt-2")}
             />
+          )}
+          {linkInvalid && (
+            <p role="alert" className="mt-2 text-[13px] font-medium text-sale">
+              {HTTPS_URL_MESSAGE}
+            </p>
           )}
         </div>
       </div>

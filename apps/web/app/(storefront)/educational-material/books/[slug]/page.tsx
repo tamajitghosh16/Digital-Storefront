@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
+import { listingEntryTags, productEntryTags } from "@repo/cache/tags";
 import { productsCache, reviveDates } from "@/lib/products-cache";
 import { getCachedPricingConfig } from "@/lib/cms";
 import { SAMPLE_BOOKS, type DisplayBook } from "@/lib/sample-data";
@@ -15,23 +16,29 @@ import type { ProductTileData } from "@/components/commerce/product-tile";
  * The book's row with its editions (one per format it's sold in). Scoped
  * to `productLine: "BOOK"` so a chart or teaching aid's slug doesn't render
  * as a book here — those have their own line's `[slug]` route. Cached under
- * the `products` tag (`lib/products-cache`); generateMetadata and the page
- * share one lookup per request through the cache.
+ * `product:<slug>` (`lib/products-cache`), which an order for it or a staff
+ * edit expires; generateMetadata and the page share one lookup per request.
  */
-const cachedBook = productsCache("book-row", (slug: string) =>
-  prisma.product.findFirst({
-    where: { slug, productLine: "BOOK" },
-    include: { editions: { orderBy: { format: "asc" } } },
-  })
+const cachedBook = productsCache(
+  "book-row",
+  (slug: string) => productEntryTags("BOOK", slug),
+  (slug: string) =>
+    prisma.product.findFirst({
+      where: { slug, productLine: "BOOK" },
+      include: { editions: { orderBy: { format: "asc" } } },
+    })
 );
 
-const cachedRelatedBooks = productsCache("book-related", (slug: string) =>
-  prisma.product.findMany({
-    where: { isPublished: true, type: { in: ["PHYSICAL_BOOK", "EBOOK"] }, productLine: "BOOK", NOT: { slug } },
-    include: { editions: { select: { format: true, priceCents: true, stockQty: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 8,
-  })
+const cachedRelatedBooks = productsCache(
+  "book-related",
+  () => listingEntryTags("BOOK"),
+  (slug: string) =>
+    prisma.product.findMany({
+      where: { isPublished: true, type: { in: ["PHYSICAL_BOOK", "EBOOK"] }, productLine: "BOOK", NOT: { slug } },
+      include: { editions: { select: { format: true, priceCents: true, stockQty: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 8,
+    })
 );
 
 async function loadBook(slug: string): Promise<DisplayBook | BookWithEditions | null> {

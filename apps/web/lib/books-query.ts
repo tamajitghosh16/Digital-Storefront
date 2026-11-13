@@ -92,6 +92,29 @@ export function parseBookQuery(params: RawParams): BookQuery {
   };
 }
 
+/**
+ * The query as a cache key: only what changes the results, normalised so
+ * equivalent URLs share one cached page — and the client-side query cache
+ * (`BooksGrid`) one entry. `view` only changes how results are drawn, so it
+ * is fixed; genre order doesn't matter; search is case-insensitive
+ * (`books-data.ts` matches with `mode: "insensitive"`), so `q` is lowercased
+ * and its whitespace collapsed. Pass the result to the data layer as well as
+ * using it as the key, so key and results can never disagree.
+ */
+export function canonicalBookQuery(query: BookQuery): BookQuery {
+  return {
+    q: query.q?.trim().toLowerCase().replace(/\s+/g, " ") || undefined,
+    genres: [...new Set(query.genres)].sort(),
+    format: query.format,
+    avail: query.avail,
+    rating: query.rating,
+    price: query.price,
+    classSet: query.classSet,
+    sort: query.sort,
+    view: "grid",
+  };
+}
+
 /** A parsed query back to the flat param map the href builder consumes. */
 export function queryToParams(query: BookQuery): Record<string, string | undefined> {
   return {

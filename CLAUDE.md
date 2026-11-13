@@ -18,6 +18,13 @@ Full HLD/LLD/data model/system design lives in
 `docs/Digital_Storefront_Technical_Design_Document_v1.1.docx`; consult it
 before making architectural changes.
 
+## Workflow
+
+**Never create a git worktree or work inside one.** Always work directly in
+this checkout on the `main` branch — don't create feature branches or
+switch away from `main` either. This overrides any default to branch or
+isolate work before committing.
+
 ## Commands
 
 Run from the repo root unless noted. This repo uses **npm workspaces**, not pnpm/yarn.
@@ -69,7 +76,7 @@ either app's Next.js env loading.
 **Two standalone apps, one shared data layer.** The monorepo exists only
 to share source code — `packages/database`, `packages/auth`,
 `packages/payments`, `packages/storage`, `packages/email`,
-`packages/ui`, `packages/config` — between `apps/web` (public storefront +
+`packages/cache`, `packages/ui`, `packages/config` — between `apps/web` (public storefront +
 customer account area) and `apps/admin` (internal back office, staff-only).
 Each app has its own `package.json`, `next.config.ts`, port, and is meant
 to deploy as its own Vercel project (Root Directory = `apps/web` or
@@ -232,6 +239,37 @@ best-effort: an email failure is logged, never thrown, and never retried
 (see `sendOrderConfirmationEmail` in `apps/web/lib/orders.ts`). Anything
 that genuinely needs retries or delays (e.g. expiring abandoned `PENDING`
 orders) needs a Vercel Cron route or a queue chosen at that point.
+
+**Caching is data-level, tag-invalidated, and goes through `packages/cache`.**
+The decision record is `docs/adr/0001-caching-strategy.md`; read it before
+changing anything cached.
+
+Storefront pages always render on request, because the nonce CSP rules out
+ISR and Partial Prerendering. What's cached is the data they read.
+
+**Rules for new code:**
+- **Reading.** Every cached server read goes through `cachedQuery()`
+  (`@repo/cache/query`), never `unstable_cache` directly. It dedupes per
+  request, coalesces concurrent misses, tags the entry and records metrics.
+- **Tags.** They come from `@repo/cache/tags`: an umbrella (`cms` /
+  `catalogue`) plus narrow ones (`cms:faqs`, `catalogue:BOOK`,
+  `product:<slug>`).
+- **Writing.** A write expires only what it changed, via the event
+  builders (`cmsChangedTags`, `productChangedTags(before, after)`,
+  `stockTakenTags`, `stockReturnedTags`):
+  - in apps/admin, through `revalidateStorefront(tags, productIds)`;
+  - in apps/web, through `revalidateTag(tag, { expire: 0 })`.
+- **TTLs** in `@repo/cache/policy` are only a backstop (5 minutes for
+  shoppers).
+
+**Where the cache lives.** With `CACHE_STORE=redis` (set before the build;
+production on Hostinger), the storefront's data cache is in Upstash Redis
+through `apps/web/cache-handler.mjs`. Admin then writes invalidations
+straight into it, as well as pinging `/api/revalidate`. Unset, it's Next's
+built-in per-process cache.
+
+**Never cached:** checkout pricing and stock checks, discount codes,
+per-user data, the session and staff role.
 
 **File uploads go through `packages/storage` (Vercel Blob)** using a
 staging → malware-scan → promote pattern. The scan itself

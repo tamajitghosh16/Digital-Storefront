@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@repo/database";
+import { listingEntryTags } from "@repo/cache/tags";
 import { withFallback } from "@/lib/safe-fetch";
+import { productsCache } from "@/lib/products-cache";
 import { SAMPLE_SERVICES, SERVICE_ADDONS } from "@/lib/sample-data";
 import { formatINRWhole } from "@/lib/format";
 import {
@@ -78,11 +80,20 @@ interface ServiceLike {
   turnaroundDays: number | null;
 }
 
+/** Every published service package, cheapest first — cached under `catalogue:services`, which a staff edit expires. */
+const cachedServices = productsCache(
+  "services-list",
+  () => listingEntryTags("services"),
+  (): Promise<ServiceLike[]> =>
+    prisma.product.findMany({
+      where: { type: "SERVICE_PACKAGE", isPublished: true },
+      orderBy: { priceCents: "asc" },
+      select: { id: true, slug: true, title: true, priceCents: true, description: true, turnaroundDays: true },
+    })
+);
+
 export default async function ServicesCataloguePage() {
-  const services = (await withFallback(
-    () => prisma.product.findMany({ where: { type: "SERVICE_PACKAGE", isPublished: true }, orderBy: { priceCents: "asc" } }),
-    SAMPLE_SERVICES
-  )) as ServiceLike[];
+  const services = (await withFallback(() => cachedServices(), SAMPLE_SERVICES)) as ServiceLike[];
 
   const featureRows = [
     { label: "Turnaround", values: services.map((s) => (s.turnaroundDays != null ? `${s.turnaroundDays} days` : "—")) },

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { productChangedTags } from "@repo/cache/tags";
 import { revalidateStorefront } from "@/lib/storefront-cache";
 import { prisma, type Prisma, type BookFormat, type ProductType, type ProductLine } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
@@ -174,7 +175,7 @@ export async function createProduct(formData: FormData) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "product.created", entity: "Product", entityId: product.id, diff: parsed.data as Prisma.InputJsonValue },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(productChangedTags(product), [product.id]);
   revalidatePath("/educational-material/books");
   redirect("/educational-material/books?created=1");
 }
@@ -201,7 +202,7 @@ export async function updateProduct(id: string, formData: FormData) {
   // dropped (order lines keep their own `bookFormat`, so history survives),
   // the rest are upserted so an edition's id is stable across saves.
   const editions = toEditions(parsed.data);
-  await prisma.product.update({
+  const updated = await prisma.product.update({
     where: { id },
     data: {
       ...data,
@@ -221,7 +222,8 @@ export async function updateProduct(id: string, formData: FormData) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "product.updated", entity: "Product", entityId: id, diff: parsed.data as Prisma.InputJsonValue },
   });
 
-  revalidateStorefront();
+  // Old and new: an edit can change the slug or move the item between listings.
+  revalidateStorefront(productChangedTags(existing, updated), [id]);
   revalidatePath("/educational-material/books");
   revalidatePath(`/educational-material/books/${id}`);
   redirect("/educational-material/books");
@@ -252,7 +254,7 @@ export async function toggleProductPublished(id: string) {
     },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(productChangedTags(existing), [id]);
   revalidatePath("/educational-material/books");
 }
 
@@ -264,9 +266,9 @@ export async function deleteProduct(id: string): Promise<DeleteProductResult> {
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const result = await deleteInventoryProduct(id, "BOOK", user!);
-  if (result.error) return result;
+  if (result.error) return { error: result.error };
 
-  revalidateStorefront();
+  revalidateStorefront(productChangedTags(result.deleted));
   revalidatePath("/educational-material/books");
   return {};
 }

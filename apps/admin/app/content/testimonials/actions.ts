@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cmsChangedTags } from "@repo/cache/tags";
 import { revalidateStorefront } from "@/lib/storefront-cache";
 import type { z } from "zod";
 import { Prisma, prisma } from "@repo/database";
@@ -43,7 +44,7 @@ export async function createTestimonial(formData: FormData) {
     },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("testimonials"));
   revalidatePath("/content/testimonials");
   redirect("/content/testimonials");
 }
@@ -64,7 +65,7 @@ export async function updateTestimonial(id: string, formData: FormData) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "testimonial.updated", entity: "Testimonial", entityId: id, diff: data as Prisma.InputJsonValue },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("testimonials"));
   revalidatePath("/content/testimonials");
   revalidatePath(`/content/testimonials/${id}`);
   redirect("/content/testimonials");
@@ -88,7 +89,7 @@ export async function toggleTestimonialActive(id: string) {
     },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("testimonials"));
   revalidatePath("/content/testimonials");
 }
 
@@ -102,6 +103,6 @@ export async function deleteTestimonial(id: string) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "testimonial.deleted", entity: "Testimonial", entityId: id, diff: Prisma.JsonNull },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("testimonials"));
   revalidatePath("/content/testimonials");
 }

@@ -9,12 +9,15 @@
  * investigator needs.
  */
 
-const REDACT_KEYS = /pass(word)?|secret|token|signature|authorization|cookie|otp|code$/i;
+/** Redacted wherever it appears in a key: `newPassword`, `refresh_token`, `x-signature`. */
+const REDACT_ANYWHERE = /pass(?:word)?|secret|token|signature|authorization|cookie|otp/i;
+/** Redacted only as a suffix: `otpCode`, `authCode` — but not `codeLength`. */
+const REDACT_SUFFIX = /code$/i;
 
 function redact(details: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(details)) {
-    out[key] = REDACT_KEYS.test(key) ? "[redacted]" : value;
+    out[key] = REDACT_ANYWHERE.test(key) || REDACT_SUFFIX.test(key) ? "[redacted]" : value;
   }
   return out;
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@repo/database";
 import { withFallback } from "@/lib/safe-fetch";
+import { listingEntryTags } from "@repo/cache/tags";
 import { productsCache, reviveDates } from "@/lib/products-cache";
 import { bookToListing, type BookWithEditions } from "@/lib/books";
 import { getCachedBanners, getCachedContent, getCachedFaqs, getCachedTestimonials } from "@/lib/cms";
@@ -66,16 +67,19 @@ const PUBLISHING_ITEMS: ProductLineItem[] = [
 const LIFESTYLE_ITEM: ProductLineItem = { label: "Indoor Plants (Chatterjee's Green Veranda)", href: "/indoor-plants" };
 const LIFESTYLE_IMAGE = "/images/indoor-plants.png";
 
-// The newest published books with their editions, cached under the
-// `products` tag (`lib/products-cache`). `productLine` keeps charts /
+// The newest published books with their editions, cached with the books
+// listing (`catalogue:BOOK`, `lib/products-cache`). `productLine` keeps charts /
 // worksheets / teaching materials — PHYSICAL_BOOK for fulfilment — out.
-const cachedLatestBooks = productsCache("home-latest", () =>
-  prisma.product.findMany({
-    where: { productLine: "BOOK", isPublished: true },
-    include: { editions: { select: { format: true, priceCents: true, stockQty: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 24,
-  })
+const cachedLatestBooks = productsCache(
+  "home-latest",
+  () => listingEntryTags("BOOK"),
+  () =>
+    prisma.product.findMany({
+      where: { productLine: "BOOK", isPublished: true },
+      include: { editions: { select: { format: true, priceCents: true, stockQty: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 24,
+    })
 );
 
 export default async function HomePage() {

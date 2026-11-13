@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@repo/ui/utils";
+import { LOW_STOCK_MAX, SAME_DAY_MIN } from "@repo/cache/policy";
 import { Stars } from "@/components/primitives";
 import { formatINRWhole } from "@/lib/format";
 import { BOOKS_BASE, type BookView } from "@/lib/books-query";
@@ -27,8 +28,8 @@ function fulfilment(listing: BookListing): { text: string; tone: string } {
   if (listing.hasPrint && listing.stockQty === null) return { text: "Ships in 2 days", tone: "text-ok" };
   const stock = listing.stockQty ?? 0;
   if (listing.hasPrint && stock > 0) {
-    if (stock < 10) return { text: `Only ${stock} left`, tone: "text-warn" };
-    if (stock >= 30) return { text: "Same-day delivery — Kolkata", tone: "text-ok" };
+    if (stock < LOW_STOCK_MAX) return { text: `Only ${stock} left`, tone: "text-warn" };
+    if (stock >= SAME_DAY_MIN) return { text: "Same-day delivery — Kolkata", tone: "text-ok" };
     return { text: "Ships in 2 days", tone: "text-ok" };
   }
   if (listing.hasEbook) return { text: "Instant download", tone: "text-ok" };

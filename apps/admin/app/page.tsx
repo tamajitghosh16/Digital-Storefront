@@ -3,6 +3,7 @@ import { prisma } from "@repo/database";
 import { cn } from "@repo/ui/utils";
 import { PageHeader, Pill } from "@/components/ui";
 import { requireStaffPage } from "@/lib/guard";
+import { getPeriodStats, getWeekRevenue } from "@/lib/admin-cache";
 
 // FR-11.2/FR-11.3: mirrors the approved back-office mockup — a period
 // selector, five headline stats, a weekly revenue chart and a recent-orders
@@ -24,9 +25,6 @@ const PERIODS: { key: PeriodKey; label: string }[] = [
   { key: "year", label: "This year" },
 ];
 
-// Anything past PENDING/CANCELLED actually moved money — that's what counts
-// as "revenue" and as a completed sale for the conversion-rate stat.
-const REVENUE_STATUSES = new Set(["PAID", "PROCESSING", "SHIPPED", "DELIVERED", "READY_FOR_DOWNLOAD"]);
 
 const STATUS_TONE: Record<string, "on" | "off" | "info"> = {
   PAID: "on",
@@ -67,29 +65,26 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
   const start = periodStart(period);
   const weekStart = startOfWeek();
 
-  const [periodOrders, newCustomers, recentOrders, weekOrders, ordersToProcess, pendingSubmissions, pendingServiceRequests] =
+  // The headline figures and the chart are aggregates cached for a minute
+  // (lib/admin-cache.ts); what needs attention and the latest orders are
+  // always read live.
+  const [periodStats, recentOrders, weekRevenue, ordersToProcess, pendingSubmissions, pendingServiceRequests] =
     await Promise.all([
-      prisma.order.findMany({ where: { createdAt: { gte: start } }, select: { status: true, totalCents: true } }),
-      prisma.user.count({ where: { createdAt: { gte: start }, role: { in: ["READER", "SELF_PUB_AUTHOR"] } } }),
+      getPeriodStats(start.toISOString()),
       prisma.order.findMany({
         orderBy: { createdAt: "desc" },
         take: 8,
         include: { items: true, user: { select: { name: true, email: true } } },
       }),
-      prisma.order.findMany({
-        where: { createdAt: { gte: weekStart } },
-        select: { createdAt: true, totalCents: true, status: true },
-      }),
+      getWeekRevenue(weekStart.toISOString()),
       prisma.order.count({ where: { shipmentStatus: "AWAITING_APPROVAL" } }),
       prisma.selfPublishingProject.count({ where: { status: { in: ["SUBMITTED", "IN_REVIEW"] } } }),
       prisma.serviceRequest.count({ where: { status: "SUBMITTED" } }),
     ]);
 
-  const revenueOrders = periodOrders.filter((o) => REVENUE_STATUSES.has(o.status));
-  const totalRevenueCents = revenueOrders.reduce((sum, o) => sum + o.totalCents, 0);
-  const orderCount = periodOrders.length;
-  const avgOrderCents = revenueOrders.length ? Math.round(totalRevenueCents / revenueOrders.length) : 0;
-  const conversionRate = orderCount ? Math.round((revenueOrders.length / orderCount) * 1000) / 10 : 0;
+  const { revenueCents: totalRevenueCents, orderCount, revenueOrderCount, newCustomers } = periodStats;
+  const avgOrderCents = revenueOrderCount ? Math.round(totalRevenueCents / revenueOrderCount) : 0;
+  const conversionRate = orderCount ? Math.round((revenueOrderCount / orderCount) * 1000) / 10 : 0;
 
   const stats = [
     { label: "Total revenue", value: money.format(totalRevenueCents / 100) },
@@ -99,7 +94,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
     { label: "Conversion rate", value: `${conversionRate}%` },
   ];
 
-  const chart = buildWeekChart(weekOrders, weekStart);
+  const chart = buildWeekChart(weekRevenue);
 
   return (
     <div className="max-w-6xl">
@@ -118,7 +113,10 @@ export default async function AdminDashboard({ searchParams }: { searchParams: P
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-xl font-bold tracking-[-0.02em] text-ink">Overview</h2>
+        <div>
+          <h2 className="font-display text-xl font-bold tracking-[-0.02em] text-ink">Overview</h2>
+          <p className="text-[13px] text-ink-subtle">Figures update every minute.</p>
+        </div>
         <div className="flex gap-0.5 rounded-full border border-line-strong p-1">
           {PERIODS.map((p) => (
             <Link
@@ -270,13 +268,8 @@ interface WeekChartData {
   baselineY: number;
 }
 
-function buildWeekChart(orders: { createdAt: Date; totalCents: number; status: string }[], weekStart: Date): WeekChartData {
-  const totals = new Array(7).fill(0) as number[];
-  for (const order of orders) {
-    if (!REVENUE_STATUSES.has(order.status)) continue;
-    const dayIndex = Math.floor((order.createdAt.getTime() - weekStart.getTime()) / 86_400_000);
-    if (dayIndex >= 0 && dayIndex < 7) totals[dayIndex] = (totals[dayIndex] ?? 0) + order.totalCents / 100;
-  }
+/** `totals`: revenue in rupees for each day of the week, Monday first (`loadWeekRevenue`). */
+function buildWeekChart(totals: number[]): WeekChartData {
 
   const width = 600;
   const height = 190;

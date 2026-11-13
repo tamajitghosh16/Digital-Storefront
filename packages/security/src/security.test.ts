@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { safeNextPath } from "./redirect";
 import { isHttpsUrl, isSafeHref, safeHrefOr } from "./href";
 import { buildContentSecurityPolicy, staticSecurityHeaders } from "./headers";
 import { rateLimit } from "./rate-limit";
+import { deploymentEnv } from "./env";
 
 describe("safeNextPath", () => {
   it.each([
@@ -91,5 +92,34 @@ describe("rateLimit (in-memory fallback)", () => {
     for (let i = 0; i < 5; i++) results.push((await rateLimit(rule, "user-1")).ok);
     expect(results).toEqual([true, true, true, false, false]);
     expect((await rateLimit(rule, "user-2")).ok).toBe(true);
+  });
+});
+
+describe("deploymentEnv", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("reads DEPLOY_ENV on hosts other than Vercel", () => {
+    vi.stubEnv("VERCEL_ENV", "");
+    vi.stubEnv("DEPLOY_ENV", "production");
+    expect(deploymentEnv()).toBe("production");
+  });
+
+  it("falls back to Vercel's own VERCEL_ENV", () => {
+    vi.stubEnv("DEPLOY_ENV", "");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    expect(deploymentEnv()).toBe("preview");
+  });
+
+  it("prefers DEPLOY_ENV when both are set", () => {
+    vi.stubEnv("DEPLOY_ENV", "staging");
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(deploymentEnv()).toBe("staging");
+  });
+
+  it("is undefined for a local or unlabelled build, whatever NODE_ENV says", () => {
+    vi.stubEnv("DEPLOY_ENV", " ");
+    vi.stubEnv("VERCEL_ENV", "");
+    vi.stubEnv("NODE_ENV", "production");
+    expect(deploymentEnv()).toBeUndefined();
   });
 });

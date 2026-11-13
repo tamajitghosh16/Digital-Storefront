@@ -212,18 +212,41 @@ and `content/testimonials` all have real create/update (and, for the
 CMS-only ones, delete) Server Actions — each validates with Zod, calls
 `assertRole()` (`CATALOGUE_WRITE_ROLES` for catalogue and pricing,
 `CONTENT_WRITE_ROLES` for the rest, both `EDITOR`/`OWNER` today), writes an
-`AuditLog` row, and `revalidatePath()`s its own list page. `apps/web` caches
-the CMS data it renders on every page (`apps/web/lib/cms.ts`), which this
-app's `revalidatePath()` can't reach, so every CMS action (site, navigation,
-pricing, homepage, banners, FAQs, testimonials, Menu categories/sub-categories) also calls
-`revalidateStorefront()` (`lib/storefront-cache.ts`) before redirecting: it
-POSTs to the storefront's `/api/revalidate` with the shared
-`STOREFRONT_REVALIDATE_SECRET`, from `after()` so a slow or down storefront
-never holds up or fails the save. A new action that changes
-storefront-visible CMS data needs that call too — and so does any action
-that writes a `Product` row (the Books and three-line catalogue actions,
-receiving purchase-order stock): the storefront caches catalogue reads too
-(`apps/web/lib/products-cache.ts`), and the same ping expires them.
+`AuditLog` row, and `revalidatePath()`s its own list page.
+
+**Every save tells the storefront exactly what changed.** `apps/web` caches
+CMS and catalogue reads, tagged (`docs/adr/0001-caching-strategy.md`), and
+this app's `revalidatePath()` can't reach them. So every such action calls
+`revalidateStorefront(tags, productIds)` (`lib/storefront-cache.ts`) before
+redirecting, with tags from `@repo/cache/tags`:
+- CMS actions (site, navigation, pricing, homepage, banners, FAQs,
+  testimonials, Menu categories/sub-categories and department visibility)
+  pass `cmsChangedTags("<section>")`.
+- Product create/edit/publish/delete in Books and the three-line CMS pass
+  `productChangedTags(before, after)`, both rows, plus the product id.
+- Receiving purchase-order stock and denying a sales order pass
+  `stockReturnedTags(products)`.
+
+`revalidateStorefront()` does three things:
+1. It expires the tags in this app's own cache.
+2. With `CACHE_STORE=redis`, it writes them straight into the storefront's
+   Redis tag ledger, which works even while the storefront is asleep.
+3. From `after()`, it POSTs `{ tags, productIds }` to the storefront's
+   `/api/revalidate` with the shared `STOREFRONT_REVALIDATE_SECRET`.
+
+None of this can hold up or fail the save. A new action that changes
+storefront-visible data needs the same call with the matching tag builder.
+Discounts don't, because codes are never cached.
+
+**This app's own cache** is `lib/admin-cache.ts`, on Next's built-in
+cache:
+- The chrome's site name and menu (`cms:settings`/`cms:menu`), expired by
+  the saves above.
+- The dashboard and Analytics aggregates (`admin:order-stats`, one
+  minute), expired by sales-order moves.
+
+The staff session and role, the order queues, the dashboard's
+"needs attention" counts and its recent orders are never cached.
 
 **Homepage copy is a registry, not a table of columns.**
 `content/homepage` renders its fields from `CONTENT_GROUPS` in

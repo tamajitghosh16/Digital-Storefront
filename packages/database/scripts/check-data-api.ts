@@ -26,12 +26,17 @@ if (!url || !key) {
 }
 
 const schema = readFileSync(resolve(here, "../prisma/schema.prisma"), "utf8");
-const tables = [...schema.matchAll(/@@map\("([^"]+)"\)/g)].map((match) => match[1]!).concat("_prisma_migrations");
+// Only plain Postgres identifiers become part of a request URL, whatever the
+// schema file happens to contain.
+const tables = [...schema.matchAll(/@@map\("([^"]+)"\)/g)]
+  .map((match) => match[1]!)
+  .concat("_prisma_migrations")
+  .filter((table) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(table));
 
 type Outcome = { table: string; status: number; rows: number | null; verdict: "blocked" | "empty" | "EXPOSED" };
 
 async function probe(table: string): Promise<Outcome> {
-  const response = await fetch(`${url}/rest/v1/${table}?select=*&limit=1`, {
+  const response = await fetch(`${url}/rest/v1/${encodeURIComponent(table)}?select=*&limit=1`, {
     headers: { apikey: key!, Authorization: `Bearer ${key}` },
   });
   if (!response.ok) return { table, status: response.status, rows: null, verdict: "blocked" };

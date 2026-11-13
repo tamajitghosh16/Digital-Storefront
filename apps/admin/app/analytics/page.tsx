@@ -1,6 +1,6 @@
-import { prisma } from "@repo/database";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { requireStaffPage } from "@/lib/guard";
+import { getRevenueByStatus } from "@/lib/admin-cache";
 
 // FR-11.5: sales and traffic analytics/reporting (revenue by category, top titles, conversion rate).
 
@@ -8,15 +8,15 @@ const money = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR
 
 export default async function AnalyticsPage() {
   await requireStaffPage();
-  const revenueByStatus = await prisma.order.groupBy({
-    by: ["status"],
-    _sum: { totalCents: true },
-    _count: true,
-  });
+  // A grouped aggregate cached for a minute (lib/admin-cache.ts).
+  const revenueByStatus = await getRevenueByStatus();
 
   return (
     <div className="max-w-4xl">
-      <PageHeader title="Analytics" description="Money taken, grouped by where each order has got to." />
+      <PageHeader
+        title="Analytics"
+        description="Money taken, grouped by where each order has got to. Figures update every minute."
+      />
 
       {revenueByStatus.length === 0 ? (
         <EmptyState title="Nothing to report yet" description="Figures appear here once orders start coming in." />
@@ -29,7 +29,7 @@ export default async function AnalyticsPage() {
                 {money.format((row._sum.totalCents ?? 0) / 100)}
               </p>
               <p className="text-[13px] text-ink-subtle">
-                {row._count} {row._count === 1 ? "order" : "orders"}
+                {row._count._all} {row._count._all === 1 ? "order" : "orders"}
               </p>
             </div>
           ))}

@@ -1,4 +1,5 @@
 import { checkEnvironment, noPublicSecrets } from "@repo/security/env";
+import { cacheConfigProblem } from "@repo/cache/env";
 
 /**
  * Runs once when the server starts. In production the back office refuses
@@ -20,6 +21,9 @@ export function register() {
     ],
     invariants: [
       noPublicSecrets,
+      // Admin writes the storefront's cache invalidations straight to Redis
+      // (lib/storefront-cache.ts), so it must agree on where that cache is.
+      () => cacheConfigProblem(),
       () => {
         const auth = process.env.NEXT_PUBLIC_AUTH_SUPABASE_URL?.replace(/\/$/, "");
         const storefront = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");

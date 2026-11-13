@@ -77,11 +77,17 @@ export function isEbookStorageConfigured(): boolean {
 
 /** Filesystem-safe object name from a user-supplied filename, keeping the last 80 chars. */
 function safeObjectName(fileName: string): string {
-  return fileName
-    .toLowerCase()
-    .replace(/[^a-z0-9.]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(-80);
+  return (
+    fileName
+      .toLowerCase()
+      // Each run of anything else becomes a single "-", so there's at most
+      // one dash at either end to trim — with single-dash anchors, not
+      // /^-+|-+$/, whose `-+$` backtracks polynomially on long dash runs.
+      .replace(/[^a-z0-9.]+/g, "-")
+      .replace(/^-/, "")
+      .replace(/-$/, "")
+      .slice(-80)
+  );
 }
 
 /**
@@ -165,12 +171,7 @@ export async function deleteEbookFile(path: string): Promise<void> {
  * `url` is the bucket's permanent public URL for the object.
  */
 export async function uploadImage(file: File | Blob, fileName: string): Promise<{ url: string; path: string }> {
-  const safeName = fileName
-    .toLowerCase()
-    .replace(/[^a-z0-9.]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(-80);
-  const path = `${crypto.randomUUID()}-${safeName}`;
+  const path = `${crypto.randomUUID()}-${safeObjectName(fileName)}`;
 
   const supabase = storageServiceClient();
   const { error } = await supabase.storage.from(IMAGE_BUCKET).upload(path, file, {

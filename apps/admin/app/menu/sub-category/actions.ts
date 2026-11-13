@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cmsChangedTags } from "@repo/cache/tags";
 import { revalidateStorefront } from "@/lib/storefront-cache";
 import { prisma, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
@@ -41,7 +42,7 @@ export async function createMenuProduct(formData: FormData) {
     },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("menu"));
   revalidatePath("/menu/sub-category");
   revalidatePath("/", "layout");
   redirect("/menu/sub-category?created=1");
@@ -70,7 +71,7 @@ export async function toggleMenuProduct(id: string) {
     },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("menu"));
   revalidatePath("/menu/sub-category");
   revalidatePath("/", "layout");
 }

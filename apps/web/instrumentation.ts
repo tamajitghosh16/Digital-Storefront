@@ -1,4 +1,6 @@
-import { checkEnvironment, noPublicSecrets } from "@repo/security/env";
+import { checkEnvironment, deploymentEnv, noPublicSecrets } from "@repo/security/env";
+import { cacheConfigProblem } from "@repo/cache/env";
+import { siteUrlProblem } from "@/lib/site-url";
 
 /**
  * Runs once when the server starts. In production, security-critical
@@ -16,6 +18,8 @@ export function register() {
     ],
     invariants: [
       noPublicSecrets,
+      () => cacheConfigProblem(),
+      siteUrlProblem,
       () =>
         process.env.RAZORPAY_KEY_ID && !process.env.RAZORPAY_WEBHOOK_SECRET
           ? "RAZORPAY_KEY_ID is set but RAZORPAY_WEBHOOK_SECRET is not — every webhook would be rejected and paid orders would stay PENDING"
@@ -23,7 +27,7 @@ export function register() {
       () =>
         process.env.NODE_ENV === "production" &&
         process.env.RAZORPAY_KEY_ID?.startsWith("rzp_test_") &&
-        process.env.VERCEL_ENV === "production"
+        deploymentEnv() === "production"
           ? "Production deployment is using Razorpay TEST keys"
           : null,
     ],

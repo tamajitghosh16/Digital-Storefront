@@ -1,9 +1,10 @@
-import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@repo/database";
+import { productEntryTags } from "@repo/cache/tags";
 import { withFallback } from "@/lib/safe-fetch";
+import { productsCache, reviveProduct } from "@/lib/products-cache";
 import { findSampleProduct, SERVICE_ADDONS } from "@/lib/sample-data";
 import { formatINRWhole } from "@/lib/format";
 import {
@@ -20,17 +21,31 @@ import {
 } from "@/components/primitives";
 import { AddToCartButton } from "@/components/commerce/add-to-cart-button";
 
-/** `cache()`d so generateMetadata and the page share one lookup per request. */
-const loadProduct = cache(
-  async (slug: string) =>
-    (await withFallback(() => prisma.product.findUnique({ where: { slug } }), null)) ?? findSampleProduct(slug)
+/**
+ * The product at this slug, cached under `product:<slug>` and
+ * `catalogue:services`; generateMetadata and the page share one lookup per
+ * request through the cache.
+ */
+const cachedServiceRow = productsCache(
+  "service-row",
+  (slug: string) => productEntryTags("services", slug),
+  (slug: string) => prisma.product.findUnique({ where: { slug } })
 );
+
+async function loadProduct(slug: string) {
+  return (await withFallback(async () => reviveProduct(await cachedServiceRow(slug)), null)) ?? findSampleProduct(slug);
+}
+
+/** Only a published service package has a page here — a draft or another product type is a 404. */
+function isListedService(product: Awaited<ReturnType<typeof loadProduct>>): product is NonNullable<typeof product> {
+  return !!product && product.type === "SERVICE_PACKAGE" && product.isPublished;
+}
 
 // Admin-controlled per-product SEO — see the apps/admin catalogue form.
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const product = await loadProduct(slug);
-  if (!product) return {};
+  if (!isListedService(product)) return {};
   return {
     title: product.metaTitle || product.title,
     description: product.metaDescription || product.description || undefined,
@@ -49,7 +64,7 @@ const PROCESS = [
 export default async function ServiceDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const product = await loadProduct(slug);
-  if (!product || product.type !== "SERVICE_PACKAGE") notFound();
+  if (!isListedService(product)) notFound();
 
   const features = (product.description ?? "").split("\n").filter(Boolean);
 

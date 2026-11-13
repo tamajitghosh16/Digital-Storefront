@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@repo/ui/utils";
+import { LOW_STOCK_MAX, SAME_DAY_MIN } from "@repo/cache/policy";
 import { Callout, Stars } from "@/components/primitives";
 import { formatINRWhole } from "@/lib/format";
 import { BookJacket, ProductShot } from "./book-jacket";
@@ -47,8 +48,8 @@ function fulfilment(product: ProductTileData): { text: string; tone: string } {
   if (product.stockQty === null) return { text: "Ships in 2 days", tone: "text-ok" };
   const stock = product.stockQty ?? 0;
   if (stock <= 0) return { text: "Out of stock", tone: "text-sale" };
-  if (stock < 10) return { text: `Only ${stock} left`, tone: "text-warn" };
-  if (stock >= 30) return { text: "Same Day Delivery — Kolkata", tone: "text-ok" };
+  if (stock < LOW_STOCK_MAX) return { text: `Only ${stock} left`, tone: "text-warn" };
+  if (stock >= SAME_DAY_MIN) return { text: "Same Day Delivery — Kolkata", tone: "text-ok" };
   return { text: "Ships in 2 days", tone: "text-ok" };
 }
 

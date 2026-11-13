@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cmsChangedTags } from "@repo/cache/tags";
 import { revalidateStorefront } from "@/lib/storefront-cache";
 import { Prisma, prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
@@ -23,7 +24,7 @@ export async function createFaq(formData: FormData) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "faq.created", entity: "Faq", entityId: faq.id, diff: parsed.data as Prisma.InputJsonValue },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("faqs"));
   revalidatePath("/content/faqs");
   redirect("/content/faqs");
 }
@@ -43,7 +44,7 @@ export async function updateFaq(id: string, formData: FormData) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "faq.updated", entity: "Faq", entityId: id, diff: parsed.data as Prisma.InputJsonValue },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("faqs"));
   revalidatePath("/content/faqs");
   revalidatePath(`/content/faqs/${id}`);
   redirect("/content/faqs");
@@ -60,7 +61,7 @@ export async function toggleFaqActive(id: string) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "faq.toggled", entity: "Faq", entityId: id, diff: { isActive: !existing.isActive } },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("faqs"));
   revalidatePath("/content/faqs");
 }
 
@@ -74,6 +75,6 @@ export async function deleteFaq(id: string) {
     data: { actorId: user!.id, actorEmail: user!.email, action: "faq.deleted", entity: "Faq", entityId: id, diff: Prisma.JsonNull },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("faqs"));
   revalidatePath("/content/faqs");
 }

@@ -1,38 +1,39 @@
 import "server-only";
-import { unstable_cache } from "next/cache";
+import { cachedQuery } from "@repo/cache/query";
+import { TTL } from "@repo/cache/policy";
 import type { Product } from "@repo/database";
 
 /**
- * Cached catalogue reads — product listings, detail lookups and the
- * homepage's product rows.
+ * Cached catalogue reads — product listings, detail lookups, related rows,
+ * the homepage's product rows, the services list, cart covers.
  *
- * Why: the shared Postgres is a Supabase pooler in another region, so a
- * listing page's two queries cost the shopper ~2s before the first byte.
- * Products change only when staff save them in apps/admin, so they're
- * cached the same way `lib/cms.ts` caches CMS data: every entry carries
- * {@link PRODUCTS_CACHE_TAG}, apps/admin's product Server Actions ping this
- * app's `/api/revalidate` after each save (apps/admin/lib/storefront-cache.ts),
- * and that expires the tag at once. {@link PRODUCTS_REVALIDATE_SECONDS} is
- * only the backstop for when the ping never arrives.
+ * Why: the shared Postgres is a pooler a round trip away, so a listing
+ * page's two queries cost the shopper real time before the first byte, for
+ * data that only changes when staff save it in apps/admin or an order moves
+ * stock.
+ *
+ * Every reader names its tags (packages/cache/src/tags.ts): listings carry
+ * `catalogue:<line>`, single products also `product:<slug>`. apps/admin
+ * expires the tags of what it saved, and checkout expires only the product
+ * pages whose stock moved (lib/stock.ts), so one edit or one order no
+ * longer empties the whole catalogue. `TTL.catalogue` is the backstop for a
+ * lost signal.
  *
  * Still read live, never through here: anything per-user (wishlist,
  * library, orders) and everything checkout prices or stock-checks a charge
  * from — `startCheckout` re-reads each `Product` itself, so a cached price
  * or stock figure can never reach a payment.
  *
- * `unstable_cache` round-trips values through JSON, so `Date` columns come
- * back as strings; {@link reviveProduct} / {@link reviveDates} turn them
- * back into Dates for callers.
+ * Values round-trip through JSON, so `Date` columns come back as strings;
+ * {@link reviveProduct} / {@link reviveDates} turn them back into Dates.
  */
-
-export const PRODUCTS_CACHE_TAG = "products";
-const PRODUCTS_REVALIDATE_SECONDS = 60;
-
-export function productsCache<A extends unknown[], R>(key: string, fn: (...args: A) => Promise<R>) {
-  return unstable_cache(fn, ["products", key], {
-    tags: [PRODUCTS_CACHE_TAG],
-    revalidate: PRODUCTS_REVALIDATE_SECONDS,
-  });
+export function productsCache<A extends unknown[], R>(
+  name: string,
+  // `NoInfer`: the arguments come from the query; the tags function may take fewer.
+  tags: NoInfer<(...args: A) => readonly string[]>,
+  query: (...args: A) => Promise<R>
+): (...args: A) => Promise<R> {
+  return cachedQuery({ name: `products:${name}`, ttl: TTL.catalogue, tags }, query);
 }
 
 type DateFields = "publishedAt" | "createdAt" | "updatedAt";

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { productChangedTags } from "@repo/cache/tags";
 import { revalidateStorefront } from "@/lib/storefront-cache";
 import { prisma, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
@@ -24,8 +25,9 @@ import { deleteInventoryProduct, type DeleteProductResult } from "@/lib/delete-p
  * Same guarantees as the Books actions: `assertRole(CATALOGUE_WRITE_ROLES)`
  * (the middleware check is a UX redirect, not a security boundary — see the
  * root CLAUDE.md), a validated payload, an `AuditLog` row, a
- * `revalidatePath` of the affected pages, and `revalidateStorefront()` so
- * the storefront's cached product reads pick the change up at once.
+ * `revalidatePath` of the affected pages, and `revalidateStorefront()` with
+ * the item's tags so exactly its storefront pages and listing pick the
+ * change up at once.
  */
 
 function toProductData(slug: string, raw: SimpleProductFormValues) {
@@ -85,7 +87,7 @@ export async function createLineProduct(slug: string, formData: FormData) {
     },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(productChangedTags(product), [product.id]);
   revalidatePath(base);
   redirect(`${base}?created=1`);
 }
@@ -105,7 +107,7 @@ export async function updateLineProduct(slug: string, id: string, formData: Form
   // Don't reset the original publish timestamp just because the item stayed published.
   if (existing.isPublished && parsed.data.isPublished) data.publishedAt = existing.publishedAt;
 
-  await prisma.product.update({ where: { id }, data });
+  const updated = await prisma.product.update({ where: { id }, data });
 
   await prisma.auditLog.create({
     data: {
@@ -118,7 +120,7 @@ export async function updateLineProduct(slug: string, id: string, formData: Form
     },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(productChangedTags(existing, updated), [id]);
   revalidatePath(base);
   revalidatePath(`${base}/${id}`);
   redirect(base);
@@ -147,7 +149,7 @@ export async function toggleLineProductPublished(slug: string, id: string) {
     },
   });
 
-  revalidateStorefront();
+  revalidateStorefront(productChangedTags(existing), [id]);
   revalidatePath(lineBasePath(slug));
 }
 
@@ -157,9 +159,9 @@ export async function deleteLineProduct(slug: string, id: string): Promise<Delet
   assertRole(user?.role, CATALOGUE_WRITE_ROLES);
 
   const result = await deleteInventoryProduct(id, getProductLineConfig(slug).productLine, user!);
-  if (result.error) return result;
+  if (result.error) return { error: result.error };
 
-  revalidateStorefront();
+  revalidateStorefront(productChangedTags(result.deleted));
   revalidatePath(lineBasePath(slug));
   return {};
 }

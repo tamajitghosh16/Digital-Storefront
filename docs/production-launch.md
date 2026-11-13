@@ -60,8 +60,9 @@ from launch scope. Source: README.md "What's real vs. what's a stub" and
       business actually operates (return window, dispatch time, refunds).
 
 **SEO basics** — built: `app/sitemap.ts` (static pages + every published
-product, hourly) and `app/robots.ts` (blocks everything outside Vercel
-Production). Set `NEXT_PUBLIC_STOREFRONT_URL` on the web project so their URLs
+product, hourly) and `app/robots.ts` (blocks everything outside the
+production deployment — Vercel's `VERCEL_ENV`, or `DEPLOY_ENV` on any other
+host). Set `NEXT_PUBLIC_STOREFRONT_URL` on the web project so their URLs
 use the canonical domain.
 
 **Quality gate**
@@ -80,7 +81,7 @@ turn on 2FA for every one of them.
 
 | Service | Plan for production | Why not free |
 |---|---|---|
-| **Vercel** | Pro (one team, two projects) | Hobby forbids commercial use. |
+| **Vercel** — or **Hostinger** | Vercel Pro (one team, two projects), or Hostinger Business / Cloud web hosting (see "Hosting on Hostinger" after Phase 7) | Vercel Hobby forbids commercial use; Hostinger Single/Premium can't run Node.js. |
 | **Supabase** × 2 | Pro for **storefront**; admin-auth can stay Free | Free projects pause after a week of inactivity and have no daily backups. A paused storefront DB = site down. |
 | **Razorpay** | Standard (KYC) | Live keys need business KYC + website review (allow 2–7 working days). |
 | **Resend** | Free tier is fine to start | Needs your domain verified. |
@@ -206,9 +207,13 @@ In the **storefront** project → Authentication:
    paid on `payment.captured`.
 5. Keep a **separate test-mode webhook** pointing at staging.
 
-**Upstash Redis (rate limiting)**
+**Upstash Redis (rate limiting, and the data cache on Hostinger)**
 - Create one Redis DB in Mumbai → `UPSTASH_REDIS_REST_URL` /
   `UPSTASH_REDIS_REST_TOKEN`; use the same values on both apps.
+- On Hostinger (or any self-hosted run) it also holds the storefront's data
+  cache: see `CACHE_STORE` / `CACHE_NAMESPACE` under "Hosting on Hostinger"
+  and `docs/adr/0001-caching-strategy.md`. Give staging its own namespace
+  (or its own DB) so it never reads production's cache.
 
 **Cloudmersive** — only if customer uploads ship: API key →
 `CLOUDMERSIVE_API_KEY` on web.
@@ -252,6 +257,7 @@ separately, and tick **Sensitive** on every secret.
 | `RESEND_API_KEY`, `EMAIL_FROM` | ✓ | ✓ | |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | ✓ | ✓ | |
 | `STOREFRONT_REVALIDATE_SECRET` | ✓ | ✓ | same value both |
+| `CACHE_STORE` / `CACHE_NAMESPACE` | — | — | leave **unset** on Vercel (its data cache is already shared); `redis` + a namespace on Hostinger |
 | `NEXT_PUBLIC_STOREFRONT_URL` | ✓ | ✓ | `https://www.<domain>` (web: sitemap/robots URLs) |
 | `NEXT_PUBLIC_ADMIN_URL` | — | ✓ | `https://admin.<domain>` (required in prod) |
 | `CLOUDMERSIVE_API_KEY` | ✓ if uploads | — | |
@@ -277,6 +283,112 @@ deployment's Runtime Logs first.
 5. Re-check that every URL used so far (Supabase Site/Redirect URLs, Razorpay
    webhook, `NEXT_PUBLIC_*_URL`) uses the final hostnames, then **redeploy
    both projects** so the `NEXT_PUBLIC_*` values are baked into the build.
+
+---
+
+## Hosting on Hostinger (instead of Phases 6–7)
+
+Use this when the apps run on Hostinger's managed Node.js hosting instead of
+Vercel. It needs **Business** or **Cloud** web hosting; Single and Premium
+can't run Node.js. Business allows 5 Node.js websites and shares 2 CPU cores /
+3 GB RAM across everything on the plan; Cloud Startup allows 10 with 4 cores /
+4 GB. A VPS also works, but then you run `node server.js`, a reverse proxy,
+TLS and restarts yourself.
+
+**Not yet proven on a real Hostinger deploy:** the npm-workspaces install,
+how Hostinger starts the standalone server from a monorepo build, attaching
+the `admin.` subdomain, and which data centre the site lands in. Do a trial
+deploy of `web` on a throwaway subdomain before pointing the real domain at it.
+
+**Before you start**
+- If hPanel already created a website on the domain (e.g. a WordPress
+  starter), delete it first — the Node.js flow expects a fresh slot for the
+  domain.
+- Install the Hostinger GitHub App on the repo.
+- If hPanel offers a choice of data centre, pick India, next to Supabase
+  Mumbai.
+
+**Two Node.js websites from the same repo** (hPanel → Websites → Add
+website → Node.js app → import from GitHub):
+
+| Setting | web | admin |
+|---|---|---|
+| Domain | `www.<domain>` | `admin.<domain>` |
+| Framework | Next.js | Next.js |
+| Branch | `main` | `main` |
+| Root directory | `/` (repo root) | `/` (repo root) |
+| Node.js version | 22 | 22 |
+| Package manager | npm | npm |
+| Build script | `build:web` | `build:admin` |
+| Output directory | `apps/web/.next` | `apps/admin/.next` |
+
+The root directory is the repo root because both apps import `packages/*`
+through npm workspaces; an install from inside `apps/web` can't resolve the
+`@repo/*` packages. `build:web` / `build:admin` (root `package.json`) build
+one app. Both `next.config.ts` files already set `output: "standalone"`
+(Hostinger forces it anyway) with file tracing from the repo root, so the
+Prisma client and the image optimizer's `sharp` are copied into the build.
+To reproduce what Hostinger runs on your own machine:
+
+```bash
+npm run build:web
+cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+PORT=3200 node --env-file=apps/web/.env.local apps/web/.next/standalone/apps/web/server.js
+```
+
+**Environment variables.** The same per-app lists as the Phase 6 table, plus
+`DEPLOY_ENV=production` on **web** (it stands in for `VERCEL_ENV`: robots.txt
+allows indexing and the app refuses to boot with Razorpay test keys). Use
+"Import .env" in the website's Environment variables page. Set everything
+**before the first build**: `NEXT_PUBLIC_*` values and robots.txt are fixed at
+build time. Saving a variable redeploys the site. Hostinger has no Preview
+environment, so these are production values only; a staging copy is another
+Node.js website with `DEPLOY_ENV=staging`, the staging Supabase projects and
+Razorpay test keys.
+
+**Data cache in Redis.** Hostinger keeps each process's cache in its own
+memory and disk, loses it on every redeploy or idle stop, and runs the bare
+domain and `www` as separate processes. So on **both** sites set
+`CACHE_STORE=redis` and `CACHE_NAMESPACE=prod` (`staging` on a staging copy),
+alongside the Upstash variables, before the build. The storefront's data
+cache then lives in Upstash, shared and kept across restarts, and admin
+writes invalidations straight into it — a save shows on the storefront's
+next page view even if the storefront was asleep when it was made. Both apps
+refuse to boot with `CACHE_STORE=redis` but no Upstash credentials or
+namespace. After the first deploy, the web site's runtime log shows a
+`cache.stats` line a minute; a `cache.store_unavailable` line means Redis
+couldn't be reached and pages were read from the database instead (see
+`docs/adr/0001-caching-strategy.md`).
+
+If you go live before Razorpay's live keys arrive, leave the four
+`RAZORPAY_*` variables unset — cash on delivery is then the only payment
+method. Don't run the live site on test keys; with `DEPLOY_ENV=production`
+it won't boot with them.
+
+**Domains and DNS.** The domain is registered at Hostinger, so every record
+(Resend's SPF/DKIM/DMARC, Search Console's TXT) goes in hPanel → Domains →
+DNS. Hostinger runs `<domain>` and `www.<domain>` as separate processes, which
+count against the plan's process limit — make `www` canonical and redirect
+the bare domain to it. Check that SSL is active on `www.` and `admin.`
+before going on (the HSTS note in Phase 7 step 4 applies), then Phase 7
+step 5: re-check every URL and redeploy both sites.
+
+**Platform limits that matter here**
+- A site with no traffic for a while is stopped and starts again on the next
+  request, so the first visitor after a quiet spell waits. Razorpay retries
+  webhook deliveries that fail or time out, so a cold start doesn't lose a
+  payment.
+- Requests stop after 120 seconds, and there are no background workers.
+  The app has neither (no job queue — see root `CLAUDE.md`); Hostinger's
+  cron jobs are there if a scheduled task is ever needed.
+- CPU, RAM and the process limit are shared plan-wide: both apps, the bare
+  domain, and any other site on the plan.
+- There are no preview deployments and no Instant Rollback. Roll back by
+  redeploying an earlier commit; migrations still aren't rolled back.
+- `post-deploy.yml` listens for GitHub deployment statuses, which only
+  Vercel reports, so it won't run. Run the checks against the live URL by
+  hand instead (`E2E_WEB_URL` / `E2E_ADMIN_URL`, see `docs/testing.md`).
 
 ---
 
@@ -332,7 +444,7 @@ list on production.
 6. Announce.
 
 **Rollback:** Vercel → Deployments → previous deployment → "Instant
-Rollback" (seconds). Database migrations are **not** rolled back by this —
+Rollback" (seconds); on Hostinger, redeploy the previous commit. Database migrations are **not** rolled back by this —
 which is why migrations should be additive (add columns/tables first, remove
 old ones in a later release).
 

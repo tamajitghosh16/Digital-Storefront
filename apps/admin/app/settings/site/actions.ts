@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cmsChangedTags } from "@repo/cache/tags";
 import { revalidateStorefront } from "@/lib/storefront-cache";
 import { prisma, SITE_SETTINGS_ID, type Prisma } from "@repo/database";
 import { getCurrentStaff } from "@repo/auth/server";
@@ -54,7 +55,7 @@ export async function updateSiteSettings(formData: FormData) {
   // revalidatePath() call here only affects admin's own cache. apps/web
   // caches site settings (apps/web/lib/cms.ts), so it's told to drop that
   // cache explicitly.
-  revalidateStorefront();
+  revalidateStorefront(cmsChangedTags("settings"));
   revalidatePath("/settings/site");
   redirect("/settings/site?saved=1");
 }

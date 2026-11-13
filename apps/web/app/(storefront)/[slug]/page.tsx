@@ -1,7 +1,9 @@
-import { cache } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { prisma } from "@repo/database";
+import { cachedQuery } from "@repo/cache/query";
+import { TTL } from "@repo/cache/policy";
+import { cmsEntryTags } from "@repo/cache/tags";
 import { withFallback } from "@/lib/safe-fetch";
 import { DummyPage } from "@/components/marketing/dummy-page";
 
@@ -16,18 +18,24 @@ import { DummyPage } from "@/components/marketing/dummy-page";
 
 /**
  * The product or category at this slug, looked up together rather than
- * product-then-category, and `cache()`d so generateMetadata and the page
- * share the one pair of queries.
+ * product-then-category. Cached under `cms:menu`, which any Products Menu
+ * save in apps/admin expires — including a miss, so a bot walking random
+ * slugs costs one lookup per slug per `TTL.cms`, not two queries per hit.
+ * generateMetadata and the page share one lookup per request.
  */
-const loadMenuEntry = cache((slug: string) =>
+const cachedMenuEntry = cachedQuery({ name: "cms:menu-entry", ttl: TTL.cms, tags: cmsEntryTags("menu") }, (slug: string) =>
   Promise.all([
-    withFallback(
-      () => prisma.menuProduct.findFirst({ where: { slug, isActive: true }, include: { category: true } }),
-      null
-    ),
-    withFallback(() => prisma.menuCategory.findFirst({ where: { slug, isActive: true } }), null),
+    prisma.menuProduct.findFirst({
+      where: { slug, isActive: true },
+      select: { name: true, category: { select: { name: true } } },
+    }),
+    prisma.menuCategory.findFirst({ where: { slug, isActive: true }, select: { name: true } }),
   ])
 );
+
+function loadMenuEntry(slug: string) {
+  return withFallback(() => cachedMenuEntry(slug), [null, null] as Awaited<ReturnType<typeof cachedMenuEntry>>);
+}
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;

@@ -4,6 +4,9 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { getCurrentUser } from "@repo/auth/server";
 import { parseLineId, prisma } from "@repo/database";
+import { cachedQuery } from "@repo/cache/query";
+import { TTL } from "@repo/cache/policy";
+import { COVER_ENTRY_TAGS } from "@repo/cache/tags";
 import { isHttpsUrl } from "@repo/security/href";
 import { RATE_LIMITS, clientIp, rateLimit } from "@repo/security/rate-limit";
 import type { CartItem } from "@/lib/cart-store";
@@ -67,6 +70,19 @@ export async function getCartStock(lineIds: string[]): Promise<CartStock | null>
 export type CartCovers = Record<string, string | null>;
 
 /**
+ * One product's cover URL, cached per product under `catalogue:covers`
+ * (which any staff product save expires), so every cart holding a title
+ * shares one entry. Covers are public and display-only — unlike stock above,
+ * nothing is charged from them.
+ */
+const cachedCover = cachedQuery(
+  { name: "products:cover", ttl: TTL.catalogue, tags: COVER_ENTRY_TAGS },
+  async (productId: string) =>
+    (await prisma.product.findUnique({ where: { id: productId }, select: { coverImageUrl: true } }))?.coverImageUrl ??
+    null
+);
+
+/**
  * Each cart line's current cover, so a line added before it carried one (or
  * whose cover staff have since replaced) shows the real scan. Only `https`
  * URLs are returned — the same check every other cover render applies.
@@ -81,11 +97,9 @@ export async function getCartCovers(lineIds: string[]): Promise<CartCovers | nul
   if (!(await rateLimit(RATE_LIMITS.catalogueApi, identity)).ok) return null;
 
   const lines = ids.map((id) => ({ id, productId: parseLineId(id).productId }));
-  const products = await prisma.product.findMany({
-    where: { id: { in: [...new Set(lines.map((line) => line.productId))] } },
-    select: { id: true, coverImageUrl: true },
-  });
-  const byId = new Map(products.map((product) => [product.id, product.coverImageUrl]));
+  const productIds = [...new Set(lines.map((line) => line.productId))];
+  const urls = await Promise.all(productIds.map((productId) => cachedCover(productId)));
+  const byId = new Map(productIds.map((productId, index) => [productId, urls[index]]));
 
   const covers: CartCovers = {};
   for (const line of lines) {

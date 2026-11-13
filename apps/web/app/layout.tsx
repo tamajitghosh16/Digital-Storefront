@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { ContactButtons } from "@/components/layout/contact-buttons";
 import { ThemeProvider } from "@/components/layout/theme-provider";
+import { QueryProvider } from "@/components/layout/query-provider";
 import { WishlistProvider } from "@/components/commerce/wishlist-provider";
 import { CartSync } from "@/components/commerce/cart-sync";
 import { getCurrentUser } from "@repo/auth/server";
@@ -52,13 +53,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="en" data-scroll-behavior="smooth" className={inter.variable} suppressHydrationWarning>
       <body className="flex min-h-screen flex-col bg-page font-sans text-ink antialiased">
         <ThemeProvider nonce={nonce}>
-          <CartSync userId={userId} />
-          <WishlistProvider userId={userId}>
-            <SiteHeader />
-            <main className="flex-1">{children}</main>
-            <SiteFooter />
-            <ContactButtons whatsAppHref={whatsAppHref} emailHref={emailHref} />
-          </WishlistProvider>
+          <QueryProvider>
+            <CartSync userId={userId} />
+            <WishlistProvider userId={userId}>
+              <SiteHeader />
+              <main className="flex-1">{children}</main>
+              <SiteFooter />
+              <ContactButtons whatsAppHref={whatsAppHref} emailHref={emailHref} />
+            </WishlistProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

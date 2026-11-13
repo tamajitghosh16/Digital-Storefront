@@ -22,19 +22,22 @@
  * an empty catalogue until it is re-seeded. `docs/books-listing-scaling.md`
  * covers the index work that keeps this branch flat at 1M rows.
  *
- * Both reads are cached per (line, filters, cursor) under the `products`
- * tag (see `lib/products-cache`), so a repeat view or scroll page skips the
- * database entirely; an admin save expires them.
+ * Both reads are cached per (line, normalised filters, cursor) under the
+ * line's `catalogue:<line>` tag (see `lib/products-cache`), so a repeat
+ * view or scroll page skips the database entirely; an admin save to that
+ * line, or an order that sells a title out, expires them.
  */
 
 import { prisma, type Prisma, type ProductLine } from "@repo/database";
+import { listingEntryTags } from "@repo/cache/tags";
+import { SAME_DAY_MIN } from "@repo/cache/policy";
 import { withFallback } from "./safe-fetch";
 import { productsCache, reviveDates } from "./products-cache";
 import { applyFilters, sortListings } from "./books-filter";
 import { bookToListing, type BookListing } from "./books";
 import { decodeCursor, encodeCursor, paginateSorted, sortKey, type BookPage } from "./books-page";
 import { SAMPLE_BOOKS } from "./sample-data";
-import type { BookQuery } from "./books-query";
+import { canonicalBookQuery, type BookQuery } from "./books-query";
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -59,7 +62,7 @@ export async function fetchBookPage({
 }): Promise<BookPage> {
   return withFallback(
     async () => {
-      const page = await cachedBookPage(productLine, query, cursor, limit);
+      const page = await cachedBookPage(productLine, canonicalBookQuery(query), cursor, limit);
       return { ...page, items: page.items.map(reviveDates) };
     },
     productLine === "BOOK"
@@ -70,19 +73,22 @@ export async function fetchBookPage({
 
 export async function countBookListings(query: BookQuery, productLine: ProductLine = "BOOK"): Promise<number> {
   return withFallback(
-    () => cachedBookCount(productLine, query),
+    () => cachedBookCount(productLine, canonicalBookQuery(query)),
     productLine === "BOOK" ? applyFilters(sampleListings(), query).length : 0
   );
 }
 
 const cachedBookPage = productsCache(
   "listing-page",
+  (productLine: ProductLine) => listingEntryTags(productLine),
   (productLine: ProductLine, query: BookQuery, cursor: string | null, limit: number) =>
     fetchBookPageFromDb({ query, cursor, limit, productLine })
 );
 
-const cachedBookCount = productsCache("listing-count", (productLine: ProductLine, query: BookQuery) =>
-  prisma.product.count({ where: buildBookWhere(query, productLine) })
+const cachedBookCount = productsCache(
+  "listing-count",
+  (productLine: ProductLine) => listingEntryTags(productLine),
+  (productLine: ProductLine, query: BookQuery) => prisma.product.count({ where: buildBookWhere(query, productLine) })
 );
 
 // ---------------------------------------------------------------------------
@@ -186,7 +192,7 @@ function buildBookWhere(query: BookQuery, productLine: ProductLine): Prisma.Prod
     if (query.format === "hardcover") and.push({ editions: { some: { format: "HARDCOVER" } } });
     if (query.format === "ebook") and.push({ editions: { some: { format: "EBOOK" } } });
     if (query.classSet) and.push({ editions: { some: print } });
-    if (query.avail === "same-day") and.push({ editions: { some: { ...print, stockQty: { gte: 30 } } } });
+    if (query.avail === "same-day") and.push({ editions: { some: { ...print, stockQty: { gte: SAME_DAY_MIN } } } });
     if (query.avail === "in-stock") {
       // A null `stockQty` is "not tracked" — always orderable — and an
       // e-book never runs out.
@@ -197,7 +203,7 @@ function buildBookWhere(query: BookQuery, productLine: ProductLine): Prisma.Prod
   } else {
     // The other lines are one shipped product each, stocked on the row.
     if (query.format === "ebook") and.push({ id: { in: [] } });
-    if (query.avail === "same-day") and.push({ stockQty: { gte: 30 } });
+    if (query.avail === "same-day") and.push({ stockQty: { gte: SAME_DAY_MIN } });
     if (query.avail === "in-stock") and.push({ OR: [{ stockQty: { gt: 0 } }, { stockQty: null }] });
   }
   if (query.price === "lt1500") and.push({ priceCents: { lt: 150000 } });

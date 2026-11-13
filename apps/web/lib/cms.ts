@@ -1,7 +1,17 @@
 import "server-only";
-import { cache } from "react";
-import { unstable_cache } from "next/cache";
-import { getContent, getPricingConfig, getSiteSettings, prisma } from "@repo/database";
+import {
+  CONTENT_DEFAULTS,
+  DEFAULT_PRICING_CONFIG,
+  getSiteSettings,
+  loadContent,
+  loadPricingConfig,
+  prisma,
+  type ContentMap,
+  type PricingConfig,
+} from "@repo/database";
+import { cachedQuery } from "@repo/cache/query";
+import { TTL } from "@repo/cache/policy";
+import { cmsEntryTags, type CmsSection } from "@repo/cache/tags";
 
 /**
  * Cached reads of the admin-managed CMS data the storefront renders on
@@ -9,34 +19,35 @@ import { getContent, getPricingConfig, getSiteSettings, prisma } from "@repo/dat
  * the Products Menu, department visibility, and the homepage's banners,
  * testimonials and FAQs.
  *
- * Why: the shared Postgres is a Supabase pooler in another region, where a
- * single query costs a few hundred milliseconds. Uncached, the header,
- * footer and metadata alone made ~10 queries per page view for data that
- * changes a few times a week.
+ * Why: the shared Postgres is a Supabase pooler a round trip away, and
+ * uncached the header, footer and metadata alone made ~10 queries per page
+ * view for data that changes a few times a week.
  *
- * Freshness: everything here carries {@link CMS_CACHE_TAG}. apps/admin's CMS
- * Server Actions call this app's `/api/revalidate` after every save (see
- * apps/admin/lib/storefront-cache.ts), which expires the tag immediately.
- * {@link CMS_REVALIDATE_SECONDS} is only the backstop for when that ping
- * never arrives, e.g. `STOREFRONT_REVALIDATE_SECRET` unset in local dev.
+ * Freshness: each reader carries the `cms` umbrella tag plus its own
+ * section's (`cms:faqs`, `cms:menu`, … — packages/cache/src/tags.ts), and
+ * apps/admin expires exactly the section it saved (apps/admin/lib/
+ * storefront-cache.ts). `TTL.cms` is only the backstop for a lost signal.
+ * The caching layers themselves live in `cachedQuery()` (@repo/cache/query):
+ * per-request dedupe, in-flight coalescing, and Next's data cache — in
+ * Redis when `CACHE_STORE=redis`.
  *
  * Deliberately NOT cached here: products, stock and prices (those go
- * through `lib/products-cache.ts`, under their own tag), and anything
+ * through `lib/products-cache.ts`, under their own tags), and anything
  * checkout uses to compute a charge — checkout actions and the cart call
  * `getPricingConfig()` directly.
  *
- * `unstable_cache` round-trips values through JSON, so rows are returned
- * without their `createdAt`/`updatedAt` Dates rather than with Date-typed
- * fields that would really be strings. Each reader is also wrapped in React
- * `cache()` so concurrent callers in one render (metadata, header, footer)
- * share a single cache lookup — and, on a miss, a single query.
+ * A database error is never cached: content and pricing are read with the
+ * throwing loaders inside the cache, and fall back to the shipped defaults
+ * outside it, so a blip costs one page its overrides rather than pinning
+ * the defaults for `TTL.cms`.
+ *
+ * Values round-trip through JSON, so rows are returned without their
+ * `createdAt`/`updatedAt` Dates rather than with Date-typed fields that
+ * would really be strings.
  */
 
-export const CMS_CACHE_TAG = "cms";
-const CMS_REVALIDATE_SECONDS = 60;
-
-function cmsCache<T>(key: string, fn: () => Promise<T>): () => Promise<T> {
-  return cache(unstable_cache(fn, ["cms", key], { tags: [CMS_CACHE_TAG], revalidate: CMS_REVALIDATE_SECONDS }));
+function cmsRead<R>(name: string, section: CmsSection, query: () => Promise<R>): () => Promise<R> {
+  return cachedQuery({ name: `cms:${name}`, ttl: TTL.cms, tags: cmsEntryTags(section) }, query);
 }
 
 type Timestamped = { createdAt?: Date; updatedAt?: Date };
@@ -50,23 +61,42 @@ function withoutTimestamps<T extends Timestamped>(row: T): WithoutTimestamps<T> 
 }
 
 /** Throws on a database error — callers wrap it in `withFallback()`. */
-export const getCachedSiteSettings = cmsCache("site-settings", async () =>
+export const getCachedSiteSettings = cmsRead("site-settings", "settings", async () =>
   withoutTimestamps(await getSiteSettings())
 );
 
+const cachedPricingConfig = cmsRead("pricing", "pricing", () => loadPricingConfig());
+
 /** For display only (promo bar, buy box). Never price a charge off this — see above. */
-export const getCachedPricingConfig = cmsCache("pricing", () => getPricingConfig());
+export async function getCachedPricingConfig(): Promise<PricingConfig> {
+  try {
+    return await cachedPricingConfig();
+  } catch (error) {
+    console.error("[cms] pricing settings unavailable; showing the defaults", error);
+    return DEFAULT_PRICING_CONFIG;
+  }
+}
 
-export const getCachedContent = cmsCache("content", () => getContent());
+const cachedContent = cmsRead("content", "content", () => loadContent());
 
-export const getCachedFooterLinks = cmsCache("footer-links", async () =>
+/** Never throws: the shipped copy stands in when the database can't be read. */
+export async function getCachedContent(): Promise<ContentMap> {
+  try {
+    return await cachedContent();
+  } catch (error) {
+    console.error("[cms] page copy unavailable; showing the defaults", error);
+    return CONTENT_DEFAULTS;
+  }
+}
+
+export const getCachedFooterLinks = cmsRead("footer-links", "nav", async () =>
   (
     await prisma.navLink.findMany({ where: { location: "FOOTER", isActive: true }, orderBy: { order: "asc" } })
   ).map(withoutTimestamps)
 );
 
 /** Active Products Menu categories with their active products, in menu order. */
-export const getCachedMenuCategories = cmsCache("menu-categories", async () =>
+export const getCachedMenuCategories = cmsRead("menu-categories", "menu", async () =>
   (
     await prisma.menuCategory.findMany({
       where: { isActive: true },
@@ -77,22 +107,22 @@ export const getCachedMenuCategories = cmsCache("menu-categories", async () =>
 );
 
 /** Keys of the built-in departments an operator has hidden from the department bar. */
-export const getCachedHiddenDepartmentKeys = cmsCache("hidden-departments", async () =>
+export const getCachedHiddenDepartmentKeys = cmsRead("hidden-departments", "menu", async () =>
   (await prisma.departmentVisibility.findMany({ where: { hidden: true }, select: { key: true } })).map(
     (row) => row.key
   )
 );
 
-export const getCachedBanners = cmsCache("banners", async () =>
+export const getCachedBanners = cmsRead("banners", "banners", async () =>
   (await prisma.banner.findMany({ where: { isActive: true }, orderBy: { order: "asc" } })).map(withoutTimestamps)
 );
 
-export const getCachedTestimonials = cmsCache("testimonials", async () =>
+export const getCachedTestimonials = cmsRead("testimonials", "testimonials", async () =>
   (await prisma.testimonial.findMany({ where: { isActive: true }, orderBy: { order: "asc" } })).map(
     withoutTimestamps
   )
 );
 
-export const getCachedFaqs = cmsCache("faqs", async () =>
+export const getCachedFaqs = cmsRead("faqs", "faqs", async () =>
   (await prisma.faq.findMany({ where: { isActive: true }, orderBy: { order: "asc" } })).map(withoutTimestamps)
 );

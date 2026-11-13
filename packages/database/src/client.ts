@@ -103,62 +103,81 @@ import {
   type PricingConfig,
 } from "./pricing";
 
-/** Every storefront copy string, with the Publisher's overrides applied. */
+/**
+ * Every storefront copy string, with the Publisher's overrides applied.
+ * Throws on a database error — for a caller that must not mistake an
+ * outage for "nothing overridden", such as a cache, which would then keep
+ * serving the defaults. Everyone else wants {@link getContent}.
+ */
+export async function loadContent(): Promise<ContentMap> {
+  const rows = await prisma.contentBlock.findMany();
+  return mergeContent(rows);
+}
+
+/** Every storefront copy string, with the Publisher's overrides applied; the shipped defaults if the database can't be read. */
 export async function getContent(): Promise<ContentMap> {
   try {
-    const rows = await prisma.contentBlock.findMany();
-    return mergeContent(rows);
+    return await loadContent();
   } catch {
     return mergeContent([]);
   }
 }
 
-/** The pricing rules the Publisher controls, as one serializable object. */
+/** The pricing rules the Publisher controls; the shipped defaults if the database can't be read. */
 export async function getPricingConfig(): Promise<PricingConfig> {
   try {
-    const [settings, tiers] = await Promise.all([
-      prisma.pricingSettings.findUnique({ where: { id: PRICING_SETTINGS_ID } }),
-      prisma.classSetTier.findMany({ where: { isActive: true }, orderBy: { quantity: "asc" } }),
-    ]);
-
-    const base = settings
-      ? {
-          delivery: {
-            freeOverCents: settings.freeDeliveryOverCents,
-            expressFeeCents: settings.expressFeeCents,
-            sameDayFeeCents: settings.sameDayFeeCents,
-            standardEta: settings.standardEta,
-            expressEta: settings.expressEta,
-            sameDayEta: settings.sameDayEta,
-          },
-          bundleEbookAddCents: settings.bundleEbookAddCents,
-          gstRates: {
-            PHYSICAL_BOOK: 0,
-            EBOOK: bpsToRate(settings.ebookGstBps),
-            SERVICE_PACKAGE: bpsToRate(settings.serviceGstBps),
-          },
-          classSetBaseCents: settings.classSetBaseCents,
-        }
-      : {
-          delivery: DEFAULT_PRICING_CONFIG.delivery,
-          bundleEbookAddCents: DEFAULT_PRICING_CONFIG.bundleEbookAddCents,
-          gstRates: DEFAULT_PRICING_CONFIG.gstRates,
-          classSetBaseCents: DEFAULT_PRICING_CONFIG.classSetBaseCents,
-        };
-
-    return {
-      ...base,
-      // The single-copy tier is the price everything else is a discount off,
-      // so it's synthesised rather than trusted to exist in the table — the
-      // buy box indexes tier[0] and must never find it missing.
-      classSetTiers: [
-        { quantity: 1, discount: 0 },
-        ...tiers
-          .filter((tier) => tier.quantity > 1)
-          .map((tier) => ({ quantity: tier.quantity, discount: bpsToRate(tier.discountBps) })),
-      ],
-    };
+    return await loadPricingConfig();
   } catch {
     return DEFAULT_PRICING_CONFIG;
   }
+}
+
+/**
+ * The pricing rules the Publisher controls, as one serializable object.
+ * Throws on a database error, like {@link loadContent}; checkout and
+ * everyone else call {@link getPricingConfig}.
+ */
+export async function loadPricingConfig(): Promise<PricingConfig> {
+  const [settings, tiers] = await Promise.all([
+    prisma.pricingSettings.findUnique({ where: { id: PRICING_SETTINGS_ID } }),
+    prisma.classSetTier.findMany({ where: { isActive: true }, orderBy: { quantity: "asc" } }),
+  ]);
+
+  const base = settings
+    ? {
+        delivery: {
+          freeOverCents: settings.freeDeliveryOverCents,
+          expressFeeCents: settings.expressFeeCents,
+          sameDayFeeCents: settings.sameDayFeeCents,
+          standardEta: settings.standardEta,
+          expressEta: settings.expressEta,
+          sameDayEta: settings.sameDayEta,
+        },
+        bundleEbookAddCents: settings.bundleEbookAddCents,
+        gstRates: {
+          PHYSICAL_BOOK: 0,
+          EBOOK: bpsToRate(settings.ebookGstBps),
+          SERVICE_PACKAGE: bpsToRate(settings.serviceGstBps),
+        },
+        classSetBaseCents: settings.classSetBaseCents,
+      }
+    : {
+        delivery: DEFAULT_PRICING_CONFIG.delivery,
+        bundleEbookAddCents: DEFAULT_PRICING_CONFIG.bundleEbookAddCents,
+        gstRates: DEFAULT_PRICING_CONFIG.gstRates,
+        classSetBaseCents: DEFAULT_PRICING_CONFIG.classSetBaseCents,
+      };
+
+  return {
+    ...base,
+    // The single-copy tier is the price everything else is a discount off,
+    // so it's synthesised rather than trusted to exist in the table — the
+    // buy box indexes tier[0] and must never find it missing.
+    classSetTiers: [
+      { quantity: 1, discount: 0 },
+      ...tiers
+        .filter((tier) => tier.quantity > 1)
+        .map((tier) => ({ quantity: tier.quantity, discount: bpsToRate(tier.discountBps) })),
+    ],
+  };
 }

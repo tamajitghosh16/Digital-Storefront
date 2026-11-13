@@ -116,23 +116,60 @@ and piece of small print. All of it is edited from `apps/admin`
 `content/testimonials`); there's no API call to admin, just the same
 shared Postgres.
 
-**CMS data and catalogue reads are cached.** The database is a Supabase
-pooler a few hundred milliseconds away per query, so every CMS read the
-chrome and homepage make goes through `lib/cms.ts` — `unstable_cache`
-tagged `cms`, wrapped in React `cache()` for per-render dedupe, returned
-without `createdAt`/`updatedAt` (the cache round-trips through JSON).
-`apps/admin` expires the tag after each save via `app/api/revalidate`
-(bearer `STOREFRONT_REVALIDATE_SECRET`); a 60s expiry is the backstop.
-Read new CMS data through a `lib/cms.ts` reader, not Prisma directly.
-Never price a charge from `getCachedPricingConfig()` — checkout actions and
-the cart call `getPricingConfig()` live. Catalogue reads — listings
-(`lib/books-data.ts`), detail pages, the homepage's book rows — go through
-`lib/products-cache.ts` the same way, under a separate `products` tag the
-same `/api/revalidate` ping expires (admin sends it after every `Product`
-write). Anything per-user stays uncached, and checkout re-reads each
-`Product` live, so a cached price or stock figure never reaches a charge.
-Covers are served through the built-in `/_next/image` optimizer (resized
-WebP, cached a month) — originals are full-size scans. Per-product SEO
+**CMS data and catalogue reads are cached** (design:
+`docs/adr/0001-caching-strategy.md`). Every page renders on request, and
+the database is a pooler round trip away, so public data is cached at the
+data level through `cachedQuery()` (`@repo/cache/query`).
+
+**CMS.** Every CMS read the chrome and homepage make goes through a
+`lib/cms.ts` reader. Each carries `cms` plus its section's tag
+(`cms:faqs`, `cms:menu`, …), and returns rows without
+`createdAt`/`updatedAt`, because the cache round-trips through JSON.
+- Read new CMS data through a `lib/cms.ts` reader, not Prisma directly.
+- Content and pricing are loaded with the throwing
+  `loadContent`/`loadPricingConfig` inside the cache, so a database error
+  is never cached.
+- Never price a charge from `getCachedPricingConfig()`: checkout actions
+  and the cart call `getPricingConfig()` live.
+
+**Catalogue.** Listings (`lib/books-data.ts`, keyed on
+`canonicalBookQuery`), detail pages, related rows, the homepage's book
+rows, `/services`, `/services/[slug]` and cart covers all go through
+`lib/products-cache.ts`. Listings carry `catalogue:<line>`; a single
+product also carries `product:<slug>`. The Products Menu `[slug]` pages
+use `cms:menu`.
+
+**Expiry.**
+- apps/admin expires exactly what it saved, via `app/api/revalidate` (a
+  `{ tags, productIds }` body; bearer `STOREFRONT_REVALIDATE_SECRET`) and,
+  with `CACHE_STORE=redis`, by writing Redis directly.
+- Checkout expires only the product pages whose stock moved
+  (`lib/stock.ts`). It re-lists a title only when its tile would change:
+  low stock, sold out, or no longer same-day.
+- `TTL` (5 min, `@repo/cache/policy`) is the backstop.
+
+**With `CACHE_STORE=redis` at build time,** `next.config.ts` swaps in
+`cache-handler.mjs`, which keeps the data cache in Upstash Redis, shared
+across processes and restarts. The handler is plain JS loaded by Next
+outside the bundler, so it can't import workspace code;
+`testing/unit/cache-handler.test.ts` keeps its key scheme in step with
+`@repo/cache/keys`.
+
+**Never cached.** Anything per-user stays uncached, and checkout re-reads
+each `Product` live, so a cached price or stock figure never reaches a
+charge.
+
+**HTTP and client caching.**
+- `/api/books` is publicly cacheable: 60 s shared, 240 s stale, with an
+  ETag.
+- `public/` images and logos are cached for an hour.
+- In the browser, `components/layout/query-provider.tsx` (TanStack Query)
+  keeps `BooksGrid`'s scroll pages and the cart's covers. Cart stock is
+  never treated as fresh.
+- Covers are served through the built-in `/_next/image` optimizer
+  (resized WebP, cached a month); the originals are full-size scans.
+- Each process logs a `cache.stats` line a minute; `CACHE_DEBUG=1` logs
+  every miss. Per-product SEO
 metadata (`Product.metaTitle`/`metaDescription`/`ogImageUrl`, editable from
 the admin catalogue form) is rendered via `generateMetadata` on each of
 `books/[slug]`, `ebooks/[slug]`, and `services/[slug]`.

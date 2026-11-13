@@ -1,8 +1,13 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 import { NO_REFERRER_HEADERS, staticSecurityHeaders } from "@repo/security/headers";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@repo/ui", "@repo/auth", "@repo/database", "@repo/storage", "@repo/security"],
+  // Self-contained server in .next/standalone, traced from the repo root -
+  // see apps/web/next.config.ts.
+  output: "standalone",
+  outputFileTracingRoot: path.join(import.meta.dirname, "../.."),
+  transpilePackages: ["@repo/ui", "@repo/auth", "@repo/cache", "@repo/database", "@repo/storage", "@repo/security"],
   poweredByHeader: false,
   // Security headers on every response (the per-request CSP is set in
   // proxy.ts). Nothing in the back office may be cached by a browser or
